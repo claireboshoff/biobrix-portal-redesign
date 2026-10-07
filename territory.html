@@ -24,18 +24,18 @@ var css=''+
 '.pbar i{display:block;height:100%;background:var(--green-bright);}'+
 '.readout{background:#f7faf1;border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:11px;padding:14px 16px;margin-top:12px;}'+
 '.readout.warn{border-left-color:var(--amber);background:var(--amber-bg);}'+
-'.map-card{overflow:hidden;}'+
+'.map-card{position:relative;padding:0;}'+
 '.map-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line-soft);}'+
 '.map-tools .grp{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}'+
 '.map-tools .lbl{font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);margin-right:2px;}'+
 '.map-tools .sp{flex:1;}'+
 '.chip.tog{cursor:pointer;user-select:none;}'+
-'#vmap{height:520px;width:100%;background:#eef2e7;position:relative;z-index:0;}'+
+'#vmap{height:calc(100vh - var(--top) - 36px);min-height:560px;width:100%;background:#eef2e7;position:relative;z-index:0;border-radius:var(--radius);}'+
 '.t-col{display:grid;gap:16px;align-content:start;}'+
 '.rep{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:.84rem;} .rep i{width:8px;height:8px;border-radius:50%;flex:none;}'+
 '.crop-chip{display:inline-block;font-size:.72rem;padding:2px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);margin:2px 4px 2px 0;white-space:nowrap;color:var(--muted);}'+
 '.map-fallback .ico{width:30px;height:30px;color:var(--green-mid);}'+
-'@media(max-width:700px){#vmap{height:340px;} .map-tools .sp{display:none;}}'+
+'@media(max-width:700px){#vmap{height:72vh;min-height:420px;}}'+
 '.map-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:11px 14px;font-size:.74rem;color:var(--muted);border-top:1px solid var(--line-soft);}'+
 '.map-legend .k{display:inline-flex;align-items:center;gap:6px;}'+
 '.map-legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}'+
@@ -69,11 +69,61 @@ var css=''+
 '@keyframes tflash{0%{background:#d6eab3}100%{background:#eef6dc}}'+
 '.terr-split{display:grid;gap:16px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;margin-top:16px;}'+
 '.terr-split .map-card{position:sticky;top:calc(var(--top) + 12px);}'+
+'.mo{position:absolute;z-index:500;}'+
+'.mo-panel{background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px -8px rgba(18,33,12,.28);}'+
+'.mo-search{top:12px;left:12px;width:300px;max-width:calc(100% - 24px);}'+
+'.mo-search .in{display:flex;align-items:center;gap:8px;padding:9px 11px;}'+
+'.mo-search .in .ico{width:16px;height:16px;color:var(--faint);}'+
+'.mo-search input{flex:1;min-width:0;border:0;outline:none;background:none;font:inherit;font-size:.86rem;color:var(--ink);}'+
+'.mo-search .x{border:0;background:none;color:var(--faint);cursor:pointer;font-size:1.05rem;line-height:1;display:none;}'+
+'.mo-search.has .x{display:block;}'+
+'.mo-search .res{display:none;max-height:340px;overflow:auto;border-top:1px solid var(--line-soft);}'+
+'.mo-search.open .res{display:block;}'+
+'.mo-search .r{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:.84rem;}'+
+'.mo-search .r:hover,.mo-search .r.on{background:var(--panel-2);}'+
+'.mo-search .r .ic{width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.62rem;font-weight:800;font-family:var(--display);}'+
+'.mo-search .r .ic .ico{width:14px;height:14px;}'+
+'.mo-search .r .t{flex:1;min-width:0;} .mo-search .r .t b{display:block;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'+
+'.mo-search .r .t small{color:var(--faint);font-size:.72rem;}'+
+'.mo-search .r .k{font-size:.6rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);}'+
+'.mo-search .none{padding:12px;font-size:.8rem;color:var(--faint);}'+
+'.mo-kpis{top:12px;right:12px;display:grid;grid-template-columns:repeat(2,96px);gap:8px;}'+
+'.mo-kpi{padding:9px 10px;text-align:left;}'+
+'.mo-kpi .l{font-size:.56rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);line-height:1.2;}'+
+'.mo-kpi .v{font-family:var(--display);font-weight:600;font-size:1.02rem;color:var(--green-darkest);margin-top:3px;line-height:1.1;white-space:nowrap;}'+
+'.mo-kpi.warn .v{color:var(--amber);}'+
+'.mo-key{left:12px;bottom:12px;width:300px;'+'transition:none;max-width:calc(100% - 24px);padding:10px 12px;}'+
+'.mo-key .row2{display:flex;flex-wrap:wrap;gap:5px;align-items:center;}'+
+'.mo-key .lbl{font-size:.58rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);width:100%;margin:2px 0 3px;}'+
+'.mo-key .chip{padding:3px 9px;font-size:.72rem;}'+
+'.mo-key .sep{height:1px;background:var(--line-soft);margin:8px 0;}'+
+'.mo-key .lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.7rem;color:var(--muted);}'+
+'.mo-key .lg .k{display:inline-flex;align-items:center;gap:5px;}'+
+'.mo-key .lg .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}'+
+'.mo-key .lg .sq{width:9px;height:9px;border-radius:3px;background:var(--green-darkest);display:inline-block;}'+
+'.mo-key .lg .ring{width:12px;height:12px;border-radius:50%;border:2px solid var(--green-mid);background:rgba(104,165,62,.35);display:inline-block;}'+
+'.mo-key .tog-key{border:0;background:none;font:inherit;font-size:.72rem;font-weight:600;color:var(--green);cursor:pointer;padding:0;margin-left:auto;}'+
+'.mo-key.min .body{display:none;}'+
+'.mo-key .hd{display:flex;align-items:center;gap:8px;font-size:.74rem;font-weight:700;color:var(--green-darkest);}'+
+'.mo-key .body{margin-top:8px;}'+
+'.mo-count{font-size:.7rem;color:var(--faint);padding:6px 12px;border-top:1px solid var(--line-soft);}'+
+'.mo-card{top:12px;left:12px;width:320px;max-width:calc(100% - 24px);display:none;max-height:calc(100% - 84px);overflow:auto;padding:14px 16px 12px;}'+
+'.mo-card.show{display:block;}'+
+'body.has-ask #vmap{height:calc(100vh - var(--top) - 160px);min-height:520px;}'+
+'.mo-card .cx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:0;background:none;color:var(--faint);font-size:1.15rem;cursor:pointer;}'+
+'.mo-card .cx:hover{background:var(--panel-2);color:var(--ink);}'+
+'.mo-card .pp{padding-right:18px;}'+
+'.mo-card .back{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;color:var(--green);background:none;border:0;cursor:pointer;padding:0;margin-bottom:8px;}'+
+'.mo-card .back .ico{width:13px;height:13px;transform:rotate(180deg);}'+
+'.map-card.carding .mo-search{display:none;}'+
+'.map-card.carding .mo-key{display:none;}'+
+'.sel-pin{outline:3px solid var(--lime);outline-offset:2px;}'+
+'@media(max-width:700px){.mo-kpis{grid-template-columns:repeat(2,84px);top:auto;bottom:12px;right:12px;} .mo-key{bottom:auto;top:62px;width:calc(100% - 24px);} .mo-key:not(.open-m) .body{display:none;}}'+
 '.terr-split .t-table .town small{display:block;font-size:.72rem;color:var(--faint);font-weight:400;}'+
 '.terr-split .t-table td,.terr-split .t-table th{padding-left:10px;padding-right:10px;}'+
 '.terr-split .t-table .bar-cell{min-width:64px !important;}'+
 '.terr-split .t-table .bar-cell .trk{min-width:30px;}'+
-'@media(max-width:1100px){.terr-split{grid-template-columns:minmax(0,1fr);} .terr-split .map-card{position:static;}}';
+'@media(max-width:1100px){.terr-split{grid-template-columns:minmax(0,1fr);} .terr-split .map-card{position:relative;top:auto;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var territory = d.all('territory');
@@ -88,35 +138,38 @@ var html='';
 html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Territory potential</h1><p>The whole country in one view: where the next farmer is, who covers it, and how much is still open.</p></div>'+
   '<div class="row" style="gap:8px;"><a class="btn" href="#funnel" id="toFunnel">'+BB.icon('plus')+'Funnel a new farmer</a></div></div>';
 
-// stat tiles
-html += '<div class="grid g4" style="margin-top:16px;">';
-html += '<div class="stat"><div class="l">Total potential</div><div class="v">'+BB.money(totPotential)+'</div><div class="s">addressable, all regions</div></div>';
-html += '<div class="stat"><div class="l">Addressable farms</div><div class="v">'+BB.num(totFarms)+'</div><div class="s">across '+regions.length+' regions</div></div>';
-html += '<div class="stat"><div class="l">Hectares in reach</div><div class="v">'+BB.num(totHa)+'</div><div class="s">total farmed area</div></div>';
-html += '<div class="stat'+(avgPen<25?' warn':'')+'"><div class="l">Avg penetration</div><div class="v">'+avgPen+'%</div><div class="s">room to grow</div></div>';
-html += '</div>';
+// the headline figures now sit inside the map (top-right), as on 9five's area map
 
 // ---- vision map beside the region & town table: click a point, its row lights up (and back) ----
 var tRows = territory.slice().sort(function(a,b){ return b.potential-a.potential; });
 html += '<div class="terr-split">';
-html += '<div class="card map-card"><div class="card-h"><div><h3>Vision map</h3><div class="sub">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</div></div></div>';
-html += '<div class="map-tools">'+
-  '<div class="grp"><span class="lbl">Show</span>'+
+html += '<div class="card map-card">';
+html += '<div id="vmap"></div>';
+html += '<div class="mo mo-panel mo-card" id="moCard" role="dialog" aria-live="polite"><button type="button" class="cx" id="moCardX" aria-label="Close">×</button><button type="button" class="back" id="moCardBack">'+BB.icon('chevron')+'Back to search</button><div id="moCardBody"></div></div>';
+// search (top-left): towns, farmers, depots, team
+html += '<div class="mo mo-panel mo-search" id="moSearch"><div class="in">'+BB.icon('search')+'<input id="moQ" placeholder="Search town, farmer, depot or team…" autocomplete="off" aria-label="Search the map"><button type="button" class="x" id="moX" aria-label="Clear">×</button></div><div class="res" id="moRes"></div>'+
+  '<div class="mo-count">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</div></div>';
+// headline figures (top-right)
+html += '<div class="mo mo-kpis">'+
+  '<div class="mo-panel mo-kpi"><div class="l">Potential</div><div class="v">'+BB.chart.moneyCompact(totPotential)+'</div></div>'+
+  '<div class="mo-panel mo-kpi"><div class="l">Farms</div><div class="v">'+BB.num(totFarms)+'</div></div>'+
+  '<div class="mo-panel mo-kpi"><div class="l">Hectares</div><div class="v">'+BB.chart.compact(totHa)+'</div></div>'+
+  '<div class="mo-panel mo-kpi'+(avgPen<25?' warn':'')+'"><div class="l">Avg reach</div><div class="v">'+avgPen+'%</div></div>'+
+'</div>';
+// layers, region jump and key (bottom-left)
+html += '<div class="mo mo-panel mo-key min" id="moKey"><div class="hd">'+BB.icon('map')+'Layers, regions &amp; key<button type="button" class="tog-key" id="moKeyTog">Show</button></div><div class="body">'+
+  '<div class="lbl">Show</div><div class="row2">'+
     '<span class="chip tog on" data-layer="territory">Territories</span>'+
     '<span class="chip tog on" data-layer="farmers">Farmers</span>'+
     '<span class="chip tog on" data-layer="depots">Depots</span>'+
-    '<span class="chip tog on" data-layer="reps">Team</span>'+
-  '</div><span class="sp"></span>'+
-  '<div class="grp"><span class="lbl">Go to</span>'+
-    '<span class="chip tog" data-region="">All of SA</span>'+
-    regions.map(function(r){ return '<span class="chip tog" data-region="'+BB.esc(r)+'">'+BB.esc(r)+'</span>'; }).join('')+
-  '</div></div>';
-html += '<div id="vmap"></div>';
-html += '<div class="map-legend">'+
-  d.all('reps').map(function(r){ return '<span class="k"><span class="dot" style="background:'+r.colour+';"></span>'+BB.esc(r.name.split(' ')[0])+' · '+BB.esc(r.region)+'</span>'; }).join('')+
-  '<span class="k"><span class="ring"></span>territory: size = potential, fill = penetration</span>'+
-  '<span class="k"><span class="sq"></span>depot</span>'+
-  '</div>';
+    '<span class="chip tog on" data-layer="reps">Team</span></div>'+
+  '<div class="lbl" style="margin-top:8px;">Go to</div><div class="row2">'+
+    '<span class="chip tog on" data-region="">All of SA</span>'+
+    regions.map(function(r){ return '<span class="chip tog" data-region="'+BB.esc(r)+'">'+BB.esc(r)+'</span>'; }).join('')+'</div>'+
+  '<div class="sep"></div><div class="lg">'+
+    d.all('reps').map(function(r){ return '<span class="k"><span class="dot" style="background:'+r.colour+';"></span>'+BB.esc(r.name.split(' ')[0])+'</span>'; }).join('')+
+    '<span class="k"><span class="ring"></span>size = potential, fill = reach</span><span class="k"><span class="sq"></span>depot</span></div>'+
+'</div></div>';
 html += '</div>';
 html += '<div class="card t-table"><div class="card-h"><div><h3>By region &amp; town</h3><div class="sub">'+territory.length+' areas · click a point on the map, or a row here</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
   '<th>Town</th><th class="num">Potential</th><th>Reach</th><th>Rep</th></tr></thead><tbody>';
@@ -233,7 +286,7 @@ var REGION_CENTRE = { 'Limpopo':[-23.9,29.8], 'KwaZulu-Natal':[-29.2,30.6], 'Fre
 function coords(town, region){ var c=TOWN[String(town||'').trim().toLowerCase()]; if(c) return c; return REGION_CENTRE[region]||null; }
 function initials(n){ return String(n||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
 
-var MAP=null, layers={}, tMarkers={};
+var MAP=null, layers={}, tMarkers={}, POP={}, SEARCH=[];
 function penBar(p){ return '<div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:6px;"><div class="pbar" style="flex:1;"><i style="width:'+Math.min(100,p)+'%;"></i></div><span class="faint" style="font-size:.74rem;">'+p+'% penetration</span></div>'; }
 
 function buildMap(){
@@ -243,8 +296,10 @@ function buildMap(){
     el.style.height='auto'; return;
   }
   var SA=L.latLngBounds([-35.6,15.5],[-21.6,33.6]);
-  MAP=L.map('vmap',{ zoomControl:false, maxBounds:SA.pad(0.25), maxBoundsViscosity:0.8, minZoom:4, maxZoom:12, scrollWheelZoom:false, attributionControl:true });
+  MAP=L.map('vmap',{ zoomControl:false, maxBounds:SA.pad(0.6), maxBoundsViscosity:0.3, minZoom:4, maxZoom:12, scrollWheelZoom:false, attributionControl:true });
   L.control.zoom({position:'bottomright'}).addTo(MAP);
+  // popups keep clear of the floating panels (search top-left, figures top-right, key bottom-left)
+  POP={ maxWidth:300, autoPan:true, autoPanPaddingTopLeft:L.point(330, 70), autoPanPaddingBottomRight:L.point(30, 30) };
   MAP.on('click', function(){ MAP.scrollWheelZoom.enable(); });
   MAP.on('mouseout', function(){ MAP.scrollWheelZoom.disable(); });
 
@@ -273,12 +328,13 @@ function buildMap(){
       '<div class="kv"><span>Potential</span><b>'+BB.money(t.potential)+'</b><span>Farms</span><b>'+t.farms+'</b><span>Hectares</span><b>'+BB.num(t.ha)+'</b><span>Covered by</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
       penBar(t.penetration||0)+
       (t.note?'<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(t.note)+'</div>':'')+
-      '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here</button></div></div>', {maxWidth:280});
+      '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here</button></div></div>', POP);
     m.on('popupopen', function(){ highlightRow(t.id, true); });
     m.on('mouseover', function(){ var tr=document.getElementById('row-'+t.id); if(tr) tr.classList.add('hv'); });
     m.on('mouseout', function(){ var tr=document.getElementById('row-'+t.id); if(tr) tr.classList.remove('hv'); });
     m.on('popupclose', function(){ highlightRow(null); });
     layers.territory.addLayer(m); tMarkers[t.id]=m;
+    SEARCH.push({ kind:'Area', layer:'territory', label:t.town, sub:t.region+' · '+t.crop, color:r.colour, ic:'map', m:m, tid:t.id });
   });
 
   // farmers
@@ -289,12 +345,13 @@ function buildMap(){
     var town=(dp.name||'').replace(/\s*Depot$/i,'');
     var c=coords(town,dp.region); if(!c) return;
     var comm=/commission/i.test(dp.status||'');
-    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'depot-pin-wrap',html:'<div class="depot-pin'+(comm?' comm':'')+'" title="'+BB.esc(dp.name)+'">D</div>',iconSize:[22,22],iconAnchor:[-14,-14]}) });
+    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'depot-pin-wrap',html:'<div class="depot-pin'+(comm?' comm':'')+'" title="'+BB.esc(dp.name)+'">D</div>',iconSize:[22,22],iconAnchor:[-14,-14],popupAnchor:[25,14]}) });
     m.bindPopup('<div class="pp"><h4>'+BB.esc(dp.name)+'</h4><div class="sub">'+BB.esc(dp.region)+'</div>'+
       '<div class="kv"><span>Status</span><b>'+BB.esc(dp.status)+'</b><span>Manager</span><b>'+BB.esc(dp.manager)+'</b></div>'+
       '<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(dp.address||'')+'</div>'+
-      '<div class="act"><a href="depots.html">Open depot</a><a href="stock.html">Stock</a></div></div>');
+      '<div class="act"><a href="depots.html">Open depot</a><a href="stock.html">Stock</a></div></div>', POP);
     layers.depots.addLayer(m);
+    SEARCH.push({ kind:'Depot', layer:'depots', label:dp.name, sub:dp.region+' · '+(dp.status||''), color:'#12210c', ic:'warehouse', m:m });
   });
 
   // team — reps at their base town
@@ -303,16 +360,20 @@ function buildMap(){
     var mine=territory.filter(function(t){return t.rep===r.id;});
     var pot=mine.reduce(function(s,t){return s+(t.potential||0);},0);
     var farmers=d.all('farmers').filter(function(f){return f.rep===r.id;}).length;
-    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'rep-pin-wrap',html:'<div class="rep-pin" style="background:'+r.colour+';" title="'+BB.esc(r.name)+'">'+initials(r.name)+'</div>',iconSize:[34,34],iconAnchor:[52,52]}) });
+    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'rep-pin-wrap',html:'<div class="rep-pin" style="background:'+r.colour+';" title="'+BB.esc(r.name)+'">'+initials(r.name)+'</div>',iconSize:[34,34],iconAnchor:[52,52],popupAnchor:[-35,-52]}) });
     m.bindPopup('<div class="pp"><h4>'+BB.esc(r.name)+'</h4><div class="sub">'+BB.esc(r.role)+' · based '+BB.esc(r.base)+'</div>'+
       '<div class="kv"><span>Covers</span><b>'+BB.esc(r.region)+'</b><span>Areas</span><b>'+mine.length+'</b><span>Farmers</span><b>'+farmers+'</b><span>Potential</span><b>'+BB.money(pot)+'</b><span>Cell</span><b>'+BB.esc(r.cell)+'</b></div>'+
-      '<div class="act"><a href="farms.html">Farms</a><a href="forecast.html">Forecast</a></div></div>');
+      '<div class="act"><a href="farms.html">Farms</a><a href="forecast.html">Forecast</a></div></div>', POP);
     layers.reps.addLayer(m);
+    SEARCH.push({ kind:'Team', layer:'reps', label:r.name, sub:r.region+' · based '+r.base, color:r.colour, txt:initials(r.name), m:m });
   });
 
-  if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.28)); else MAP.setView([-29,25],5);
+  ['territory','farmers','depots','reps'].forEach(function(k){ layers[k].eachLayer(cardify); });
+  MAP.closePopup=function(){ if(CARD_M) closeCard(); return MAP; };
+  MAP.on('click', function(){ if(CARD_M) closeCard(); });
+  if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.2),{paddingTopLeft:[20,70],paddingBottomRight:[20,50]}); else MAP.setView([-29,25],5);
   // Leaflet sometimes measures a 0-height container on first paint inside cards
-  setTimeout(function(){ try{ MAP.invalidateSize(); if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.28)); }catch(e){} }, 120);
+  setTimeout(function(){ try{ MAP.invalidateSize(); if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.2),{paddingTopLeft:[20,70],paddingBottomRight:[20,50]}); }catch(e){} }, 120);
 
   // toggles
   document.querySelectorAll('.chip.tog[data-layer]').forEach(function(ch){
@@ -342,6 +403,79 @@ function buildMap(){
     };
   });
 }
+// ---- details open in a card docked inside the map (top-left), never a bubble the panels can cover ----
+var CARD_M=null;
+function openCard(m){
+  if(!MAP||!m) return;
+  if(CARD_M && CARD_M!==m) closeCard(true);
+  CARD_M=m;
+  document.getElementById('moCardBody').innerHTML=m._cardHtml||'';
+  document.querySelector('.map-card').classList.add('carding');
+  document.getElementById('moCard').classList.add('show');
+  if(m.setStyle){ m._w=m.options.weight; m.setStyle({ weight:5 }); } else if(m._icon){ var pin=m._icon.firstChild; if(pin) pin.classList.add('sel-pin'); }
+  // keep the point clear of the card: if it sits under the card, slide the map right
+  var pt=MAP.latLngToContainerPoint(m.getLatLng()), card=document.getElementById('moCard');
+  if(pt.x < card.offsetWidth+40) MAP.panBy([pt.x-(card.offsetWidth+90), 0], {animate:true});
+  m.fire('popupopen');
+}
+function closeCard(quiet){
+  var m=CARD_M; CARD_M=null;
+  document.getElementById('moCard').classList.remove('show');
+  document.querySelector('.map-card').classList.remove('carding');
+  if(m){ if(m.setStyle) m.setStyle({ weight:m._w||2 }); else if(m._icon && m._icon.firstChild) m._icon.firstChild.classList.remove('sel-pin'); if(!quiet) m.fire('popupclose'); }
+}
+// a marker built with bindPopup becomes a card marker: same content, same open/close hooks
+function cardify(m){
+  if(!m || m._carded) return m; var p=m.getPopup && m.getPopup(); if(!p) return m;
+  m._cardHtml=p.getContent(); m.unbindPopup(); m._carded=true;
+  m.options.bubblingMouseEvents=false;   // a click on a point must not also count as a click on the map (which closes the card)
+  m.openPopup=function(){ openCard(m); return m; };
+  m.closePopup=function(){ if(CARD_M===m) closeCard(); return m; };
+  m.on('click', function(ev){ if(ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent); openCard(m); });
+  return m;
+}
+(function(){
+  document.getElementById('moCardX').onclick=function(){ closeCard(); };
+  document.getElementById('moCardBack').onclick=function(){ closeCard(); var q=document.getElementById('moQ'); q.focus(); };
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape' && CARD_M) closeCard(); });
+})();
+
+// ---- the floating panels: search, key toggle ----
+function goTo(e){
+  if(!MAP) return;
+  if(!MAP.hasLayer(layers[e.layer])){ MAP.addLayer(layers[e.layer]); var c=document.querySelector('.chip.tog[data-layer="'+e.layer+'"]'); if(c) c.classList.add('on'); }
+  var ll=e.m.getLatLng(); MAP.flyTo(ll, Math.max(MAP.getZoom(), e.kind==='Area'?8:9), {duration:0.8});
+  setTimeout(function(){ e.m.openPopup(); }, 850);
+}
+(function wirePanels(){
+  var box=document.getElementById('moSearch'), q=document.getElementById('moQ'), res=document.getElementById('moRes'), x=document.getElementById('moX'), hits=[], cur=-1;
+  function draw(){
+    var t=q.value.trim().toLowerCase(); box.classList.toggle('has', !!t);
+    if(!t){ box.classList.remove('open'); res.innerHTML=''; return; }
+    hits=SEARCH.filter(function(e){ return (e.label+' '+e.sub+' '+e.kind).toLowerCase().indexOf(t)>=0; }).slice(0,12); cur=hits.length?0:-1;
+    res.innerHTML=hits.length? hits.map(function(e,i){ return '<div class="r'+(i===cur?' on':'')+'" data-i="'+i+'"><span class="ic" style="background:'+e.color+'">'+(e.txt?BB.esc(e.txt):BB.icon(e.ic))+'</span><span class="t"><b>'+BB.esc(e.label)+'</b><small>'+BB.esc(e.sub)+'</small></span><span class="k">'+e.kind+'</span></div>'; }).join('')
+      : '<div class="none">Nothing on the map matches “'+BB.esc(q.value.trim())+'”.</div>';
+    box.classList.add('open');
+  }
+  function pick(i){ var e=hits[i]; if(!e) return; box.classList.remove('open'); q.blur(); goTo(e); }
+  q.addEventListener('input', draw);
+  q.addEventListener('focus', function(){ if(q.value.trim()) draw(); });
+  q.addEventListener('keydown', function(e){
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(!hits.length) return; cur=(cur+(e.key==='ArrowDown'?1:hits.length-1))%hits.length; [].forEach.call(res.querySelectorAll('.r'),function(r,i){ r.classList.toggle('on',i===cur); }); }
+    else if(e.key==='Enter'){ e.preventDefault(); pick(cur<0?0:cur); }
+    else if(e.key==='Escape'){ q.value=''; draw(); q.blur(); }
+  });
+  res.addEventListener('click', function(e){ var r=e.target.closest('.r'); if(r) pick(+r.getAttribute('data-i')); });
+  x.onclick=function(){ q.value=''; draw(); q.focus(); };
+  document.addEventListener('click', function(e){ if(!e.target.closest('#moSearch')) box.classList.remove('open'); });
+  // stop map drag/zoom when working inside a panel
+  if(typeof L!=='undefined') document.querySelectorAll('.mo').forEach(function(p){ L.DomEvent.disableClickPropagation(p); L.DomEvent.disableScrollPropagation(p); });
+  var key=document.getElementById('moKey'), kt=document.getElementById('moKeyTog');
+  kt.onclick=function(){ var phone=window.matchMedia('(max-width:700px)').matches;
+    if(phone){ var o=key.classList.toggle('open-m'); kt.textContent=o?'Hide':'Show'; } else { var m=key.classList.toggle('min'); kt.textContent=m?'Show':'Hide'; } };
+  kt.textContent='Show';
+})();
+
 function addFarmerMarker(f){
   if(!MAP || !layers.farmers) return;
   var c=coords(f.town,f.region); if(!c) return;
@@ -353,8 +487,10 @@ function addFarmerMarker(f){
   var m=L.circleMarker([la,ln],{ pane:'farm', radius:6, color:'#fff', weight:2, fillColor:prospect?'#9aa88f':r.colour, fillOpacity:1, dashArray:prospect?'2,2':null });
   m.bindPopup('<div class="pp"><h4>'+BB.esc(f.farm||f.name)+'</h4><div class="sub">'+BB.esc(f.name)+' · '+BB.esc(f.town||f.region)+'</div>'+
     '<div class="kv"><span>Status</span><b>'+BB.esc(f.status||'')+'</b><span>Crops</span><b>'+BB.esc((f.crops||[]).join(', ')||'—')+'</b><span>Hectares</span><b>'+BB.num(f.ha||0)+'</b><span>Rep</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
-    '<div class="act"><a href="farm-detail.html?farmer='+encodeURIComponent(f.id)+'">Farm file</a><a href="voice-order.html">Capture order</a></div></div>');
+    '<div class="act"><a href="farm-detail.html?farmer='+encodeURIComponent(f.id)+'">Farm file</a><a href="voice-order.html">Capture order</a></div></div>', POP);
   layers.farmers.addLayer(m);
+  if(MAP && MAP.closePopup && layers.farmers) cardify(m);
+  SEARCH.push({ kind:'Farmer', layer:'farmers', label:f.farm||f.name, sub:f.name+' · '+(f.town||f.region||''), color:r.colour, ic:'farm', m:m });
   return m;
 }
 function highlightRow(id, fromMap){
