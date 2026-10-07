@@ -59,3 +59,33 @@ Mount into an empty `<div id="…">` *after* the HTML is in the page.
 ## Voice
 Keep the existing copy's plain, direct voice. Shorten where a sentence only restates the heading.
 No exclamation marks, no "Welcome to…".
+
+## Clicks open popups, not pages (Oct 2026)
+Clicking a chart part, a figure or a row shows its detail **over the page** (`BB.popup`); the page it
+used to jump to is a button inside the popup. The shell already gives every chart a default popup
+(figures, share, change on the previous period, rank). Pages add the records behind the click:
+
+- **Charts:** pass `detail: function(ctx){ return {...popup options} }` to `BB.chart.bar/line/hbar/donut`.
+  `ctx` = `{kind:'column', index, label, values, total}` (bar/line) · `{kind:'row', index, row, value}` (hbar)
+  · `{kind:'slice', index, row, value, total}` (donut). Return popup options to merge over the default
+  (`sub`, `stats`, `table:{columns, rows:[{cells:[...], href}], num:[i]}`, `html`, `actions:[{label, href, primary}]`,
+  `wide:true`, `note`). Return `false` to handle the click yourself. Keep the default `stats` unless you
+  have better ones.
+- **Figures (`a.stat.tap`):** they no longer navigate. Register the list behind each one:
+  `BB.statDetail('overdue', function(tile){ return { sub, stats, table, actions:[{label:'Open the full list', href, primary:true}] }; })`
+  and tag the tile `data-detail="overdue"`. Unregistered tiles get a simple popup with an "Open the full list" button.
+- **Rows that took you to another page** (`tr.click` → `location.href = …`): show a popup preview of that
+  record (key facts, a short table of its lines/orders/invoices) with **Open full record** as the primary
+  action. Rows whose click already does something on the page (expand, select, fill a form, fly the map) stay.
+- Popup table rows can link (`href`) to the record page; that's fine — it's the user choosing to go.
+- Never invent numbers; the popup shows what the page already has.
+
+## Table filters (bb-table.js — the 9five column filter)
+Every `table.bb` gets a funnel per column automatically: filter by condition, by value (with counts),
+sort; totals rows follow the filter; filters survive redraws. Consequences for pages:
+- **Remove page-level controls that only filter one table's rows by a value that is a column in it**
+  (status chips, region chips, a select that narrows the table) — the funnel does that now. Keep controls
+  that change scope for the whole page or also drive the charts/KPIs (e.g. depot scope, My farms / All farms,
+  period pickers, `?show=` URL presets), and anything the Ask bar or another page links to (`?show=overdue`).
+- Don't give tables their own max-height / inner scroll; the page scrolls (`.scroll.tall` is now a no-op).
+- Opt a table out with `data-nofilter="1"` only if it isn't a data list (e.g. a form laid out as a table).
