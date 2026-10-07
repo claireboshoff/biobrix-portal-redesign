@@ -13,6 +13,58 @@
 <script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
 <script src="bb-data.js?v=redesign1"></script>
 <script src="bb-shell.js?v=redesign1"></script>
+<script src="bb-intel.js?v=redesign1"></script>
+<style>
+/* ── Ask bar: BioBrix Intelligence, docked at the bottom of Home ── */
+main.wrap.has-ask{padding-bottom:150px;}
+.askdock{position:fixed;z-index:85;bottom:22px;left:calc(var(--nav) + (100vw - var(--nav)) / 2);transform:translateX(-50%);
+  width:min(760px, calc(100vw - var(--nav) - 48px));display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.askdock > *{pointer-events:auto;}
+.ask-sugs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 4px;}
+.ask-sugs::-webkit-scrollbar{display:none;}
+.ask-sug{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(183,217,122,.22);background:rgba(18,33,12,.88);backdrop-filter:blur(8px);
+  color:rgba(234,244,216,.85);font:inherit;font-size:.76rem;font-weight:500;padding:6px 10px 6px 12px;border-radius:8px;cursor:pointer;transition:border-color .15s,color .15s;}
+.ask-sug:hover{border-color:var(--lime);color:#fff;}
+.ask-sug .ico{width:13px;height:13px;color:var(--lime);}
+.ask-bar{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;background:rgba(15,28,10,.94);backdrop-filter:saturate(1.3) blur(12px);
+  border:1px solid rgba(183,217,122,.18);box-shadow:0 18px 44px -10px rgba(10,20,6,.55),0 2px 6px rgba(10,20,6,.2);}
+.ask-bar .spark{width:40px;height:40px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,var(--green-bright),var(--lime));color:#13260c;}
+.ask-bar .spark .ico{width:20px;height:20px;}
+.ask-bar input{flex:1;min-width:0;background:none;border:0;outline:none;color:#fff;font:inherit;font-size:.95rem;padding:10px 4px;}
+.ask-bar input::placeholder{color:rgba(234,244,216,.55);}
+.ask-bar .ib{width:38px;height:38px;border-radius:9px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(183,217,122,.18);background:rgba(255,255,255,.04);color:rgba(234,244,216,.8);cursor:pointer;transition:border-color .15s,color .15s;}
+.ask-bar .ib:hover{border-color:var(--lime);color:#fff;}
+.ask-bar .ib .ico{width:17px;height:17px;}
+.ask-bar .go{background:var(--lime);border-color:var(--lime);color:#13260c;}
+.ask-bar .go:hover{background:#a9cf68;color:#13260c;}
+.ask-out{display:none;border-radius:14px;background:rgba(15,28,10,.96);backdrop-filter:blur(12px);border:1px solid rgba(183,217,122,.18);color:#eaf4d8;
+  box-shadow:0 18px 44px -10px rgba(10,20,6,.55);max-height:min(52vh,460px);overflow:auto;}
+.askdock.open .ask-out{display:block;}
+.ask-out .hd{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;border-bottom:1px solid rgba(183,217,122,.12);position:sticky;top:0;background:rgba(15,28,10,.98);}
+.ask-out .hd .ico{width:16px;height:16px;color:var(--lime);}
+.ask-out .hd h4{flex:1;font-family:var(--display);font-weight:600;font-size:.98rem;color:#fff;}
+.ask-out .x{width:30px;height:30px;border-radius:8px;border:0;background:none;color:rgba(234,244,216,.7);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.ask-out .x:hover{color:#fff;background:rgba(255,255,255,.06);}
+.ask-out .bd{padding:12px 16px 14px;font-size:.88rem;line-height:1.6;}
+.ask-out .bd .ln1{white-space:pre-line;margin-bottom:6px;}
+.ask-out .bd .q{font-size:.74rem;color:rgba(234,244,216,.5);margin-bottom:8px;}
+.ask-out .ft{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 14px;}
+.ask-out .ft a{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid rgba(183,217,122,.25);color:#eaf4d8;}
+.ask-out .ft a:hover{border-color:var(--lime);color:#fff;}
+.ask-out .ft a.pri{background:var(--lime);border-color:var(--lime);color:#13260c;}
+.ask-out .ft a .ico{width:14px;height:14px;}
+.ask-out .pages a{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#eaf4d8;font-size:.88rem;}
+.ask-out .pages a:hover,.ask-out .pages a.on{background:rgba(183,217,122,.08);color:#fff;}
+.ask-out .pages a .ico{width:16px;height:16px;color:var(--lime);}
+.ask-out .pages a small{margin-left:auto;font-size:.66rem;letter-spacing:.5px;text-transform:uppercase;color:rgba(234,244,216,.45);}
+.ask-out .lbl{padding:10px 16px 4px;font-size:.62rem;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(234,244,216,.42);}
+@media(max-width:900px){
+  .askdock{left:12px;right:12px;width:auto;transform:none;bottom:calc(74px + env(safe-area-inset-bottom));}
+  main.wrap.has-ask{padding-bottom:170px;}
+  .ask-bar .ib.open-intel{display:none;}
+}
+@media print{ .askdock{display:none !important;} }
+</style>
 </head>
 <body>
 <script>
@@ -38,65 +90,8 @@ var newLeaf = d.all('leaf').filter(function(l){return l.status==='New';}).length
 var awaitingStock = orders.filter(function(o){return o.status==='Awaiting stock';}).length;
 var myFarmers = u.rep ? d.where('farmers',function(f){return f.rep===u.rep;}).length : d.all('farmers').length;
 
-// ---- primary actions per role (the 3 big buttons — "not overwhelming") ----
-var BIG = {
-  director: [
-    {t:'BioBrix Intelligence', s:'Ask it anything · what needs you today', ic:'✦', href:'intelligence.html', c:'#3f6b28'},
-    {t:(sage&&sage.live)?'Sales — week & month':'Operations board', s:(sage&&sage.live)?'By agent, by customer, against budget':'See the whole business, live', ic:'⬡', href:(sage&&sage.live)?'sales-report.html':'operations.html', c:'#22431a'},
-    {t:(sage&&sage.live)?'Forecast & actual':'Sales forecast', s:(sage&&sage.live)?'Plan the year, watch it against invoiced':(forecastVal? BB.money(forecastVal)+' in the pipeline':'Rep pipeline'), ic:'▲', href:(sage&&sage.live)?'forecast-plan.html':'forecast.html', c:'#2f6f9e'}
-  ],
-  advisor: [
-    {t:'Capture an order', s:'In front of the farmer, speak it', ic:'🎙', href:'voice-order.html', c:'#c77d17'},
-    {t:'BioServices', s:'Soil · Leaf · Watch · Consult', ic:'✦', href:'bioservices.html', c:'#22431a'},
-    {t:'Field visit (BioWatch)', s:'Log a monitoring check', ic:'🌱', href:'biowatch.html', c:'#3f6b28'}
-  ],
-  operations: [
-    {t:'New & pending orders', s:awaitingStock? awaitingStock+' awaiting stock':'Action the pipeline', ic:'▲', href:'orders.html', c:'#22431a'},
-    {t:'Stock across depots', s:lowStock? lowStock+' items low — reorder':'All 3 depots', ic:'⬡', href:'stock.html', c:'#2f6f9e'},
-    {t:'Suppliers & reorder', s:'13 suppliers, one view', ic:'📦', href:'suppliers.html', c:'#c77d17'}
-  ],
-  finance: [
-    {t:'Finance & reconciliation', s:'Invoices, Pastel sync, reported vs actual', ic:'🧾', href:'finance.html', c:'#22431a'},
-    {t:'Orders & quotes', s:'Approve, invoice, track', ic:'📋', href:'orders.html', c:'#3f6b28'},
-    {t:'Sales forecast', s:'Per product · rep · area · month', ic:'📈', href:'forecast.html', c:'#2f6f9e'}
-  ],
-  warehouse: [
-    {t:'My depot', s:'Stock, blending, deliveries', ic:'⬡', href:'depots.html', c:'#22431a'},
-    {t:'Stock take', s:'Count & update inventory', ic:'📦', href:'stock.html', c:'#3f6b28'},
-    {t:'Deliveries', s:'What is going out', ic:'🚚', href:'deliveries.html', c:'#2f6f9e'}
-  ]
-};
-var big = BIG[u.roleKey] || BIG.director;
-
-// Once their own figures are flowing, every seat's three buttons have to land on their business.
-// The sets above still point at sections running on demonstration data, so each seat gets a live
-// set of its own. FreedomHub seats keep the demonstration set so the full product can still be shown.
-var LIVE_BIG = {
-  advisor: [
-    {t:'Your customers', s:'What they owe, what they have bought', ic:'🌾', href:'farms.html', c:'#22431a'},
-    {t:'Sales — week & month', s:'Yours, against budget', ic:'▲', href:'sales-report.html', c:'#3f6b28'},
-    {t:'Forecast & actual', s:'Plan the year, watch it against invoiced', ic:'◎', href:'forecast-plan.html', c:'#2f6f9e'}
-  ],
-  operations: [
-    {t:'Operations board', s:'The whole business, live', ic:'⬡', href:'operations.html', c:'#22431a'},
-    {t:'What is moving', s:'Litres and kilograms going out', ic:'📦', href:'dispatch.html', c:'#3f6b28'},
-    {t:'BioBrix Intelligence', s:'Ask it anything · what needs you today', ic:'✦', href:'intelligence.html', c:'#2f6f9e'}
-  ],
-  finance: [
-    {t:'Finance', s:'Owed to you, overdue, over their limit', ic:'🧾', href:'finance.html', c:'#22431a'},
-    {t:'Sales — week & month', s:'By agent, by customer, against budget', ic:'▲', href:'sales-report.html', c:'#3f6b28'},
-    {t:'Commission', s:'Worked out on what was actually invoiced', ic:'◈', href:'commission.html', c:'#2f6f9e'}
-  ],
-  warehouse: [
-    {t:'What is moving', s:'Litres and kilograms going out', ic:'📦', href:'dispatch.html', c:'#22431a'},
-    {t:'Jobs & requests', s:'What has been asked for', ic:'✉', href:'jobs.html', c:'#3f6b28'}
-  ]
-};
 var fhSeat = /@freedomhub\.io$/i.test(u.email||'');
 var clientLive = !!(BB.auth && BB.auth.tenantLive ? BB.auth.tenantLive() : (sage && sage.live));
-if(clientLive && !fhSeat && LIVE_BIG[u.roleKey]) big = LIVE_BIG[u.roleKey];
-// Last line of defence: never put a card in front of someone who cannot open it.
-if(BB.auth && typeof BB.auth.canPage === 'function') big = big.filter(function(b){ return BB.auth.canPage(b.href); });
 
 // ---- pulse tiles per role ----
 var PULSE = {
@@ -171,20 +166,14 @@ var MODULES = [
 ];
 
 // ---- render ----
-// Layout: greeting + the seat's primary actions in one row; then the KPI strip; then a chart
-// beside the work queue. The rail carries every other page, so there is no "everything else" drawer.
-var BIG_IC = { 'intelligence.html':'sparkles','sales-report.html':'sales','operations.html':'board','forecast-plan.html':'target','forecast.html':'chart',
-  'voice-order.html':'mic','bioservices.html':'sprout','biowatch.html':'eye','orders.html':'receipt','stock.html':'package','suppliers.html':'link',
-  'finance.html':'wallet','depots.html':'warehouse','deliveries.html':'truck','farms.html':'farm','dispatch.html':'moving','commission.html':'percent','jobs.html':'wrench' };
+// Layout: greeting, then the KPI strip, then a chart beside the work queue. The rail carries every
+// page, so Home has no shortcut buttons; BioBrix Intelligence sits in the Ask bar docked at the bottom.
 var html = '';
 var today = new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'long'});
-html += '<div class="page-head row between" style="gap:16px;">'+
-  '<div><div class="eyebrow">'+greet+' · '+BB.esc(today)+'</div>'+
+html += '<div class="page-head">'+
+  '<div class="eyebrow">'+greet+' · '+BB.esc(today)+'</div>'+
   '<h1>'+BB.esc(first)+', here\'s what needs you.</h1>'+
-  '<p>'+BB.esc(u.role)+(u.region?' · '+BB.esc(u.region):'')+'. Everything is saved on this device and syncs when you have signal.</p></div>'+
-  '<div class="row" style="gap:8px;">'+big.map(function(b,i){
-    return '<a class="btn '+(i?'ghost':'')+'" href="'+b.href+'" title="'+BB.esc(b.s)+'">'+BB.icon(BIG_IC[b.href.split('?')[0]]||'chevron')+BB.esc(b.t)+'</a>';
-  }).join('')+'</div>'+
+  '<p>'+BB.esc(u.role)+(u.region?' · '+BB.esc(u.region):'')+'. Everything is saved on this device and syncs when you have signal.</p>'+
 '</div>';
 
 // ---- From the accounting system (only when it is actually connected) ----
@@ -401,6 +390,78 @@ html += '<div class="divider" style="margin-top:28px;"></div>'+
 
 document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
 chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
+
+// ---- Ask BioBrix: the Intelligence engine as a bar docked at the bottom of Home ----------------
+// Type a question and the answer opens above the bar; type a page name and it offers to jump there.
+// Only for seats that may open Intelligence — the answer links lead there.
+(function(){
+  if(!(BB.intel && BB.auth && BB.auth.canPage && BB.auth.canPage('intelligence.html'))) return;
+  var main=document.querySelector('main.wrap'); if(main) main.classList.add('has-ask');
+  var sugs = BB.intel.suggest.map(function(q){ return '<button type="button" class="ask-sug" data-q="'+BB.esc(q)+'">'+BB.esc(q)+BB.icon('plus')+'</button>'; }).join('');
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="askdock" id="askdock" role="search">'+
+      '<div class="ask-out" id="askOut" aria-live="polite"></div>'+
+      '<div class="ask-sugs" id="askSugs">'+sugs+'</div>'+
+      '<form class="ask-bar" id="askForm" autocomplete="off">'+
+        '<span class="spark" aria-hidden="true">'+BB.icon('sparkles')+'</span>'+
+        '<input id="askQ" type="text" placeholder="Ask BioBrix anything, or search for a page" aria-label="Ask BioBrix anything, or search for a page">'+
+        '<a class="ib open-intel" href="intelligence.html" title="Open BioBrix Intelligence" aria-label="Open BioBrix Intelligence">'+BB.icon('board')+'</a>'+
+        '<button class="ib go" type="submit" title="Ask" aria-label="Ask">'+BB.icon('chevron')+'</button>'+
+      '</form>'+
+    '</div>');
+  var dock=document.getElementById('askdock'), out=document.getElementById('askOut'), q=document.getElementById('askQ');
+  function close(){ dock.classList.remove('open'); out.innerHTML=''; }
+  function show(html){ out.innerHTML=html; dock.classList.add('open'); out.scrollTop=0; }
+  function head(icon, title){ return '<div class="hd">'+BB.icon(icon)+'<h4>'+BB.esc(title)+'</h4><button type="button" class="x" aria-label="Close">×</button></div>'; }
+  // pages this seat can open, straight from the rail
+  function pageHits(t){
+    t=t.toLowerCase(); if(t.length<2) return [];
+    var seen={};
+    return [].slice.call(document.querySelectorAll('#bbNav #nav-items a[href]')).filter(function(a){
+      var h=a.getAttribute('href'); if(seen[h]) return false; seen[h]=1;
+      return a.textContent.toLowerCase().indexOf(t)>=0;
+    }).slice(0,4).map(function(a){
+      var cat=a.closest('.rail-tab'), cl=cat&&cat.querySelector('.rt-label');
+      return { href:a.getAttribute('href'), label:a.textContent.trim(), cat:cl?cl.textContent:'' };
+    });
+  }
+  function ask(text){
+    text=(text||'').trim(); if(!text) return;
+    var a=BB.intel.answer(text) || BB.intel.answer('at a glance');
+    var pages=pageHits(text);
+    show(head('sparkles', a.title)+
+      '<div class="bd"><div class="q">You asked: “'+BB.esc(text)+'”</div>'+a.lines.map(function(l){ return '<div class="ln1">'+BB.esc(l)+'</div>'; }).join('')+'</div>'+
+      (pages.length?'<div class="lbl">Pages</div><div class="pages">'+pages.map(function(p){ return '<a href="'+p.href+'">'+BB.icon('chevron')+BB.esc(p.label)+'<small>'+BB.esc(p.cat)+'</small></a>'; }).join('')+'</div>':'')+
+      '<div class="ft"><a class="pri" href="'+a.to+'">Open the detail'+BB.icon('chevron')+'</a><a href="intelligence.html">'+BB.icon('sparkles')+'BioBrix Intelligence</a></div>');
+  }
+  // While typing, a page name offers a jump before anything is asked.
+  q.addEventListener('input', function(){
+    var t=q.value.trim(), hits=pageHits(t);
+    if(!t){ close(); return; }
+    if(hits.length) show(head('search','Go to')+'<div class="pages">'+hits.map(function(p,i){ return '<a href="'+p.href+'"'+(p.label.toLowerCase()===t.toLowerCase()?' class="on"':'')+'>'+BB.icon('chevron')+BB.esc(p.label)+'<small>'+BB.esc(p.cat)+'</small></a>'; }).join('')+
+      '</div><div class="ft"><a class="pri" href="#" data-ask="1">'+BB.icon('sparkles')+'Ask “'+BB.esc(t)+'” instead</a></div>');
+    else close();
+  });
+  document.getElementById('askForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    // An exact page name ("Stock") goes there; anything else is a question.
+    var exact=pageHits(q.value.trim()).filter(function(p){ return p.label.toLowerCase()===q.value.trim().toLowerCase(); })[0];
+    if(exact){ location.href=exact.href; return; }
+    ask(q.value);
+  });
+  q.addEventListener('keydown', function(e){ if(e.key==='Escape'){ q.value=''; close(); q.blur(); } });
+  out.addEventListener('click', function(e){
+    if(e.target.closest('.x')){ close(); return; }
+    var aa=e.target.closest('[data-ask]'); if(aa){ e.preventDefault(); ask(q.value); }
+  });
+  document.getElementById('askSugs').addEventListener('click', function(e){
+    var b=e.target.closest('.ask-sug'); if(!b) return; q.value=b.getAttribute('data-q'); ask(q.value);
+  });
+  document.addEventListener('click', function(e){ if(dock.classList.contains('open') && !e.target.closest('#askdock')) close(); });
+  // "/" focuses the bar from anywhere on Home
+  document.addEventListener('keydown', function(e){ if(e.key==='/' && !/input|textarea|select/i.test((document.activeElement||{}).tagName||'')){ e.preventDefault(); q.focus(); } });
+})();
+
 
 Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
   b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Follow-up done · '+d.farmer(fu.farmer).name); location.reload(); };
