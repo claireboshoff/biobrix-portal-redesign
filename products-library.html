@@ -59,6 +59,31 @@ var LEVER_IC={ Biology:'sprout', Chemistry:'flask', Physics:'leaf' };
 
 function levers(){ return ['All','Biology','Chemistry','Physics']; }
 
+// ---- popups: the products behind a figure or a chart part. A row opens that product's sheet here. ----
+// (The lever buttons, supplier picker and search stay: they narrow the cards, which are not a table.)
+function showProduct(id){
+  BB.closePopup(); state.open[id]=true;
+  if(!filtered().some(function(p){ return p.id===id; })){ state.lever='All'; state.supplier=''; state.q=''; render(); } else refreshCards();
+  setTimeout(function(){ var c=document.querySelector('.pcard[data-prod="'+id+'"]'); if(c) c.scrollIntoView({ behavior:'smooth', block:'center' }); }, 80);
+}
+function prodDetail(list){
+  list=list.slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
+  return { table:{ columns:['Product','Lever','Supplier','Pack','Price'], rows:list.map(function(p){ var sup=d.supplier(p.supplier)||{name:'—'};
+      return [{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.cat||'')+'</div>' }, { html:'<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever||'—')+'</span>' }, sup.name+(sup.lead!=null?' · '+sup.lead+' days':''), p.pack||'—', BB.money(p.price)+' / '+(p.unit||'unit')]; }), num:[4] },
+    note: list.length? 'Tap a product for its data sheet.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=list[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ showProduct(p.id); }; }); } };
+}
+function toCatalogue(){ BB.closePopup(); var el=document.getElementById('catalogue'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+function isImported(p){ var s=d.supplier(p.supplier)||{}; return !!(s.country && s.country!=='ZA'); }
+BB.statDetail('plImported', function(){ return Object.assign(prodDetail(products.filter(isImported)), { sub:'supplied from outside South Africa — allow for the longer lead time', actions:[{ label:'Open the full list', primary:true, onClick:toCatalogue }] }); });
+BB.statDetail('plSuppliers', function(){
+  var ids=products.map(function(p){ return p.supplier; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+  var rows=ids.map(function(id){ var s=d.supplier(id)||{name:'—'}; return { s:s, n:products.filter(function(p){ return p.supplier===id; }).length }; }).sort(function(a,b){ return b.n-a.n; });
+  return { sub:'the suppliers behind the products in this library',
+    table:{ columns:['Supplier','From','Lead time','Products'], rows:rows.map(function(x){ return [{ html:'<b>'+BB.esc(x.s.name)+'</b>'+(x.s.note?'<div class="faint" style="font-size:.72rem;">'+BB.esc(x.s.note)+'</div>':'') }, x.s.country||'—', x.s.lead!=null? x.s.lead+' days' : '—', String(x.n)]; }), num:[3] },
+    actions:[{ label:'Open the full list', primary:true, onClick:toCatalogue }] };
+});
+
 function filtered(){
   var q=state.q.trim().toLowerCase();
   return products.filter(function(p){
@@ -84,8 +109,8 @@ function statRow(){
   var avgLead=leads.length? Math.round(leads.reduce(function(a,b){ return a+b; },0)/leads.length) : null;
   return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Products</div><div class="v">'+products.length+'</div><div class="s">'+bio+' biology · '+chem+' chemistry · '+phys+' physics</div></div>'+
-    '<div class="stat"><div class="l">Suppliers represented</div><div class="v">'+reps.length+'</div><div class="s">of '+suppliers.length+' in the network</div></div>'+
-    '<div class="stat"><div class="l">Imported lines</div><div class="v">'+imported+'</div><div class="s">supplied from outside SA</div></div>'+
+    '<a class="stat tap" href="#catalogue" data-detail="plSuppliers"><div class="l">Suppliers represented</div><div class="v">'+reps.length+'</div><div class="s">of '+suppliers.length+' in the network</div></a>'+
+    '<a class="stat tap" href="#catalogue" data-detail="plImported"><div class="l">Imported lines</div><div class="v">'+imported+'</div><div class="s">supplied from outside SA</div></a>'+
     '<div class="stat"><div class="l">Average lead time</div><div class="v">'+(avgLead!=null?avgLead+' days':'—')+'</div><div class="s">across these suppliers</div></div>'+
   '</div>';
 }
@@ -141,7 +166,7 @@ function render(){
   html += statRow();
 
   html += '<div class="split" style="margin-top:16px;align-items:start;">';
-  html += '<div class="card"><div class="card-h"><div><h3>Catalogue</h3><div class="sub" id="shownCnt">'+filtered().length+' of '+products.length+' shown</div></div></div>'+
+  html += '<div class="card" id="catalogue" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Catalogue</h3><div class="sub" id="shownCnt">'+filtered().length+' of '+products.length+' shown</div></div></div>'+
     '<div class="card-p" style="padding-top:2px;">'+toolbar()+'<div id="cardWrap">'+cards()+'</div></div></div>';
 
   html += '<div style="display:grid;gap:16px;min-width:0;">';
@@ -153,11 +178,15 @@ function render(){
   if(products.length){
     try{
       var cnt={}; products.forEach(function(p){ cnt[p.lever]=(cnt[p.lever]||0)+1; });
-      BB.chart.donut('#chLever',{ centreLabel:'products', size:136, rows:Object.keys(cnt).map(function(k){ return { label:k, value:cnt[k], color:LEVER_COL[k]||'#6b7a5e' }; }) });
+      BB.chart.donut('#chLever',{ centreLabel:'products', size:136, valueLabel:'Products', rows:Object.keys(cnt).map(function(k){ return { label:k, value:cnt[k], color:LEVER_COL[k]||'#6b7a5e' }; }),
+        detail:function(ctx){ return prodDetail(products.filter(function(p){ return p.lever===ctx.row.label; })); } });
       var seen={}, rows=[];
-      products.forEach(function(p){ if(seen[p.supplier]) return; seen[p.supplier]=1; var s=d.supplier(p.supplier); if(s && s.lead!=null) rows.push({ label:s.name, sub:s.country||'', value:s.lead, color:(s.country&&s.country!=='ZA')?'#c77d17':'#3f6b28' }); });
+      products.forEach(function(p){ if(seen[p.supplier]) return; seen[p.supplier]=1; var s=d.supplier(p.supplier); if(s && s.lead!=null) rows.push({ id:p.supplier, label:s.name, sub:s.country||'', value:s.lead, color:(s.country&&s.country!=='ZA')?'#c77d17':'#3f6b28' }); });
       rows.sort(function(a,b){ return b.value-a.value; });
-      BB.chart.hbar('#chLead',{ rows:rows, fmt:function(v){ return v+' days'; }, legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#c77d17'}] });
+      BB.chart.hbar('#chLead',{ rows:rows, fmt:function(v){ return v+' days'; }, valueLabel:'Lead time', legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#c77d17'}],
+        // that supplier's products
+        detail:function(ctx){ var s=d.supplier(ctx.row.id)||{};
+          return Object.assign(prodDetail(products.filter(function(p){ return p.supplier===ctx.row.id; })), { sub:[s.note, s.country? 'from '+s.country : ''].filter(Boolean).join(' · ') }); } });
     }catch(e){ console.warn('chart', e); }
   }
   wire();

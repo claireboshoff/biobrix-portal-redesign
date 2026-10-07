@@ -42,6 +42,7 @@ var css=''+
 '.composer textarea:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}'+
 '.pane-empty{padding:56px 20px;text-align:center;color:var(--faint);font-size:.88rem;}'+
 '.pane-empty .ico{width:30px;height:30px;margin-bottom:10px;color:var(--green-mid);}'+
+'.pop-jobs{border:1px solid var(--line);border-radius:10px;overflow:hidden;} .pop-jobs .job:first-child{border-top:0;}'+
 '@media(max-width:560px){.job,.band-h,.band-none{padding-left:14px;padding-right:14px;} .thread{padding:14px;} .composer{padding:10px 14px;} .bub{max-width:90%;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
@@ -54,15 +55,18 @@ function render(){
   var html='';
   html+='<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Requests &amp; changes</div><h1>Jobs to FreedomHub</h1><p>Anything you want changed, fixed or added — a button, a report, a whole new section — write it here. The team builds it, keeps you posted in the thread, and it ships into this portal.</p></div>'+
     '<div class="row"><button class="btn" id="newJob">'+BB.icon('plus')+'New job</button></div></div>';
+  // Each figure opens the jobs behind it over the page; picking one opens its thread here.
+  var tile=function(k, cls, label, sub){ return '<a class="stat tap'+(cls?' '+cls:'')+'" href="jobs.html#band-'+k+'" data-detail="jobs-'+k+'"><div class="l">'+label+'</div><div class="v">'+cnt(k)+'</div><div class="s">'+sub+' ›</div></a>'; };
+  bands.forEach(function(b){ BB.statDetail('jobs-'+b.k, function(){ return bandPop(b, jobs.filter(function(j){ return j.band===b.k; })); }); });
   html+='<div class="grid g3" style="margin-top:14px;">'+
-    '<div class="stat'+(cnt('needs')?' warn':'')+'"><div class="l">Needs you</div><div class="v">'+cnt('needs')+'</div><div class="s">a question from the team</div></div>'+
-    '<div class="stat"><div class="l">In flight</div><div class="v">'+cnt('flight')+'</div><div class="s">being built now</div></div>'+
-    '<div class="stat"><div class="l">Shipped</div><div class="v">'+cnt('shipped')+'</div><div class="s">done and live</div></div>'+
+    tile('needs', cnt('needs')?'warn':'', 'Needs you', 'a question from the team')+
+    tile('flight', '', 'In flight', 'being built now')+
+    tile('shipped', '', 'Shipped', 'done and live')+
   '</div>';
   html+='<div class="jobs-grid"><div class="card"><div class="card-h"><div><h3>Requests</h3><div class="sub">tap one to open its thread</div></div><span class="badge b-grey">'+jobs.length+'</span></div>';
   bands.forEach(function(b){
     var list=jobs.filter(function(j){return j.band===b.k;});
-    html+='<div class="band-h"><b>'+b.t+' · '+list.length+'</b><span>'+b.hint+'</span></div>';
+    html+='<div class="band-h" id="band-'+b.k+'"><b>'+b.t+' · '+list.length+'</b><span>'+b.hint+'</span></div>';
     if(!list.length) html+='<div class="band-none">Nothing here.</div>';
     list.forEach(function(j){ html+='<div class="job'+(openId===j.id?' on':'')+'" data-job="'+j.id+'" role="button" tabindex="0"><div style="min-width:0;"><div class="t">'+BB.esc(j.title)+'</div><div class="m">'+BB.esc(d.person(j.by).name)+' · '+BB.date(j.created)+' · '+j.msgs.length+' message'+(j.msgs.length===1?'':'s')+'</div></div>'+BB.statusBadge(j.status)+'</div>'; });
   });
@@ -90,6 +94,19 @@ function render(){
   }
   html+='</div></div><div style="height:24px;"></div>';
   document.querySelector('main.wrap').innerHTML=html; wire();
+}
+function bandPop(b, list){
+  var last=function(j){ var m=j.msgs[j.msgs.length-1]; return m? (m.from==='fh'?'FreedomHub':d.person(m.from).name)+': '+m.text : ''; };
+  return { sub:b.hint+' · '+list.length+' job'+(list.length===1?'':'s'), wide:list.length>0, stats:[],
+    html: list.length? '<div class="pop-jobs">'+list.map(function(j){
+        return '<div class="job" data-popjob="'+j.id+'" role="button" tabindex="0"><div style="min-width:0;"><div class="t">'+BB.esc(j.title)+'</div>'+
+          '<div class="m">'+BB.esc(d.person(j.by).name)+' · '+BB.date(j.created)+' · '+j.msgs.length+' message'+(j.msgs.length===1?'':'s')+'</div>'+
+          (last(j)?'<div class="m" style="color:var(--muted);">'+BB.esc(last(j).length>140?last(j).slice(0,140)+'…':last(j))+'</div>':'')+'</div>'+BB.statusBadge(j.status)+'</div>'; }).join('')+'</div>'
+      : '<div class="empty">Nothing here.</div>',
+    actions:[{ label:'Show in the list', primary:true, onClick:function(){ BB.closePopup(); var el=document.getElementById('band-'+b.k); if(el) el.scrollIntoView({ behavior:'smooth', block:'center' }); } }],
+    onOpen:function(body){ body.querySelectorAll('[data-popjob]').forEach(function(el){
+      var go=function(){ BB.closePopup(); openId=el.getAttribute('data-popjob'); composing=false; render(); toPane(); };
+      el.onclick=go; el.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }; }); } };
 }
 // On a phone the pane sits below the list — bring it into view when it changes.
 function toPane(){ try{ if(window.matchMedia('(max-width:999px)').matches){ var p=document.getElementById('pane'); if(p) p.scrollIntoView({behavior:'smooth',block:'start'}); } }catch(e){} }

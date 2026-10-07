@@ -345,6 +345,8 @@
     else if (spec.values) {
       var have = {}; T.rows.forEach(function (r) { have[r.v[c.i] && r.v[c.i] !== '—' ? r.v[c.i] : '(Blank)'] = 1; });
       var keep = Object.keys(have).filter(function (v) { return spec.values.some(function (w) { return String(w).toLowerCase() === v.toLowerCase(); }); });
+      // a cell can carry more than its value ("Awaiting stock HOLD"): fall back to starts-with
+      if (!keep.length) keep = Object.keys(have).filter(function (v) { return spec.values.some(function (w) { return v.toLowerCase().indexOf(String(w).toLowerCase()) === 0; }); });
       if (!keep.length) throw new Error('None of those values are in "' + c.label + '". Values: ' + Object.keys(have).slice(0, 30).join(', '));
       T.st.f[c.i] = { kind: 'in', set: new Set(keep) };
     } else if (spec.op) {

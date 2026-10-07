@@ -74,8 +74,28 @@ function render(){
       return '<a class="'+(view===k?'on':'')+'" href="forecast-plan.html?view='+k+'&from='+startYm+'">'+t+'</a>';
     }).join('')+'</div></div>';
   var chartJobs = [];
+  // ---- popups: what sits behind a chart part ----
+  function merge(a,b){ Object.keys(b).forEach(function(k){ a[k]=b[k]; }); return a; }
+  // a ledger customer's farm file, when the accounts have been laid over the farm list
+  var farmOf = {}; try{ d.allUnscoped('farmers').forEach(function(f){ if(f.sageId!=null) farmOf[f.sageId]=f.id; }); }catch(e){}
+  function custHref(id){ return farmOf[id]? 'farm-detail.html?farmer='+encodeURIComponent(farmOf[id]) : null; }
+  var custName = {}; ((sg && sg.customers)||[]).forEach(function(c){ custName[c.id]=c.name; });
+  // invoices (ledger) behind a month or a customer: date, number, customer, amount, with a total
+  function invoiceTable(list, showCust){
+    list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var tot=0, cols=['Date','Invoice'].concat(showCust?['Customer']:[]).concat(['Amount']);
+    var rows=list.slice(0,200).map(function(i){ tot+=(i.amount||0);
+      return { href:custHref(i.customer), cells:[BB.date(i.date), i.label||i.ref||'—'].concat(showCust?[custName[i.customer]||'—']:[]).concat([money(i.amount||0)]) }; });
+    var all=list.reduce(function(t,i){ return t+(i.amount||0); },0);
+    if(list.length>1) rows.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-1).map(function(){ return ''; })).concat([{ html:'<b>'+money(all)+'</b>' }]) });
+    return { table:{ columns:cols, rows:rows, num:[cols.length-1] }, note: list.length>200? 'Showing the 200 newest of '+list.length+'.' : (showCust && list.length? 'Tap an invoice to open that customer’s farm file.' : null) };
+  }
+  function prevMonthsAll(){ var out=[], p=startYm.split('-'), y=parseInt(p[0],10), m=parseInt(p[1],10); for(var i=0;i<12;i++){ m--; if(m<1){m=12;y--;} out.unshift(y+'-'+String(m).padStart(2,'0')); } return out; }
+  var ledgerInv = (sg && sg.live) ? (sg.invoices||[]).filter(function(i){ return i.kind!=='opening'; }) : [];
   function emptyChart(sel, msg){ chartJobs.push(function(){ var el=document.querySelector(sel); if(el) el.innerHTML='<div class="empty">'+msg+'</div>'; }); }
   function stat(l, v, sub, cls){ return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></div>'; }
+  // a figure that is a list of invoices opens that list over the page
+  function tapStat(key, href, l, v, sub){ return '<a class="stat tap" href="'+href+'" data-detail="'+key+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></a>'; }
 
   // ---------- actuals from the ledger ----------
   var actualByMonth = {}, actualByCustomerMonth = {};
@@ -115,11 +135,38 @@ function render(){
       '<div class="card"><div class="card-h"><div><h3>Biggest lines '+(rankByLy?'last year':'in the plan')+'</h3><div class="sub">'+(rankByLy?'units invoiced in these months last year':'planned units this season')+'</div></div></div><div class="card-p"><div id="chProd"></div></div></div>'+
     '</div>';
     if(planTot || lyTot) chartJobs.push(function(){ BB.chart.bar('#chPlan',{ labels:months.map(monthLabel), height:230, table:true,
-      series:[{name:'Plan',values:planM,color:'#3f6b28'},{name:'Last year',values:lyM,color:'#c77d17'}] }); });
+      series:[{name:'Plan',values:planM,color:'#3f6b28'},{name:'Last year',values:lyM,color:'#c77d17'}],
+      // the product lines that make up the month: planned units beside the same month last year
+      detail:function(ctx){
+        var m=months[ctx.index], ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4), tp=0, tl=0;
+        var rows=products.map(function(p){
+          var v=Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0), w=(p.months&&p.months[ly])? Number(p.months[ly].qty)||0 : 0;
+          return { p:p, v:v, w:w };
+        }).filter(function(x){ return x.v||x.w; }).sort(function(a,b){ return (b.v-a.v)||(b.w-a.w); });
+        rows.forEach(function(x){ tp+=x.v; tl+=x.w; });
+        var cells=rows.map(function(x){ return { cells:[{ html:'<b>'+BB.esc(x.p.name)+'</b>' }, x.p.pack||'L', x.v? BB.num(x.v) : '—', x.w? BB.num(x.w) : '—',
+          { html:(x.v&&x.w)? BB.delta(x.v,x.w)||'—' : '—' }] }; });
+        if(rows.length>1) cells.push({ cells:[{ html:'<b>'+rows.length+' products</b>' }, '', { html:'<b>'+BB.num(Math.round(tp))+'</b>' }, { html:'<b>'+BB.num(Math.round(tl))+'</b>' }, ''] });
+        return { sub:rows.length? rows.length+' product'+(rows.length===1?'':'s')+' planned or sold in '+ctx.label : 'Nothing planned or sold in '+ctx.label,
+          table:{ columns:['Product','Unit','Plan','Last year','Change'], rows:cells, num:[2,3,4] },
+          note:'Units. Type the plan in the table on this page.' };
+      } }); });
     else emptyChart('#chPlan','Nothing planned yet. Type a figure in the table below and it shows here.');
     var topP = perProd.map(function(x){ return { label:x.label, sub:x.sub, value:rankByLy? x.ly : x.value }; })
       .filter(function(x){ return x.value>0; }).sort(function(a,b){ return b.value-a.value; }).slice(0,8);
-    if(topP.length) chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:topP }); });
+    if(topP.length) chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:topP,
+      // one product, month by month: plan beside last year
+      detail:function(ctx){
+        var p=products.filter(function(x){ return x.name===ctx.row.label; })[0]; if(!p) return null;
+        var tp=0, tl=0;
+        var cells=months.map(function(m){
+          var v=Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0), ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4), w=(p.months&&p.months[ly])? Number(p.months[ly].qty)||0 : 0;
+          tp+=v; tl+=w; return { cells:[monthLabel(m), v? BB.num(v) : '—', w? BB.num(w) : '—', { html:(v&&w)? BB.delta(v,w)||'—' : '—' }] }; });
+        cells.push({ cells:[{ html:'<b>The season</b>' }, { html:'<b>'+(tp? BB.num(Math.round(tp)) : '—')+'</b>' }, { html:'<b>'+(tl? BB.num(Math.round(tl)) : '—')+'</b>' }, ''] });
+        return { sub:(p.code? p.code+' · ' : '')+(p.pack||'L')+' · units per month',
+          stats:[{ l:'Planned', v:tp? BB.num(Math.round(tp)) : '—', s:'this season' }, { l:'Same months last year', v:tl? BB.num(Math.round(tl)) : '—' }].concat(p.sold? [{ l:'Sold to date', v:BB.num(p.sold) }] : []),
+          table:{ columns:['Month','Plan','Last year','Change'], rows:cells, num:[1,2,3] } };
+      } }); });
     else emptyChart('#chProd','No product has a planned figure yet.');
 
     // Counting what we could propose lets the button say something true rather than "fill".
@@ -184,16 +231,23 @@ function render(){
       stat('Customers shown', top.length, top.length? 'your biggest, by invoiced to date' : 'from your accounting system')+
       stat('Invoiced to date', money(invTop), 'these customers, all time')+
       stat('Planned, next six months', planCust? money(planCust) : '—', planCust? 'typed against these customers' : 'type it in the table below')+
-      stat('Last 12 months', money(prevVals.reduce(function(a,b){return a+b;},0)), 'invoiced, every customer')+
+      tapStat('fpLast12', 'sales-report.html?view=monthly', 'Last 12 months', money(prevVals.reduce(function(a,b){return a+b;},0)), 'invoiced, every customer')+
     '</div>';
     html += '<div class="split" style="margin-top:16px;">'+
       '<div class="card"><div class="card-h"><div><h3>Invoiced, the 12 months before</h3><div class="sub">what the plan starts from</div></div>'+BB.liveChip()+'</div><div class="card-p"><div id="chBack"></div></div></div>'+
       '<div class="card"><div class="card-h"><div><h3>Biggest customers</h3><div class="sub">invoiced to date</div></div></div><div class="card-p"><div id="chCust"></div></div></div>'+
     '</div>';
-    if(prevVals.some(function(v){ return v>0; })) chartJobs.push(function(){ BB.chart.bar('#chBack',{ labels:prevMonths.map(monthLabel), money:true, height:290, table:true, series:[{name:'Invoiced',values:prevVals,color:'#3f6b28'}] }); });
+    if(prevVals.some(function(v){ return v>0; })) chartJobs.push(function(){ BB.chart.bar('#chBack',{ labels:prevMonths.map(monthLabel), money:true, height:290, table:true, series:[{name:'Invoiced',values:prevVals,color:'#3f6b28'}],
+      detail:function(ctx){ var m=prevMonths[ctx.index], list=ledgerInv.filter(function(i){ return ym(i.date)===m; });
+        return merge(invoiceTable(list, true), { sub:list.length+' invoice'+(list.length===1?'':'s')+' in '+ctx.label+', opening balances left out', wide:true }); } }); });
     else emptyChart('#chBack','This fills in from your accounting system.');
-    var topRows = top.filter(function(r){ return r.last12>0; }).slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.last12 }; });
-    if(topRows.length) chartJobs.push(function(){ BB.chart.hbar('#chCust',{ money:true, rows:topRows }); });
+    var topRows = top.filter(function(r){ return r.last12>0; }).slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.last12, cid:r.c.id, href:custHref(r.c.id) }; });
+    if(topRows.length) chartJobs.push(function(){ BB.chart.hbar('#chCust',{ money:true, rows:topRows, openLabel:'Open farm file',
+      detail:function(ctx){ var id=ctx.row.cid, list=ledgerInv.filter(function(i){ return i.customer===id; });
+        var x=invoiceTable(list, false);
+        var plan=0; months.slice(0,6).forEach(function(m){ plan += Number(((fc[d.fKey(m, null, 'sage_'+id)]||{}).value)||0); });
+        return merge(x, { sub:(ctx.row.sub? ctx.row.sub+' · ' : '')+list.length+' invoice'+(list.length===1?'':'s')+' to date',
+          stats:[{ l:'Invoiced to date', v:money(ctx.value) }, { l:'Invoices', v:BB.num(list.length) }, { l:'Planned, next six months', v:plan? money(plan) : '—' }] }); } }); });
     else emptyChart('#chCust','No customer figures yet.');
 
     html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>By customer</h3><div class="sub">your 40 biggest · last year invoiced shown as the starting point · amounts in rands</div></div>'+BB.liveChip()+'</div>';
@@ -230,7 +284,7 @@ function render(){
     var trk = fSoFar? Math.round(aSoFar/fSoFar*100) : null;
     html += '<div class="grid g4">'+
       stat('Forecast for the year', fTot? money(fTot) : '—', fTot? 'typed or added up from customers' : 'set a month below')+
-      stat('Invoiced so far', money(aTot), 'this season, opening balances left out')+
+      tapStat('fpSoFar', 'sales-report.html?view=monthly', 'Invoiced so far', money(aTot), 'this season, opening balances left out')+
       stat('Left to reach forecast', (fTot? money(Math.max(0,fTot-aTot)) : '—'), fTot? (aTot>=fTot?'forecast reached, '+money(aTot-fTot)+' over':'for the whole year') : 'set a forecast first')+
       stat('Tracking', trk===null? '—' : trk+'%', trk===null? 'needs a forecast and an invoiced month' : 'of forecast, in months with both', (trk!==null && trk<80)?'warn':'')+
     '</div>';
@@ -246,11 +300,24 @@ function render(){
       var cumSeries = [{name:'Invoiced',values:cav,color:'#22431a',area:true}];
       if(fTot) cumSeries.unshift({name:'Forecast',values:cfv,color:'#68a53e',dash:true});
       chartJobs.push(function(){ BB.chart.bar('#chVal',{ labels:months.map(monthLabel), money:true, height:230, table:true,
-        series:[{name:'Forecast',values:fv,color:'#8fbf5a'},{name:'Invoiced',values:av,color:'#22431a'}] }); });
+        series:[{name:'Forecast',values:fv,color:'#8fbf5a'},{name:'Invoiced',values:av,color:'#22431a'}],
+        // the month: where its forecast comes from, and the invoices that make up the actual
+        detail:function(ctx){ var r=rowsV[ctx.index], list=ledgerInv.filter(function(i){ return ym(i.date)===r.m; });
+          var x=invoiceTable(list, true);
+          return merge(x, { wide:true, sub:(r.typed? 'forecast typed for the month' : r.fromCustomers? 'forecast added up from the per-customer figures' : 'no forecast set')+' · '+list.length+' invoice'+(list.length===1?'':'s') }); } }); });
       var cumPts = cav.filter(function(v){ return v!=null; }).length;
       if(!fTot && cumPts<3) emptyChart('#chCum','Fills in as the year goes: '+money(aTot)+' invoiced so far.');
       else chartJobs.push(function(){ BB.chart.line('#chCum',{ labels:months.map(monthLabel), money:true, height:230, table:true,
-        series:cumSeries }); });
+        series:cumSeries,
+        // the year up to that month, added up month by month
+        detail:function(ctx){ var rf=0, ra=0, cells=[];
+          for(var i=0;i<=ctx.index;i++){ rf+=fv[i]; var fut=months[i]>nowYm; if(!fut) ra+=av[i];
+            cells.push({ cells:fTot? [monthLabel(months[i]), fv[i]? money(fv[i]) : '—', fut? '—' : (av[i]? money(av[i]) : '—'), money(rf), fut? '—' : money(ra)]
+                                   : [monthLabel(months[i]), fut? '—' : (av[i]? money(av[i]) : '—'), fut? '—' : money(ra)] }); }
+          // a running total's "share of the chart" means nothing: show where the year stands instead
+          var st=[{ l:'Invoiced so far', v:money(ra) }].concat(fTot? [{ l:'Forecast so far', v:money(rf) }, { l:ra>=rf?'Ahead by':'Behind by', v:money(Math.abs(ra-rf)), cls:ra>=rf?'':'warn' }] : []);
+          return { stats:st, sub:'the season from '+monthLabel(months[0])+' to '+ctx.label, table:fTot? { columns:['Month','Forecast','Invoiced','Forecast so far','Invoiced so far'], rows:cells, num:[1,2,3,4] } : { columns:['Month','Invoiced','Invoiced so far'], rows:cells, num:[1,2] }, wide:!!fTot };
+        } }); });
     } else { emptyChart('#chVal','No forecast set and nothing invoiced in these months yet.'); emptyChart('#chCum','Fills in as the year goes.'); }
 
     html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Forecast against what was invoiced</h3><div class="sub">actuals straight from your accounting system · type a month\'s forecast to set it</div></div>'+BB.liveChip()+'</div>';
@@ -271,6 +338,12 @@ function render(){
 
   if(pl.updatedAt) html += '<div class="fp-note faint" style="font-size:.76rem;margin-top:14px;">Last change to the plan: '+BB.esc(String(pl.updatedAt).slice(0,16).replace('T',' '))+(pl.updatedBy? ' by '+BB.esc(pl.updatedBy):'')+'.</div>';
 
+  // the invoices behind the two invoiced figures (sales report has them week by week and month by month)
+  function invTile(list, sub){ var x=invoiceTable(list, true);
+    return merge(x, { sub:sub, wide:true, stats:[{ l:'Invoiced', v:money(list.reduce(function(t,i){ return t+(i.amount||0); },0)) }, { l:'Invoices', v:BB.num(list.length) }],
+      actions:[{ label:'Open the full list', href:'sales-report.html?view=monthly', primary:true }] }); }
+  BB.statDetail('fpLast12', function(){ var p=prevMonthsAll(); return invTile(ledgerInv.filter(function(i){ return p.indexOf(ym(i.date))>=0; }), 'every customer, '+monthLabel(p[0])+' to '+monthLabel(p[11])); });
+  BB.statDetail('fpSoFar', function(){ return invTile(ledgerInv.filter(function(i){ return months.indexOf(ym(i.date))>=0; }), 'this season, '+monthLabel(months[0])+' to '+monthLabel(months[11])); });
   host.innerHTML = html;
   chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 

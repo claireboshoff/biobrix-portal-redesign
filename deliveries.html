@@ -25,14 +25,8 @@ var d = BB.data;
 // Warehouse seat sees only deliveries for its own depot. Directors / ops see all.
 var scopeDepot = (BB.user && BB.user.roleKey==='warehouse' && BB.user.depot) ? BB.user.depot : null;
 
-var STATUS_CHIPS = [
-  { id:'all', name:'All' },
-  { id:'In transit', name:'In transit' },
-  { id:'Delivered', name:'Delivered' },
-  { id:'Awaiting stock', name:'Awaiting stock' }
-];
+// Status chips are gone: the Status column's funnel filters the table now.
 var STATUS_OPTIONS = ['Awaiting stock','In transit','Delivered'];
-var filter = 'all';
 
 function orderRef(delivery){
   var o = d.by('orders', delivery.order);
@@ -40,6 +34,41 @@ function orderRef(delivery){
 }
 
 var STATUS_COL = { 'In transit':'#2f6f9e', 'Delivered':'#3f6b28', 'Awaiting stock':'#c77d17' };
+
+// ---- popups ----
+function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
+function go(label, href, primary){ return href && can(href) ? { label:label, href:href, primary:!!primary } : null; }
+function farmHref(fid){ return fid && can('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(fid) : null; }
+function depShort(id){ return String(d.depot(id).name||'').replace(/ Depot$/,''); }
+function delTable(list, withHold){
+  return { columns:['Order','Farmer'].concat(scopeDepot?[]:['Depot']).concat(['Transport','ETA','Status']),
+    rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(x){ var h=withHold&&d.deliveryHold(d.by('orders', x.order));
+      return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(orderRef(x))+'</span>' }, d.farmer(x.farmer).name].concat(scopeDepot?[]:[depShort(x.depot)]).concat([x.transport||'—', BB.date(x.eta),
+        { html:BB.statusBadge(x.status)+(h?' <span class="badge '+(h.sev==='high'?'b-bad':'b-warn')+'" title="'+BB.esc(h.reason)+'">HOLD</span>':'') }]), href:farmHref(x.farmer) }; }) };
+}
+// The deliveries in one status, with a button that narrows the table below to them.
+function statusDetail(all, st){
+  var list=all.filter(function(x){ return x.status===st; });
+  return { title:st, table:delTable(list, true), actions:[list.length?{ label:'Show them in the table', primary:true, onClick:function(){ BB.closePopup(); showStatus(st); } }:null] };
+}
+function showStatus(st){
+  try{
+    var t=(BB.tableFilters.list()||[]).filter(function(x){ return x.title==='Deliveries'; })[0];
+    var col=t && t.columns.filter(function(c){ return c.column==='Status'; })[0];
+    var vals=((col&&col.values)||[]).filter(function(v){ return v.indexOf(st)===0; });
+    if(vals.length) BB.tableFilters.set('Deliveries', 'Status', { values:vals });
+  }catch(e){ console.warn('filter', e); }
+  var c=document.getElementById('dlvTable'); if(c) c.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function deliveryPreview(x){
+  var o=d.by('orders', x.order), f=d.farmer(x.farmer), hold=o&&d.deliveryHold(o);
+  return { eyebrow:'Delivery', title:(o?o.ref+' · ':'')+f.name, sub:'from '+d.depot(x.depot).name+' · '+(x.transport&&x.transport!=='—'?x.transport:'no transport yet'),
+    stats:[{l:'Status', html:BB.statusBadge(x.status)}, {l:'ETA', v:BB.date(x.eta)}, {l:'Order value', v:o?BB.money(d.orderValue(o)):'—'}]
+      .concat(hold?[{l:'Finance hold', v:'HOLD', s:hold.reason, cls:hold.sev==='high'?'bad':'warn'}]:[]),
+    table:o?{ columns:['Product','Quantity','Value'], num:[1,2], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod);
+      return { cells:[p.name, BB.num(l.qty)+' '+(p.unit||''), BB.money((p.price||0)*(l.qty||0))] }; }) }:null,
+    actions:[go('Open the order','orders.html',true), go('Open the farm', farmHref(x.farmer))] };
+}
 
 function render(){
   var all = d.all('deliveries');
@@ -51,7 +80,7 @@ function render(){
   var holdOf = function(x){ return d.deliveryHold(d.by('orders', x.order)); };
   var onHold = all.filter(function(x){ return !!holdOf(x); }).length;
 
-  var rows = filter==='all' ? all : all.filter(function(x){ return x.status===filter; });
+  var rows = all;
 
   var html = '';
   html += '<section class="page-head row between" style="gap:16px;">'+
@@ -61,19 +90,16 @@ function render(){
     ((BB.auth && BB.auth.canPage && BB.auth.canPage('labels.html')) ? '<div class="row"><a class="btn ghost" href="labels.html">'+BB.icon('tag')+'Delivery labels</a></div>' : '')+
   '</section>';
 
+  var tile = function(key, cls, l, v, s){ return '<a class="stat tap'+(cls?' '+cls:'')+'" href="#dlvTable" data-detail="'+key+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+s+' ›</div></a>'; };
   html += '<div class="grid g4" style="margin-top:14px;">'+
-    '<div class="stat"><div class="l">In transit</div><div class="v">'+inTransit+'</div><div class="s">on the road</div></div>'+
-    '<div class="stat"><div class="l">Delivered</div><div class="v">'+delivered+'</div><div class="s">this season</div></div>'+
-    '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting stock</div><div class="v">'+awaiting+'</div><div class="s">held on stock</div></div>'+
-    '<div class="stat'+(onHold>0?' bad':'')+'"><div class="l">On finance hold</div><div class="v">'+onHold+'</div><div class="s">account overdue or over limit</div></div>'+
+    tile('dl-transit', '', 'In transit', inTransit, 'on the road')+
+    tile('dl-delivered', '', 'Delivered', delivered, 'this season')+
+    tile('dl-awaiting', awaiting>0?'warn':'', 'Awaiting stock', awaiting, 'held on stock')+
+    tile('dl-hold', onHold>0?'bad':'', 'On finance hold', onHold, 'account overdue or over limit')+
   '</div>';
-
-  var chips = '<div class="row" style="gap:6px;">';
-  STATUS_CHIPS.forEach(function(c){
-    var n = c.id==='all' ? all.length : all.filter(function(x){ return x.status===c.id; }).length;
-    chips += '<button class="chip'+(filter===c.id?' on':'')+'" data-status="'+BB.esc(c.id)+'">'+BB.esc(c.name)+' <span style="opacity:.7;">'+n+'</span></button>';
-  });
-  chips += '</div>';
+  STATUS_OPTIONS.forEach(function(st){ BB.statDetail('dl-'+(st==='In transit'?'transit':st==='Delivered'?'delivered':'awaiting'), function(){ return statusDetail(all, st); }); });
+  BB.statDetail('dl-hold', function(){ var list=all.filter(function(x){ return !!holdOf(x); });
+    return { table:delTable(list, true), actions:[go('Open what is overdue','finance.html?show=overdue',true)] }; });
 
   var tbl = '<div class="scroll"><table class="bb">'+
     '<thead><tr><th>Order</th><th>Farmer</th>'+(scopeDepot?'':'<th>Depot</th>')+'<th>Transport</th><th>ETA</th><th>Status</th><th class="num">Advance</th></tr></thead><tbody>';
@@ -85,7 +111,7 @@ function render(){
       var hold = holdOf(x);
       var holdBadge = hold ? ' <span class="badge '+(hold.sev==='high'?'b-bad':'b-warn')+'" title="'+BB.esc(hold.reason)+'">HOLD</span>' : '';
       tbl += '<tr>'+
-        '<td style="white-space:nowrap;"><b style="color:var(--green-dark);">'+BB.esc(orderRef(x))+'</b></td>'+
+        '<td style="white-space:nowrap;"><a href="#" class="dl-open" data-open="'+BB.esc(x.id)+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(orderRef(x))+'</a></td>'+
         '<td style="white-space:nowrap;">'+BB.esc(d.farmer(x.farmer).name)+'</td>'+
         (scopeDepot?'':'<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>')+
         '<td class="muted">'+BB.esc(x.transport)+'</td>'+
@@ -98,7 +124,7 @@ function render(){
   tbl += '</tbody></table></div>';
 
   var depots = scopeDepot ? [] : d.all('depots');
-  var tableCard = '<div class="card"><div class="card-h"><div><h3>Deliveries</h3><div class="sub">'+rows.length+' in this view'+(scopeDepot?' · '+BB.esc(d.depot(scopeDepot).name):'')+'</div></div>'+chips+'</div>'+tbl+'</div>';
+  var tableCard = '<div class="card" id="dlvTable"><div class="card-h"><div><h3>Deliveries</h3><div class="sub">'+rows.length+' deliver'+(rows.length===1?'y':'ies')+(scopeDepot?' · '+BB.esc(d.depot(scopeDepot).name):'')+' · tap an order for its lines</div></div></div>'+tbl+'</div>';
   var statusCard = '<div class="card"><div class="card-h"><div><h3>By status</h3><div class="sub">'+all.length+' deliver'+(all.length===1?'y':'ies')+(scopeDepot?' from your depot':' across the depots')+'</div></div></div><div class="card-p">'+
     (all.length?'<div id="chStatus"></div>':'<div class="empty">No deliveries yet.</div>')+'</div></div>';
   if(depots.length){
@@ -118,17 +144,22 @@ function render(){
   wire();
 
   try{
-    if(all.length) BB.chart.donut('#chStatus', { centreLabel:all.length===1?'delivery':'deliveries', rows:STATUS_OPTIONS.map(function(s){ return { label:s, value:all.filter(function(x){ return x.status===s; }).length, color:STATUS_COL[s] }; }) });
-    if(depots.length) BB.chart.hbar('#chDepot', {
+    if(all.length) BB.chart.donut('#chStatus', { valueLabel:'Deliveries', centreLabel:all.length===1?'delivery':'deliveries', rows:STATUS_OPTIONS.map(function(s){ return { label:s, value:all.filter(function(x){ return x.status===s; }).length, color:STATUS_COL[s] }; }),
+      // those deliveries
+      detail:function(ctx){ var o=statusDetail(all, ctx.row.label); delete o.stats; return o; } });
+    if(depots.length) BB.chart.hbar('#chDepot', { valueLabel:'Deliveries',
       legend:STATUS_OPTIONS.map(function(s){ return { name:s, color:STATUS_COL[s] }; }),
       rows:depots.map(function(dep){ var mine = all.filter(function(x){ return x.depot===dep.id; });
-        return { label:dep.name, sub:dep.region, parts:STATUS_OPTIONS.map(function(s){ return { name:s, value:mine.filter(function(x){ return x.status===s; }).length, color:STATUS_COL[s] }; }) }; }) });
+        return { label:dep.name, sub:dep.region, depId:dep.id, parts:STATUS_OPTIONS.map(function(s){ return { name:s, value:mine.filter(function(x){ return x.status===s; }).length, color:STATUS_COL[s] }; }) }; }),
+      // that depot's deliveries
+      detail:function(ctx){ var mine=all.filter(function(x){ return x.depot===ctx.row.depId; });
+        return { table:delTable(mine, false), actions:[go('Open the depot','depots.html',true)] }; } });
   }catch(e){ console.warn('chart', e); }
 }
 
 function wire(){
-  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-status]'), function(btn){
-    btn.onclick = function(){ filter = btn.getAttribute('data-status'); render(); };
+  Array.prototype.forEach.call(document.querySelectorAll('a.dl-open[data-open]'), function(a){
+    a.onclick = function(e){ e.preventDefault(); var x=d.by('deliveries', a.getAttribute('data-open')); if(x) BB.popup(deliveryPreview(x)); };
   });
   Array.prototype.forEach.call(document.querySelectorAll('select[data-del]'), function(sel){
     sel.onchange = function(){

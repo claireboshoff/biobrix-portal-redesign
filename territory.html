@@ -176,6 +176,23 @@ html += '<div class="card-f">Point us at your data sources (industry hectares, p
 document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
 
 // ---- breakdown charts: potential by region (won vs open) and by rep ----
+// A chart part opens its areas over the page; tapping an area flies the map to it (as a table row does).
+function areaDetail(ts, o){
+  ts=ts.slice().sort(function(a,b){ return (b.potential||0)-(a.potential||0); });
+  var cols=['Town'].concat(o.region?['Region']:[]).concat(['Crop','Farms','Hectares','Potential','Reach']).concat(o.rep?['Rep']:[]);
+  var tp=0, tf=0, th=0;
+  var rows=ts.map(function(t){ var r=d.rep(t.rep); tp+=(t.potential||0); tf+=(t.farms||0); th+=(t.ha||0);
+    return { cells:[{ html:'<b>'+BB.esc(t.town)+'</b>' }].concat(o.region?[t.region]:[]).concat([t.crop||'—', BB.num(t.farms||0), BB.num(t.ha||0), BB.money(t.potential||0), (t.penetration||0)+'%'])
+      .concat(o.rep?[{ html:'<span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span>' }]:[]) }; });
+  if(ts.length>1){ var pen=Math.round(ts.reduce(function(s,t){ return s+(t.penetration||0); },0)/ts.length);
+    rows.push({ cells:[{ html:'<b>'+ts.length+' areas</b>' }].concat(o.region?['']:[]).concat(['', { html:'<b>'+BB.num(tf)+'</b>' }, { html:'<b>'+BB.num(th)+'</b>' }, { html:'<b>'+BB.money(tp)+'</b>' }, pen+'% avg']).concat(o.rep?['']:[]) }); }
+  var numAt=o.region?[3,4,5,6]:[2,3,4,5];
+  return { sub:o.sub, wide:true, table:{ columns:cols, rows:rows, num:numAt }, actions:o.actions||[],
+    note: ts.length? 'Tap an area to show it on the map.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var t=ts[i]; if(!t) return;
+      tr.classList.add('click'); tr.title='Show '+t.town+' on the map';
+      tr.onclick=function(){ BB.closePopup(); var row=document.getElementById('row-'+t.id); if(row && row.onclick) row.onclick(); else highlightRow(t.id, true); }; }); } };
+}
 try{
   var regAgg = regions.map(function(rg){
     var ts = territory.filter(function(t){ return t.region===rg; });
@@ -183,9 +200,17 @@ try{
     var won = ts.reduce(function(s2,t){ return s2+(t.potential||0)*Math.min(100,t.penetration||0)/100; },0);
     return { label:rg, sub:ts.length+' area'+(ts.length===1?'':'s'), value:pot, total:pot, parts:[{name:'Won',value:won,color:'#22431a'},{name:'Still open',value:pot-won,color:'#8fbf5a'}] };
   }).sort(function(a,b){ return b.value-a.value; });
-  if(regAgg.length) BB.chart.hbar('#chRegion',{ money:true, rows:regAgg, legend:[{name:'Won',color:'#22431a'},{name:'Still open',color:'#8fbf5a'}] });
-  var repAgg = d.all('reps').map(function(r){ return { label:r.name, value:territory.filter(function(t){ return t.rep===r.id; }).reduce(function(s2,t){ return s2+(t.potential||0); },0), color:r.colour }; }).filter(function(x){ return x.value>0; });
-  if(repAgg.length) BB.chart.donut('#chRep',{ money:true, centreLabel:'potential', size:132, rows:repAgg });
+  if(regAgg.length) BB.chart.hbar('#chRegion',{ money:true, rows:regAgg, legend:[{name:'Won',color:'#22431a'},{name:'Still open',color:'#8fbf5a'}],
+    detail:function(ctx){ var rg=ctx.row.label, ts=territory.filter(function(t){ return t.region===rg; });
+      return areaDetail(ts, { rep:true, sub:ts.length+' area'+(ts.length===1?'':'s')+' in '+rg,
+        actions:[{ label:'Show '+rg+' on the map', primary:true, onClick:function(){ BB.closePopup(); var ch=document.querySelector('.chip.tog[data-region="'+rg.replace(/"/g,'\\"')+'"]'); if(ch){ ch.click(); document.getElementById('vmap').scrollIntoView({ behavior:'smooth', block:'center' }); } } }] }); } });
+  var repAgg = d.all('reps').map(function(r){ return { label:r.name, value:territory.filter(function(t){ return t.rep===r.id; }).reduce(function(s2,t){ return s2+(t.potential||0); },0), color:r.colour, rid:r.id }; }).filter(function(x){ return x.value>0; });
+  if(repAgg.length) BB.chart.donut('#chRep',{ money:true, centreLabel:'potential', size:132, rows:repAgg,
+    detail:function(ctx){ var r=d.rep(ctx.row.rid), ts=territory.filter(function(t){ return t.rep===r.id; });
+      var farmers=d.all('farmers').filter(function(f){ return f.rep===r.id; }).length;
+      var x=areaDetail(ts, { region:true, sub:(r.role? r.role+' · ' : '')+'based '+(r.base||'—')+' · '+ts.length+' area'+(ts.length===1?'':'s') });
+      x.stats=[{ l:'Potential', v:BB.money(ctx.value), s:Math.round(ctx.value/ctx.total*100)+'% of all territory' }, { l:'Areas', v:BB.num(ts.length) }, { l:'Farmers', v:BB.num(farmers) }];
+      return x; } });
 }catch(e){ console.warn('chart', e); }
 var toF = document.getElementById('toFunnel');
 if(toF) toF.onclick=function(e){ e.preventDefault(); var c=document.getElementById('funnel'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(function(){ var f=document.getElementById('pFarm'); if(f) f.focus(); },500); };

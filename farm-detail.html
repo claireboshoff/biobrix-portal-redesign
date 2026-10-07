@@ -39,6 +39,12 @@ table.bb .bar-cell .trk{max-width:50px;}
 .card .empty{padding:26px 20px;}
 .stack{display:flex;flex-direction:column;gap:16px;min-width:0;}
 td.dt{white-space:nowrap;}
+/* popups */
+.pp-h{font-size:.66rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin:16px 0 6px;}
+.pp-h:first-child{margin-top:0;}
+.pp-flag{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.84rem;}
+.pp-flag.ok{background:var(--ok-bg);color:var(--ok);}
+.pp-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 </style>
 </head>
 <body>
@@ -104,14 +110,14 @@ if(!f){
   html += '<div class="grid g5" style="margin-top:12px;">'+
     '<div class="stat"><div class="l">Hectares</div><div class="v">'+(f.ha? BB.num(f.ha) : '—')+'</div><div class="s">'+(f.ha?'on the farm':'not captured yet')+'</div></div>'+
     '<div class="stat"><div class="l">Blocks</div><div class="v">'+blocks.length+'</div><div class="s">'+(blocks.length? BB.num(blockHa)+' ha mapped' : 'none recorded')+'</div></div>'+
-    '<div class="stat'+(ti.overdue?' bad':(ti.sev==='warn'?' warn':''))+'"><div class="l">Outstanding</div><div class="v">'+BB.money(ti.balance)+'</div><div class="s">'+(ti.overdue?'overdue':(ti.limit?'of '+BB.money(ti.limit)+' limit':'no credit limit set'))+'</div></div>'+
-    '<div class="stat"><div class="l">In the pipeline</div><div class="v">'+BB.money(ti.openPipeline)+'</div><div class="s">'+openOrders.length+' open order'+(openOrders.length===1?'':'s')+'</div></div>'+
-    '<div class="stat'+(toInterp?' warn':'')+'"><div class="l">Samples</div><div class="v">'+(soil.length+leaf.length)+'</div><div class="s">'+soil.length+' soil · '+leaf.length+' leaf'+(toInterp?' · '+toInterp+' to interpret':'')+'</div></div>'+
+    '<a class="stat tap'+(ti.overdue?' bad':(ti.sev==='warn'?' warn':''))+'" href="#acct" data-detail="fdOwed"><div class="l">Outstanding</div><div class="v">'+BB.money(ti.balance)+'</div><div class="s">'+(ti.overdue?'overdue':(ti.limit?'of '+BB.money(ti.limit)+' limit':'no credit limit set'))+'</div></a>'+
+    '<a class="stat tap" href="#ords" data-detail="fdPipe"><div class="l">In the pipeline</div><div class="v">'+BB.money(ti.openPipeline)+'</div><div class="s">'+openOrders.length+' open order'+(openOrders.length===1?'':'s')+'</div></a>'+
+    '<a class="stat tap'+(toInterp?' warn':'')+'" href="#blks" data-detail="fdSamples"><div class="l">Samples</div><div class="v">'+(soil.length+leaf.length)+'</div><div class="s">'+soil.length+' soil · '+leaf.length+' leaf'+(toInterp?' · '+toInterp+' to interpret':'')+'</div></a>'+
   '</div>';
 
   // blocks beside the account insight
   html += '<div class="split" style="margin-top:16px;align-items:start;">';
-  html += '<div class="card"><div class="card-h"><div><h3>Blocks</h3><div class="sub">latest soil and leaf reading per block</div></div><span class="badge b-grey">'+blocks.length+'</span></div>';
+  html += '<div class="card" id="blks" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Blocks</h3><div class="sub">latest soil and leaf reading per block · tap one for its readings</div></div><span class="badge b-grey">'+blocks.length+'</span></div>';
   if(!blocks.length){
     html += '<div class="empty">No blocks recorded for this farm yet.</div>';
   } else {
@@ -135,7 +141,7 @@ if(!f){
         var pend = [bSoil&&bSoil.status!=='Interpreted'?'soil '+bSoil.status.toLowerCase():'', bLeaf&&bLeaf.status!=='Interpreted'?'leaf '+bLeaf.status.toLowerCase():''].filter(Boolean).join(' · ');
         res = '<span class="faint" style="font-size:.78rem;">'+(pend? esc(pend) : 'no results yet')+'</span>';
       }
-      html += '<tr>'+
+      html += '<tr class="click" data-block="'+esc(b.id)+'">'+
         '<td style="min-width:190px;"><b>'+esc(b.name)+'</b><div class="faint" style="font-size:.74rem;">'+esc(b.crop)+' · planted '+esc(b.planted)+'</div></td>'+
         '<td class="num"><div class="bar-cell"><span class="trk"><i style="width:'+Math.round((b.ha||0)/maxHa*100)+'%"></i></span><span>'+BB.num(b.ha)+'</span></div></td>'+
         '<td style="min-width:200px;">'+res+'</td>'+
@@ -152,7 +158,7 @@ if(!f){
 
   // before you drive — the financial insight
   var sevIc = ti.sev==='ok'?'check':(ti.sev==='grey'?'user':'alert');
-  html += '<div class="card"><div class="card-h"><div><h3>Before you drive</h3><div class="sub">is the trip worth it</div></div>'+BB.liveChip()+'</div><div class="card-p">'+
+  html += '<div class="card" id="acct" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Before you drive</h3><div class="sub">is the trip worth it</div></div>'+BB.liveChip()+'</div><div class="card-p">'+
     '<div class="verdict '+esc(ti.sev)+'">'+BB.icon(sevIc)+esc(ti.verdict)+'</div>'+
     (ti.limit?'<div id="chCred" style="margin-bottom:14px;"></div>':'')+
     '<div class="kvl">'+
@@ -186,7 +192,7 @@ if(!f){
     html += '<div class="scroll"><table class="bb"><thead><tr>'+
       '<th>Crop</th><th>Goal</th><th>Season</th><th>Status</th></tr></thead><tbody>';
     programs.forEach(function(p){
-      html += '<tr class="click" data-prog="'+encodeURIComponent(id)+'">'+
+      html += '<tr class="click" data-prog="'+esc(p.id)+'">'+
         '<td><b>'+esc(p.crop)+'</b></td>'+
         '<td>'+esc(p.goal)+'</td>'+
         '<td>'+esc(p.season)+'</td>'+
@@ -196,7 +202,7 @@ if(!f){
     html += '</tbody></table></div>';
   }
   html += '</div></div><div class="stack">';
-  html += '<div class="card"><div class="card-h"><div><h3>Recent orders</h3><div class="sub">'+(orders.length>6?'latest 6 of '+orders.length:orders.length+' on record')+'</div></div>'+
+  html += '<div class="card" id="ords" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Recent orders</h3><div class="sub">'+(orders.length>6?'latest 6 of '+orders.length:orders.length+' on record')+'</div></div>'+
     '<a class="btn ghost sm" href="orders.html">All orders '+BB.icon('chevron')+'</a></div>';
   if(!orders.length){
     html += '<div class="empty">No orders captured for this farm yet.</div>';
@@ -204,7 +210,7 @@ if(!f){
     html += '<div class="scroll"><table class="bb"><thead><tr>'+
       '<th>Ref</th><th>Date</th><th>Delivery</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>';
     orders.slice(0,6).forEach(function(o){
-      html += '<tr class="click" data-order="1">'+
+      html += '<tr class="click" data-order="'+esc(o.id)+'">'+
         '<td><b>'+esc(o.ref)+'</b></td>'+
         '<td class="dt">'+BB.date(o.date)+'</td>'+
         '<td>'+BB.monthName(o.deliverMonth)+'</td>'+
@@ -224,7 +230,7 @@ if(!f){
     html += '<div class="scroll"><table class="bb"><thead><tr>'+
       '<th>Document</th><th>Kind</th><th>Date</th><th class="num">Size</th></tr></thead><tbody>';
     files.forEach(function(x){
-      html += '<tr class="click" data-file="1">'+
+      html += '<tr class="click" data-file="'+esc(x.id)+'">'+
         '<td>'+esc(x.name)+'</td>'+
         '<td><span class="badge b-grey">'+esc(x.kind)+'</span></td>'+
         '<td class="dt">'+BB.date(x.date)+'</td>'+
@@ -248,21 +254,127 @@ if(!f){
       var owedIn=Math.min(Math.max(0,ti.balance), ti.limit), overBy=Math.max(0, ti.balance-ti.limit), open=Math.max(0, ti.limit-ti.balance);
       BB.chart.hbar('#chCred', { money:true, rows:[{ label:'Credit used', display:Math.round(Math.max(0,ti.balance)/ti.limit*100)+'%',
         parts:[{name:'Owed', value:owedIn, color:'#3f6b28'},{name:'Over the limit', value:overBy, color:'#b8382a'},{name:'Credit still open', value:open, color:'#cfe0b8'}] }],
-        legend:[{name:'Owed', color:'#3f6b28'},{name:'Over the limit', color:'#b8382a'},{name:'Still open', color:'#cfe0b8'}] });
+        legend:[{name:'Owed', color:'#3f6b28'},{name:'Over the limit', color:'#b8382a'},{name:'Still open', color:'#cfe0b8'}],
+        // the account behind the bar: what is open, and what came in lately
+        detail:function(){ return { title:f.farm+' · account', sub:ti.verdict, html:invoicesHtml()+paymentsHtml(), actions:financeActs() }; } });
     }
   }catch(e){ console.warn('chart', e); }
 
-  // link rows
+  // ---- popups: each row and figure shows its record over the page; the page it belongs to is a button ----
   var farmerId = id;
-  Array.prototype.forEach.call(document.querySelectorAll('tr[data-prog]'), function(row){
-    row.onclick=function(){ location.href='bioconsult.html?farmer='+encodeURIComponent(farmerId); };
+  function canGo(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } }
+  function byDate(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); }
+  function owingOf(i){ return i.outstanding!=null ? (+i.outstanding||0) : (+i.amount||0); }
+  function ppTable(cols, rows, num){
+    num=num||[];
+    return '<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+cols.map(function(c,i){ return '<th'+(num.indexOf(i)>=0?' class="num"':'')+'>'+esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+r.cells.map(function(c,i){ return '<td'+(num.indexOf(i)>=0?' class="num"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')+
+      '</tbody></table></div>';
+  }
+  function openInv(){ return d.where('invoices', function(i){ return i.farmer===id && i.status!=='Paid' && owingOf(i)!==0; }).sort(byDate); }
+  function invoicesHtml(){
+    var inv=openInv();
+    if(!inv.length) return '<div class="pp-h">Open invoices</div><div class="faint" style="font-size:.82rem;">'+
+      (f.sageBalance!=null && f.sageBalance>0 ? 'No open invoice lines here — the balance is as your accounting system reports it.' : 'No open invoices.')+'</div>';
+    var tot=inv.reduce(function(t,i){ return t+owingOf(i); },0);
+    return '<div class="pp-h">Open invoices · '+inv.length+'</div>'+ppTable(['Invoice','Date','Due','Status','Owing'],
+      inv.slice(0,10).map(function(i){ return { cells:['<b style="white-space:nowrap;">'+esc(i.label||i.ref||'—')+'</b>'+(i.description && i.description!==(i.label||i.ref)?'<div class="faint" style="font-size:.72rem;">'+esc(i.description)+'</div>':''),
+        i.date?BB.shortDate(i.date):'—', i.dueDate?BB.shortDate(i.dueDate):'—', BB.statusBadge(i.status||'Outstanding'), BB.money(owingOf(i))] }; })
+      .concat(inv.length>1?[{ cells:['<b>'+(inv.length>10?'All '+inv.length:'Total')+'</b>','','','','<b>'+BB.money(tot)+'</b>'] }]:[]), [4]);
+  }
+  // payments straight from the ledger when it is connected; otherwise the invoices marked paid
+  function paymentsHtml(){
+    var pays=d.where('payments', function(p){ return p.farmer===id; }).sort(byDate).slice(0,5)
+      .map(function(p){ return { date:p.date, ref:p.ref||p.description||'Payment', amt:+p.amount||0 }; });
+    if(!pays.length) pays=d.where('invoices', function(i){ return i.farmer===id && i.status==='Paid'; })
+      .map(function(i){ return { date:i.paidDate||i.date, ref:(i.label||i.ref||'')+(i.description?' — '+i.description:''), amt:+i.amount||0 }; }).sort(byDate).slice(0,5);
+    if(!pays.length) return '';
+    return '<div class="pp-h">Recently paid</div>'+ppTable(['Date','Reference','Amount'], pays.map(function(p){ return { cells:[p.date?BB.shortDate(p.date):'—', esc(p.ref), BB.money(p.amt)] }; }), [2]);
+  }
+  function financeActs(){ return canGo('finance.html') ? [{ label:'Open in Finance', href:'finance.html' }] : []; }
+  function toCard(sel){ return function(){ BB.closePopup(); var el=document.getElementById(sel); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }; }
+  function sampleRows(list){
+    return list.slice().sort(byDate).map(function(x){ var b=d.by('blocks',x.block)||{name:'—'};
+      return { cells:[esc(x.kind), '<b>'+esc(b.name)+'</b>', x.date?BB.shortDate(x.date):'—', BB.statusBadge(x.status), '<span style="font-size:.78rem;">'+esc(x.flag||'—')+'</span>'],
+        href: canGo('bioanalyze-soil.html') ? (x.kind==='Soil'?'bioanalyze-soil.html':'bioanalyze-leaf.html')+'?block='+encodeURIComponent(x.block) : null }; });
+  }
+  BB.statDetail('fdOwed', function(){
+    var inv=openInv(), od=inv.filter(function(i){ return i.status==='Overdue'; });
+    return { eyebrow:f.farm, sub:ti.verdict, stats:[{ l:'Outstanding', v:BB.money(ti.balance), s:ti.limit?'of '+BB.money(ti.limit)+' limit':'no credit limit set', cls:ti.overdue?'bad':'' },
+        { l:'Overdue', v:BB.money(od.reduce(function(t,i){ return t+owingOf(i); },0)), s:od.length+' invoice'+(od.length===1?'':'s'), cls:od.length?'bad':'' },
+        { l:'Credit open', v:ti.limit?BB.money(Math.max(0,ti.available)):'—' }],
+      html:invoicesHtml()+paymentsHtml(), actions:[{ label:'Open the full list', primary:true, onClick:toCard('acct') }].concat(financeActs()) };
   });
-  Array.prototype.forEach.call(document.querySelectorAll('tr[data-order]'), function(row){
-    row.onclick=function(){ location.href='orders.html'; };
+  BB.statDetail('fdPipe', function(){
+    var open=orders.filter(function(o){ return o.status==='Forecast'||o.status==='Pending'; });
+    return { eyebrow:f.farm, sub:'forecast and pending orders, not yet confirmed',
+      table:{ columns:['Ref','Date','Delivery','Status','Value'], rows:open.map(function(o){ return { cells:[{ html:'<b>'+esc(o.ref)+'</b>' }, BB.shortDate(o.date), BB.monthName(o.deliverMonth), { html:BB.statusBadge(o.status) }, BB.money(d.orderValue(o))] }; }), num:[4] },
+      actions:[{ label:'Open the full list', primary:true, onClick:toCard('ords') }].concat(canGo('orders.html')?[{ label:'All orders', href:'orders.html' }]:[]) };
   });
-  Array.prototype.forEach.call(document.querySelectorAll('tr[data-file]'), function(row){
-    row.onclick=function(){ location.href='farm-files.html?farmer='+encodeURIComponent(farmerId); };
+  BB.statDetail('fdSamples', function(){
+    var list=soil.map(function(s){ return Object.assign({ kind:'Soil' }, s); }).concat(leaf.map(function(l){ return Object.assign({ kind:'Leaf' }, l); }));
+    return { eyebrow:f.farm, sub:'soil and leaf samples on this farm, newest first',
+      table:{ columns:['Type','Block','Sampled','Status','Reading'], rows:sampleRows(list) },
+      note: list.length? 'Tap a sample to open that block’s results.' : null,
+      actions:[{ label:'Open the full list', primary:true, onClick:toCard('blks') }] };
   });
+  // a block: its latest soil and leaf readings, the last walk and the programme on it
+  function blockPopup(bid){
+    var b=d.by('blocks',bid); if(!b) return;
+    var s=soil.filter(function(x){ return x.block===bid; }).sort(byDate)[0], l=leaf.filter(function(x){ return x.block===bid; }).sort(byDate)[0];
+    var w=d.where('watch', function(x){ return x.block===bid; }).sort(byDate)[0], pr=programs.filter(function(x){ return x.block===bid; })[0];
+    var reading=function(x, kind, fields){
+      if(!x) return '<div class="pp-h">'+kind+'</div><div class="faint" style="font-size:.82rem;">No '+kind.toLowerCase()+' sample yet.</div>';
+      var h='<div class="pp-h">'+kind+' · sampled '+BB.date(x.date)+'</div>';
+      if(x.status!=='Interpreted') return h+'<div class="pp-flag">'+BB.statusBadge(x.status)+' '+esc(x.flag||'Readings appear once interpreted.')+'</div>';
+      h+=ppTable(fields.map(function(q){ return q[0]; }), [{ cells:fields.map(function(q){ return x[q[1]]!=null? esc(x[q[1]]) : '—'; }) }]);
+      var ok=/improv|maintain|balanced|good|hold/i.test(x.flag||'');
+      return h+'<div class="pp-flag'+(ok?' ok':'')+'"><b>Interpretation:</b> '+esc(x.flag||'—')+'</div>';
+    };
+    var html=reading(s,'Soil',[['pH','ph'],['Organic matter','om'],['Ca:Mg','ca_mg'],['Microbial','microbial'],['P','p']])+
+      reading(l,'Leaf',[['N','n'],['K','k'],['Ca','ca']]);
+    if(w) html+='<div class="pp-h">Last field check · '+BB.date(w.date)+'</div><div style="font-size:.84rem;">'+esc(w.stage||'Field check')+' · vigour <b>'+esc(w.vigour||'—')+'</b>'+(w.pest?' · '+esc(w.pest):'')+(w.note?'<div class="faint" style="margin-top:3px;">'+esc(w.note)+'</div>':'')+'</div>';
+    if(pr) html+='<div class="pp-h">Programme</div><div style="font-size:.84rem;"><b>'+esc(pr.goal||'—')+'</b> · '+esc(pr.season||'')+' '+BB.statusBadge(pr.status)+'</div>';
+    var acts=[];
+    if(canGo('bioanalyze-soil.html')) acts.push({ label:'Soil results', href:'bioanalyze-soil.html?block='+encodeURIComponent(bid), primary:true }, { label:'Leaf results', href:'bioanalyze-leaf.html?block='+encodeURIComponent(bid) });
+    if(canGo('biowatch.html')) acts.push({ label:'Monitor', href:'biowatch.html?block='+encodeURIComponent(bid) });
+    var nS=soil.filter(function(x){ return x.block===bid; }).length, nL=leaf.filter(function(x){ return x.block===bid; }).length;
+    BB.popup({ eyebrow:f.farm+' · block', title:b.name, sub:[b.crop, b.planted?'planted '+b.planted:''].filter(Boolean).join(' · '),
+      stats:[{ l:'Area', v:b.ha? BB.num(b.ha)+' ha' : '—' }, { l:'Samples', v:String(nS+nL), s:nS+' soil · '+nL+' leaf' }, { l:'Programme', v:pr? pr.status : 'None', s:pr? pr.season : 'not built yet' }],
+      html:html, actions:acts });
+  }
+  function progPopup(pid){
+    var p=d.by('programs',pid); if(!p) return;
+    var b=d.by('blocks',p.block)||{name:'—'}, v=(p.lines||[]).reduce(function(t,l){ return t+(l.cost||0); },0), adv=d.rep(p.advisor);
+    BB.popup({ eyebrow:'BioConsult programme', title:p.goal||(p.crop+' programme'), sub:[b.name, p.crop, p.season, 'by '+adv.name].filter(Boolean).join(' · '),
+      stats:[{ l:'Status', html:BB.statusBadge(p.status) }, { l:'Programme value', v:BB.money(v) }, { l:'Per hectare', v:b.ha? BB.money(Math.round(v/b.ha)) : '—', s:b.ha? BB.num(b.ha)+' ha' : null }],
+      table:{ columns:['Product','Rate','Timing','Cost'], rows:(p.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.lever||'')+'</div>' }, l.rate||'—', l.timing||'—', BB.money(l.cost||0)]; }), num:[3] },
+      actions: canGo('bioconsult.html') ? [{ label:'Open full record', href:'bioconsult.html?open='+encodeURIComponent(p.id), primary:true }] : [] });
+  }
+  function orderPopup(oid){
+    var o=d.by('orders',oid); if(!o) return;
+    var del=d.where('deliveries', function(x){ return x.order===o.id; })[0], inv=d.where('invoices', function(i){ return i.order===o.id; })[0];
+    var stats=[{ l:'Status', html:BB.statusBadge(o.status) }, { l:'Value', v:BB.money(d.orderValue(o)), s:d.quoteStatus(o)? 'quote '+BB.money(d.quoteTotal(o))+' · '+d.quoteStatus(o) : null }, { l:'Delivery', v:BB.monthName(o.deliverMonth), s:del? del.status+(del.eta?' · ETA '+BB.shortDate(del.eta):'') : 'no delivery booked' }];
+    if(inv) stats.push({ l:'Invoice', v:inv.label||inv.ref||'—', s:inv.status });
+    BB.popup({ eyebrow:'Order · '+f.farm, title:o.ref, sub:['captured '+BB.date(o.date), o.source? 'by '+String(o.source).toLowerCase() : '', d.rep(o.rep).name].filter(Boolean).join(' · '), stats:stats,
+      table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.pack||'')+'</div>' }, BB.num(l.qty)+' '+(pr.unit||''), BB.money((pr.price||0)*(l.qty||0))]; }), num:[1,2] },
+      actions: canGo('orders.html') ? [{ label:'Open full record', href:'orders.html', primary:true }] : [] });
+  }
+  function filePopup(fid){
+    var x=d.by('files',fid); if(!x) return;
+    var docHref='document.html?farmer='+encodeURIComponent(farmerId)+'&kind='+encodeURIComponent(x.kind||'Document')+'&name='+encodeURIComponent(x.name||'');
+    BB.popup({ eyebrow:'Farm file · '+f.farm, title:x.name, stats:[{ l:'Kind', v:x.kind||'—' }, { l:'Filed', v:x.date?BB.date(x.date):'—' }, { l:'Size', v:x.size||'—' }],
+      actions:[{ label:'Open full record', href:docHref, primary:true }].concat(canGo('farm-files.html')?[{ label:'All files for this farm', href:'farm-files.html?farmer='+encodeURIComponent(farmerId) }]:[]) });
+  }
+  function rowClick(attr, fn){
+    Array.prototype.forEach.call(document.querySelectorAll('tr['+attr+']'), function(row){
+      row.onclick=function(e){ if(e.target.closest('a,button')) return; fn(row.getAttribute(attr)); };
+    });
+  }
+  rowClick('data-block', blockPopup);
+  rowClick('data-prog', progPopup);
+  rowClick('data-order', orderPopup);
+  rowClick('data-file', filePopup);
 }
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }

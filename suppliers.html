@@ -43,6 +43,30 @@ function panel(title, sub, actions, body, cls){
   return '<div class="card'+(cls?' '+cls:'')+'"><div class="card-h"><div><h3>'+title+'</h3>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(actions||'')+'</div>'+body+'</div>';
 }
 
+// ---- popups ----
+function isOpenPo(po){ return po.status!=='Delivered' && po.status!=='Received'; }
+function poTable(list, withSup){
+  return { columns:(withSup?['Supplier']:[]).concat(['Items','To','Raised','ETA','Status']),
+    rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(po){
+      var items=(po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
+      return { cells:(withSup?[d.supplier(po.supplier).name]:[]).concat([items||'—', String(d.depot(po.depot).name).replace(/ Depot$/,''), BB.date(po.date), BB.date(po.eta), { html:BB.statusBadge(po.status) }]) }; }) };
+}
+function miniTable(title, t){
+  if(!t.rows.length) return '<div class="sub" style="margin:12px 0 4px;font-weight:600;">'+title+'</div><div class="faint" style="font-size:.84rem;">None.</div>';
+  return '<div class="sub" style="margin:12px 0 6px;font-weight:600;">'+title+'</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+
+    t.columns.map(function(c,i){ return '<th'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+    (t.rows.length? t.rows.map(function(r){ return '<tr>'+r.cells.map(function(c,i){ return '<td'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c))+'</td>'; }).join('')+'</tr>'; }).join('')
+      : '')+'</tbody></table></div>';
+}
+function prodTable(list, withSup){
+  return { columns:['Product','Code'].concat(withSup?['Supplier','Lead']:['Pack']).concat(['Price']), num:withSup?[3,4]:[3],
+    rows:list.map(function(p){ var sp=d.supplier(p.supplier);
+      return { cells:[p.name, p.code||''].concat(withSup?[sp.name||'—', sp.lead!=null?sp.lead+' days':'—']:[p.pack||'']).concat([BB.money(p.price)+'/'+(p.unit||'')]) }; }) };
+}
+// select a supplier in the list on this page
+function openSupplier(id){ return { label:'Show it in the list', primary:true, onClick:function(){ BB.closePopup(); selected=id; render();
+  var el=document.getElementById('supdetail'); if(el) el.scrollIntoView({ behavior:'smooth', block:'center' }); } }; }
+
 function renderProducts(supId){
   var list = products.filter(function(p){ return p.supplier===supId; });
   var sup = d.supplier(supId);
@@ -85,8 +109,9 @@ function render(){
     '<div class="stat"><div class="l">Suppliers</div><div class="v">'+suppliers.length+'</div><div class="s">across the network</div></div>'+
     '<div class="stat"><div class="l">Local · imported</div><div class="v">'+localCount+' · '+imported+'</div><div class="s">ZA vs overseas</div></div>'+
     '<div class="stat"><div class="l">Avg lead time</div><div class="v">'+avgLead+' <span style="font-size:.9rem;">days</span></div><div class="s">order to arrival</div></div>'+
-    '<div class="stat"><div class="l">Purchase orders open</div><div class="v">'+openPos.length+'</div><div class="s">with suppliers now</div></div>'+
+    '<a class="stat tap" href="#poCard" data-detail="sp-pos"><div class="l">Purchase orders open</div><div class="v">'+openPos.length+'</div><div class="s">with suppliers now ›</div></a>'+
   '</div>';
+  BB.statDetail('sp-pos', function(){ return { table:poTable(openPos, true), actions:[] }; });
 
   // reorder radar
   var low = inventory.filter(function(i){ return i.qty<i.reorder; });
@@ -135,7 +160,7 @@ function render(){
 
   html += '<div class="split" style="margin-top:16px;">'+
     panel('Reorder radar', 'below reorder · longest lead first, so order these soonest', '<span class="badge '+(radar.length?'b-warn':'b-ok')+'">'+radar.length+' below reorder</span>', radarBody)+
-    panel('Purchase orders', pos.length+' with suppliers', '', poBody)+
+    '<div id="poCard" style="min-width:0;">'+panel('Purchase orders', pos.length+' with suppliers', '', poBody)+'</div>'+
   '</div>';
 
   // supplier table beside the network picture
@@ -171,9 +196,20 @@ function render(){
   try{
     BB.chart.hbar('#chLead', { fmt:function(v){ return v+' days'; },
       legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#2f6f9e'}],
-      rows:suppliers.slice().sort(function(a,b){ return b.lead-a.lead; }).map(function(s){ return { label:s.name, value:s.lead, color:isLocal(s.country)?'#3f6b28':'#2f6f9e' }; }) });
+      rows:suppliers.slice().sort(function(a,b){ return b.lead-a.lead; }).map(function(s){ return { label:s.name, value:s.lead, color:isLocal(s.country)?'#3f6b28':'#2f6f9e', supId:s.id }; }),
+      valueLabel:'Lead time',
+      // that supplier's products and open purchase orders
+      detail:function(ctx){ var sup=d.supplier(ctx.row.supId), mine=products.filter(function(p){ return p.supplier===sup.id; }), po=pos.filter(function(x){ return x.supplier===sup.id && isOpenPo(x); });
+        return { sub:(isLocal(sup.country)?'Local':'Imported')+' · '+(sup.note||''), wide:true,
+          stats:[{l:'Lead time', v:sup.lead+' days'}, {l:'Products', v:mine.length}, {l:'Open POs', v:po.length}],
+          html:miniTable('Products', prodTable(mine, false))+miniTable('Open purchase orders', poTable(po, false)),
+          actions:[openSupplier(sup.id)] }; } });
     var locP = products.filter(function(p){ var sp=d.supplier(p.supplier); return sp && isLocal(sp.country); }).length;
-    BB.chart.donut('#chSource', { centreLabel:'products', rows:[{label:'Local (ZA)', value:locP, color:'#3f6b28'},{label:'Imported', value:products.length-locP, color:'#2f6f9e'}] });
+    BB.chart.donut('#chSource', { centreLabel:'products', valueLabel:'Products', rows:[{label:'Local (ZA)', value:locP, color:'#3f6b28', local:true},{label:'Imported', value:products.length-locP, color:'#2f6f9e', local:false}],
+      // the products from that source
+      detail:function(ctx){ var list=products.filter(function(p){ var sp=d.supplier(p.supplier); return !!(sp && isLocal(sp.country))===ctx.row.local; })
+        .sort(function(a,b){ return (d.supplier(b.supplier).lead||0)-(d.supplier(a.supplier).lead||0); });
+        return { table:prodTable(list, true), wide:true }; } });
   }catch(e){ console.warn('chart', e); }
 }
 

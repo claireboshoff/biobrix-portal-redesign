@@ -11,10 +11,6 @@
 <script src="bb-shell.js?v=redesign1"></script>
 <style>
   .mini{font-size:.72rem;color:var(--faint);}
-  .srch-wrap{position:relative;flex:1 1 240px;max-width:320px;}
-  .srch-wrap .ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint);pointer-events:none;}
-  .srch{width:100%;padding:8px 12px 8px 32px;border:1px solid var(--line);border-radius:9px;font-size:.86rem;font-family:inherit;background:#fff;outline:none;}
-  .srch:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}
   td.up b{color:var(--ok);} td.down b{color:var(--red);}
   .dp-row{margin-top:16px;}
   .dp-empty{margin-top:16px;}
@@ -34,8 +30,7 @@ var THIS = shift(0), PREV = shift(-1), LASTYR = shift(-12);
 function monthName(ym){
   var p=ym.split('-'); return new Date(+p[0], +p[1]-1, 1).toLocaleDateString('en-ZA',{month:'short', year:'2-digit'});
 }
-var filter = '';
-var prods = [], showValue = false;
+var prods = [], showValue = false, M12 = [], MY = [], hasYear = false;
 function qty(v){ return (Math.round(v*10)/10).toLocaleString('en-ZA'); }
 
 function render(){
@@ -66,20 +61,20 @@ function render(){
   var moving = prods.filter(function(p){ return p.now>0; }).length;
 
   // twelve months of units out, and the twelve before that — counted off the same invoices
-  var M12 = [], MY = [];
+  M12 = []; MY = [];
   for(var k=11;k>=0;k--){ M12.push(shift(-k)); MY.push(shift(-k-12)); }
   // Months before the ledger's first entry are unknown, not zero: they draw as a gap, not a cliff.
   var first = prods.reduce(function(mn,p){ Object.keys(p.months).forEach(function(k){ if(!mn || k<mn) mn=k; }); return mn; }, null);
   var unitsIn = function(ym){ if(!first || ym<first) return null; return prods.reduce(function(t,p){ var m=p.months[ym]; return t+((m&&m.qty)||0); },0); };
   var series12 = M12.map(unitsIn), seriesY = MY.map(unitsIn);
-  var hasYear = seriesY.some(function(v){ return v>0; });
+  hasYear = seriesY.some(function(v){ return v>0; });
   var spark12 = series12.map(function(v){ return v||0; });
 
   html += '<div class="sec"><h2>This month</h2><span class="ln"></span><span class="cnt">'+monthName(THIS)+' so far</span>'+BB.liveChip()+'</div>';
   html += '<div class="grid g4">'+
-    '<div class="stat"><div class="l">Units out</div><div class="v">'+qty(nowQ)+'</div><div class="s">across '+moving+' products</div><div class="spark">'+BB.chart.spark(spark12)+'</div></div>'+
-    '<div class="stat"><div class="l">'+monthName(PREV)+'</div><div class="v">'+qty(prevQ)+'</div><div class="s">'+(prevQ? (nowQ>=prevQ?'ahead of last month':'behind last month') : 'nothing last month')+'</div></div>'+
-    '<div class="stat"><div class="l">'+monthName(LASTYR)+'</div><div class="v">'+qty(yrQ)+'</div><div class="s">same month a year ago</div></div>'+
+    '<a class="stat tap" href="#tbl" data-detail="dp-'+THIS+'"><div class="l">Units out</div><div class="v">'+qty(nowQ)+'</div><div class="s">across '+moving+' products ›</div><div class="spark">'+BB.chart.spark(spark12)+'</div></a>'+
+    '<a class="stat tap" href="#tbl" data-detail="dp-'+PREV+'"><div class="l">'+monthName(PREV)+'</div><div class="v">'+qty(prevQ)+'</div><div class="s">'+(prevQ? (nowQ>=prevQ?'ahead of last month':'behind last month') : 'nothing last month')+' ›</div></a>'+
+    '<a class="stat tap" href="#tbl" data-detail="dp-'+LASTYR+'"><div class="l">'+monthName(LASTYR)+'</div><div class="v">'+qty(yrQ)+'</div><div class="s">same month a year ago ›</div></a>'+
     (showValue
       ? '<div class="stat"><div class="l">Invoiced this month</div><div class="v">'+BB.money(Math.round(sum('nowV')))+'</div><div class="s">excluding VAT</div></div>'
       : '<div class="stat"><div class="l">Products on the books</div><div class="v">'+prods.length+'</div><div class="s">sold at least once</div></div>')+
@@ -95,60 +90,77 @@ function render(){
 
   // ---- the list ----
   html += '<div class="card dp-row"><div class="card-h"><div><h3>Product by product</h3><div class="sub">busiest first · quantities as invoiced</div></div>'+
-    '<div class="row" style="gap:10px;flex:1 1 260px;justify-content:flex-end;"><span class="badge b-grey" id="cnt"></span>'+
-    '<label class="srch-wrap">'+BB.icon('search')+'<input class="srch" id="srch" placeholder="Find a product or code" value="'+BB.esc(filter)+'"></label></div></div>'+
+    '<span class="badge b-grey" id="cnt"></span></div>'+
     '<div id="tbl"></div></div>';
   html += '<div class="pline faint" style="font-size:.78rem;margin-top:10px;">Quantities are as they were invoiced — litres, kilograms or units, whichever the line was sold in. Credit notes are already taken off.</div>';
 
   host.innerHTML = html;
   renderTable();
+  [THIS, PREV, LASTYR].forEach(function(ym){ BB.statDetail('dp-'+ym, function(){ return monthDetail(ym); }); });
 
   var lbl = M12.map(function(ym){ return monthName(ym); });
   try{
     BB.chart.line('#chMonths', { labels:lbl, height:240, table:true, fmt:qty,
-      series:[{name:'Last 12 months', values:series12, color:'#3f6b28', area:true}].concat(hasYear?[{name:'Year before', values:seriesY, color:'#c77d17', dash:true}]:[]) });
-    if(busiest.length) BB.chart.hbar('#chBusy', { fmt:qty, rows:busiest.map(function(p){ return { label:p.name, sub:p.code||'', value:p.now, color:'#3f6b28' }; }) });
+      series:[{name:'Last 12 months', values:series12, color:'#3f6b28', area:true}].concat(hasYear?[{name:'Year before', values:seriesY, color:'#c77d17', dash:true}]:[]),
+      // the product lines invoiced that month
+      detail:function(ctx){ var o=monthDetail(M12[ctx.index]); delete o.stats; delete o.title; delete o.eyebrow; return o; } });
+    if(busiest.length) BB.chart.hbar('#chBusy', { fmt:qty, valueLabel:'Units out', rows:busiest.map(function(p){ return { label:p.name, sub:p.code||'', value:p.now, color:'#3f6b28', prod:p }; }),
+      detail:function(ctx){ var o=productDetail(ctx.row.prod); delete o.stats; delete o.title; delete o.eyebrow; return o; } });
   }catch(e){ console.warn('chart', e); }
+}
 
-  var s = document.getElementById('srch');
-  if(s){
-    s.addEventListener('input', function(){ filter = s.value; renderTable();
-      var n = document.getElementById('srch'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } });
-  }
+// ---- popups ----
+// One month: every product invoiced in it, busiest first (with the same month a year earlier).
+function monthDetail(ym){
+  var p=ym.split('-'), ago=(+p[0]-1)+'-'+p[1];
+  var agoKnown=prods.some(function(x){ return !!x.months[ago]; });   // before the ledger starts is unknown, not zero
+  var list=prods.map(function(x){ var m=x.months[ym]||{}, a=x.months[ago]||{}; return { p:x, q:m.qty||0, v:m.value||0, a:a.qty||0 }; })
+    .filter(function(x){ return x.q>0; }).sort(function(a,b){ return b.q-a.q; });
+  var tq=list.reduce(function(t,x){ return t+x.q; },0), tv=list.reduce(function(t,x){ return t+x.v; },0);
+  return { eyebrow:'What is moving', title:monthName(ym), sub:list.length+' product'+(list.length===1?'':'s')+' invoiced'+(ym===THIS?' so far':''), wide:true,
+    stats:[{l:'Units out', v:qty(tq)}, {l:'Products', v:list.length}].concat(showValue?[{l:'Invoiced', v:BB.money(Math.round(tv)), s:'excluding VAT'}]:[]),
+    table:{ columns:['Product','Code',monthName(ym),monthName(ago)].concat(showValue?['Invoiced']:[]), num:showValue?[2,3,4]:[2,3],
+      rows:list.map(function(x){ return { cells:[x.p.name, x.p.code||'', qty(x.q), agoKnown?qty(x.a):'—'].concat(showValue?[BB.money(Math.round(x.v))]:[]) }; }) },
+    actions:[] };
+}
+// One product: its last twelve months.
+function productDetail(pr){
+  var rows=M12.slice().reverse().map(function(ym){ var m=pr.months[ym]||{}; return { cells:[monthName(ym), qty(m.qty||0)].concat(showValue?[BB.money(Math.round(m.value||0))]:[]) }; });
+  return { eyebrow:'What is moving', title:pr.name, sub:[pr.code, pr.pack].filter(Boolean).join(' · ')||null,
+    stats:[{l:monthName(THIS), v:qty(pr.now)}, {l:monthName(PREV), v:qty(pr.prev)}, {l:monthName(LASTYR), v:qty(pr.yr)}, {l:'All time', v:qty(pr.total)}],
+    table:{ columns:['Month','Quantity'].concat(showValue?['Invoiced']:[]), num:showValue?[1,2]:[1], rows:rows }, actions:[] };
 }
 
 // Only the table redraws as you type; the charts above stay put.
 function renderTable(){
   var el = document.getElementById('tbl'); if(!el) return;
   var rows = prods.slice();
-  if(filter){
-    var q = filter.toLowerCase();
-    rows = rows.filter(function(p){ return (p.name||'').toLowerCase().indexOf(q)>=0 || (p.code||'').toLowerCase().indexOf(q)>=0; });
-  }
   rows.sort(function(a,b){ return (b.now-a.now) || (b.total-a.total); });
   var cols = showValue?7:6;
   var html = '<div class="scroll tall"><table class="bb"><thead><tr>'+
     '<th>Product</th><th>Code</th><th class="num">'+monthName(THIS)+'</th><th class="num">'+monthName(PREV)+'</th>'+
     '<th class="num">'+monthName(LASTYR)+'</th><th class="num">All time</th>'+(showValue?'<th class="num">Invoiced</th>':'')+'</tr></thead><tbody>';
   if(!rows.length){
-    html += '<tr><td colspan="'+cols+'"><div class="empty">Nothing matches that.</div></td></tr>';
+    html += '<tr><td colspan="'+cols+'"><div class="empty">No products yet.</div></td></tr>';
   }
-  var shown = rows.slice(0,200), t = {now:0,prev:0,yr:0,total:0,nowV:0};
-  shown.forEach(function(p){
+  var shown = rows, t = {now:0,prev:0,yr:0,total:0,nowV:0};
+  shown.forEach(function(p, k){
     ['now','prev','yr','total','nowV'].forEach(function(k){ t[k]+=p[k]; });
     var move = p.prev? (p.now>p.prev?'up':(p.now<p.prev?'down':'')) : '';
-    html += '<tr><td><b>'+BB.esc(p.name)+'</b>'+(p.pack?'<div class="mini">'+BB.esc(p.pack)+'</div>':'')+'</td>'+
+    html += '<tr class="click" data-prod="'+prods.indexOf(p)+'"><td><b>'+BB.esc(p.name)+'</b>'+(p.pack?'<div class="mini">'+BB.esc(p.pack)+'</div>':'')+'</td>'+
       '<td class="mini">'+BB.esc(p.code||'')+'</td>'+
       '<td class="num'+(move?' '+move:'')+'"><b>'+qty(p.now)+'</b></td>'+
       '<td class="num">'+qty(p.prev)+'</td><td class="num">'+qty(p.yr)+'</td><td class="num">'+qty(p.total)+'</td>'+
       (showValue?'<td class="num">'+BB.money(Math.round(p.nowV))+'</td>':'')+'</tr>';
   });
   html += '</tbody>';
-  if(shown.length) html += '<tfoot><tr><td colspan="2">Total'+(filter?' · matching':'')+'</td><td class="num">'+qty(t.now)+'</td><td class="num">'+qty(t.prev)+'</td><td class="num">'+qty(t.yr)+'</td><td class="num">'+qty(t.total)+'</td>'+
+  if(shown.length) html += '<tfoot><tr><td colspan="2">Total</td><td class="num">'+qty(t.now)+'</td><td class="num">'+qty(t.prev)+'</td><td class="num">'+qty(t.yr)+'</td><td class="num">'+qty(t.total)+'</td>'+
     (showValue?'<td class="num">'+BB.money(Math.round(t.nowV))+'</td>':'')+'</tr></tfoot>';
   html += '</table></div>';
-  if(rows.length>200) html += '<div class="card-f">Showing the 200 busiest. Search above for anything else.</div>';
   el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll('tr.click[data-prod]'), function(tr){
+    tr.onclick = function(){ var pr=prods[+tr.getAttribute('data-prod')]; if(pr) BB.popup(productDetail(pr)); };
+  });
   var c = document.getElementById('cnt'); if(c) c.textContent = rows.length+' product'+(rows.length===1?'':'s');
 }
 

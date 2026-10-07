@@ -132,6 +132,29 @@ function progValue(p){
   return (p.lines||[]).reduce(function(s,l){ return s + (l.cost||0); }, 0);
 }
 
+// ---- popups: the farmer's own records behind a figure or a chart part (never anyone else's) ----
+function toSec(sel){ return function(){ BB.closePopup(); var el=document.getElementById(sel); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }; }
+function invRows(list){
+  return list.map(function(i){ return [{ html:'<b>'+BB.esc(i.label||i.ref||'—')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' },
+    i.date?BB.shortDate(i.date):'—', i.status==='Paid'? (i.paidDate?'paid '+BB.shortDate(i.paidDate):'paid') : (i.dueDate?'due '+BB.shortDate(i.dueDate):'—'), { html:BB.statusBadge(i.status||'Outstanding') }, BB.money(i.amount||0)]; });
+}
+function invTable(list){ return { columns:['Invoice','Issued','Due / paid','Status','Amount'], rows:invRows(list), num:[4] }; }
+var TILE = {};
+BB.statDetail('cpOwing', function(){
+  var open=TILE.open||[];
+  return { sub:open.length? 'invoices still to pay, newest first' : 'nothing to pay — thank you', table:invTable(open),
+    actions:[{ label:'Open the full list', primary:true, onClick:toSec('account') }] };
+});
+BB.statDetail('cpBlocks', function(){
+  var blocks=TILE.blocks||[], soil=TILE.soil||[], leaf=TILE.leaf||[];
+  var last=function(list,bid){ return list.filter(function(x){ return x.block===bid; })[0]; };
+  return { sub:'your blocks and their latest lab reading',
+    table:{ columns:['Block','Ha','Soil','Leaf'], rows:blocks.map(function(b){ var s1=last(soil,b.id), l1=last(leaf,b.id);
+      var cell=function(x){ return x? { html:'<span class="badge '+statusFlagBadge(x.flag)+'" style="white-space:normal;">'+BB.esc(x.flag||x.status)+'</span>' } : '—'; };
+      return [{ html:'<b>'+BB.esc(b.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.crop||'')+'</div>' }, BB.num(b.ha||0), cell(s1), cell(l1)]; }), num:[1] },
+    actions:[{ label:'Open the full list', primary:true, onClick:toSec('reports') }] };
+});
+
 // =================================================================
 var chartJobs = [];
 var LEVER_COL = { Biology:'#3f6b28', Chemistry:'#2f6f9e', Physics:'#c77d17' };
@@ -221,7 +244,8 @@ function render(){
 
   // ---- farm at a glance ----
   html += '<div class="grid g4" style="margin-top:16px;">';
-  html += '<div class="stat"><div class="l">Blocks</div><div class="v">'+blocks.length+'</div><div class="s">'+BB.num(f.ha)+' ha total</div></div>';
+  TILE.blocks=blocks; TILE.soil=soil; TILE.leaf=leaf;
+  html += '<a class="stat tap" href="#reports" data-detail="cpBlocks"><div class="l">Blocks</div><div class="v">'+blocks.length+'</div><div class="s">'+BB.num(f.ha)+' ha total</div></a>';
   html += '<div class="stat"><div class="l">Latest soil read</div><div class="v" style="font-size:1.15rem;">'+
     BB.esc(latestSoil? latestSoil.status : 'Awaiting')+'</div><div class="s">'+
     BB.esc(latestSoil? (d.by('blocks', latestSoil.block)||{name:'—'}).name : 'no report yet')+'</div></div>';
@@ -291,7 +315,11 @@ function render(){
     html += '<div class="card"><div class="card-h"><div><h3>Where it goes</h3><div class="sub">programme value by lever</div></div></div><div class="card-p">'+(lvRows.length?'<div id="chLever"></div>':'<div class="empty" style="padding:20px;">No product lines yet.</div>')+'</div>'+
       '<div class="card-f">Biology feeds the soil life, chemistry corrects what the lab found, physics fixes structure and water.</div></div>';
     html += '</div>';
-    if(lvRows.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lvRows, money:true, centreLabel:'total', size:140 }); });
+    if(lvRows.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lvRows, money:true, centreLabel:'total', size:140, valueLabel:'Programme value',
+      // the products in your programme that work on this lever
+      detail:function(ctx){ var ls=[]; showPrograms.forEach(function(p){ var blk=d.by('blocks',p.block)||{name:'—'}; (p.lines||[]).forEach(function(ln){ if((d.product(ln.prod).lever||'Other')===ctx.row.label) ls.push({ ln:ln, blk:blk }); }); });
+        return { table:{ columns:['Product','Block','Rate','Timing','Value'], rows:ls.map(function(x){ var pr=d.product(x.ln.prod); return [{ html:'<b>'+BB.esc(pr.name)+'</b>' }, x.blk.name, x.ln.rate||'—', x.ln.timing||'—', BB.money(x.ln.cost||0)]; }), num:[4] },
+          actions:[{ label:'Open the full list', primary:true, onClick:toSec('programme') }] }; } }); });
   }
 
   // ---- my orders & deliveries ----
@@ -348,7 +376,12 @@ function render(){
       var doneO = function(o){ return o.status==='Delivered'; };
       html += '<div class="card"><div class="card-h"><div><h3>Orders by delivery month</h3><div class="sub">order value</div></div></div><div class="card-p"><div id="chOrders"></div></div></div>';
       chartJobs.push(function(){ BB.chart.bar('#chOrders',{ labels:spanM.map(BB.monthName), money:true, stacked:true, height:210, table:true,
-        series:[{name:'Delivered', values:sumM(doneO), color:'#22431a'},{name:'Still to come', values:sumM(function(o){ return !doneO(o); }), color:'#68a53e'}] }); });
+        series:[{name:'Delivered', values:sumM(doneO), color:'#22431a'},{name:'Still to come', values:sumM(function(o){ return !doneO(o); }), color:'#68a53e'}],
+        // your orders for delivery that month
+        detail:function(ctx){ var m=spanM[ctx.index], list=orders.filter(function(o){ return o.deliverMonth===m; });
+          return { table:{ columns:['Ref','Ordered','Status','Delivery ETA','Value'], rows:list.map(function(o){ var del=d.where('deliveries', function(x){ return x.order===o.id; })[0];
+              return [{ html:'<b>'+BB.esc(o.ref)+'</b>' }, BB.shortDate(o.date), { html:BB.statusBadge(o.status) }, del? BB.shortDate(del.eta)+' · '+del.status : '—', BB.money(oVal(o))]; }), num:[4] },
+            actions:[{ label:'Open the full list', primary:true, onClick:toSec('orders') }] }; } }); });
     }
     html += '</div>';
   }
@@ -359,6 +392,7 @@ function render(){
   var paid = invs.filter(function(i){ return i.status==='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
   var owing = invs.filter(function(i){ return i.status!=='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
   var overdue = invs.filter(function(i){ return i.status==='Overdue'; });
+  TILE.open = invs.filter(function(i){ return i.status!=='Paid'; });
   html += '<div class="sec" id="account"><h2>My account</h2><span class="ln"></span><span class="cnt">invoices, statement &amp; payments</span></div>';
   // overdue notice (warm but clear) — shown before the statement so it can't be missed
   if(d.isOverdue(id)){
@@ -370,7 +404,7 @@ function render(){
   html += '<div class="grid g4">'+
     '<div class="stat"><div class="l">Invoiced to date</div><div class="v">'+BB.money(billed)+'</div><div class="s">'+invs.length+' invoices</div></div>'+
     '<div class="stat"><div class="l">Paid</div><div class="v" style="color:var(--ok)">'+BB.money(paid)+'</div><div class="s">thank you</div></div>'+
-    '<div class="stat'+(owing>0?' warn':'')+'"><div class="l">Outstanding balance</div><div class="v">'+BB.money(owing)+'</div><div class="s">'+(overdue.length?overdue.length+' overdue':'up to date')+'</div></div>'+
+    '<a class="stat tap'+(owing>0?' warn':'')+'" href="#account" data-detail="cpOwing"><div class="l">Outstanding balance</div><div class="v">'+BB.money(owing)+'</div><div class="s">'+(overdue.length?overdue.length+' overdue':'up to date')+'</div></a>'+
     '<div class="stat"><div class="l">Credit limit</div><div class="v">'+BB.money(creditLimit)+'</div><div class="s">'+(creditLimit>0?'available '+BB.money(d.availableCredit(id)):'no credit terms set')+'</div></div>'+
   '</div>';
   if(!invs.length){
@@ -388,7 +422,14 @@ function render(){
       var payM = monthsA.map(function(m){ return invs.filter(function(i){ return i.status==='Paid' && mk(i.paidDate)===m; }).reduce(function(t,i){ return t+(i.amount||0); },0); });
       html += '<div class="card"><div class="card-h"><div><h3>Invoiced and paid</h3><div class="sub">by month</div></div></div><div class="card-p"><div id="chAcct"></div></div></div>';
       chartJobs.push(function(){ BB.chart.bar('#chAcct',{ labels:monthsA.map(function(m){ return BB.monthName(+m.slice(5,7)-1); }), money:true, height:210, table:true,
-        series:[{name:'Invoiced', values:invM, color:'#3f6b28'},{name:'Paid', values:payM, color:'#68a53e'}] }); });
+        series:[{name:'Invoiced', values:invM, color:'#3f6b28'},{name:'Paid', values:payM, color:'#68a53e'}],
+        // that month on your account: the invoices issued and the payments received
+        detail:function(ctx){ var m=monthsA[ctx.index];
+          var issued=invs.filter(function(i){ return mk(i.date)===m; }), paidIn=invs.filter(function(i){ return i.status==='Paid' && mk(i.paidDate)===m; });
+          var rows=issued.map(function(i){ return [BB.shortDate(i.date), { html:'Invoice <b>'+BB.esc(i.label||i.ref||'')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' }, { html:BB.statusBadge(i.status||'Outstanding') }, '+ '+BB.money(i.amount||0)]; })
+            .concat(paidIn.map(function(i){ return [BB.shortDate(i.paidDate), { html:'Payment received — <b>'+BB.esc(i.label||i.ref||'')+'</b>' }, { html:'<span class="badge b-ok">Paid</span>' }, '− '+BB.money(i.amount||0)]; }));
+          return { sub:m.slice(0,4), table:{ columns:['Date','What','Status','Amount'], rows:rows, num:[3] },
+            actions:[{ label:'Open the full list', primary:true, onClick:toSec('account') }] }; } }); });
     }
     // outstanding / overdue first with Pay
     var open = invs.filter(function(i){ return i.status!=='Paid'; });
@@ -429,7 +470,11 @@ function render(){
     ledger.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
     html += '<div style="display:grid;gap:16px;min-width:0;">';
     html += '<div class="card"><div class="card-h"><div><h3>Your account</h3><div class="sub">everything invoiced to date</div></div></div><div class="card-p"><div id="chBal"></div></div></div>';
-    chartJobs.push(function(){ BB.chart.donut('#chBal',{ rows:balRows, money:true, centreLabel:'invoiced', size:140 }); });
+    chartJobs.push(function(){ BB.chart.donut('#chBal',{ rows:balRows, money:true, centreLabel:'invoiced', size:140,
+      // the invoices that make up this part of your account
+      detail:function(ctx){ var lbl=ctx.row.label;
+        var list=invs.filter(function(i){ return lbl==='Paid' ? i.status==='Paid' : lbl==='Overdue' ? i.status==='Overdue' : (i.status!=='Paid' && i.status!=='Overdue'); });
+        return { table:invTable(list), actions:[{ label:'Open the full list', primary:true, onClick:toSec('account') }] }; } }); });
     html += '<div class="card"><div class="card-h"><div><h3>Statement</h3><div class="sub">transaction history</div></div></div><div class="stmt scroll'+(ledger.length>8?' tall':'')+'">';
     ledger.forEach(function(t){
       html += '<div class="tx"><div style="min-width:0;"><div class="d">'+BB.shortDate(t.date)+'</div>'+BB.esc(t.txt)+'</div>'+

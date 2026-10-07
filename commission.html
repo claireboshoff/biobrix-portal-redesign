@@ -51,13 +51,16 @@ function render(){
   var nProdRates = Object.keys(comm.byProduct||{}).filter(function(k){ return comm.byProduct[k]!=null; }).length;
 
   // ---- this month, worked out (ledger only) ----
-  var live = !!(sg && sg.live), keys=[], rows={}, total=0, invTotal=0, chartJob=null, agentName=null;
+  var live = !!(sg && sg.live), keys=[], rows={}, total=0, invTotal=0, chartJob=null, agentName=null, monthInv=[], akeyOf=null, custOf=null;
   if(live){
     var pl2 = pl, byId={}; (sg.customers||[]).forEach(function(c){ byId[c.id]=c; });
     var agentOf = function(c){ var s=pl2.agents&&pl2.agents['sage_'+c.id]; if(s) return s; return c.sageRep? ('sage_rep_'+c.sageRep):null; };
     agentName = function(k){ if(!k) return 'Not allocated'; var m=agentList.find(function(a){return a.k===k;}); return m? m.t : k; };
     var thisMonth = new Date().toISOString().slice(0,7);
-    (sg.invoices||[]).filter(function(i){ return i.kind!=='opening' && ym(i.date)===thisMonth; }).forEach(function(i){
+    monthInv = (sg.invoices||[]).filter(function(i){ return i.kind!=='opening' && ym(i.date)===thisMonth; });
+    akeyOf = function(i){ return agentOf(byId[i.customer]||{})||'none'; };
+    custOf = function(i){ return byId[i.customer]||{}; };
+    monthInv.forEach(function(i){
       var c=byId[i.customer]||{}; var a=agentOf(c)||'none';
       rows[a]=rows[a]||{v:0,n:0}; rows[a].v+=(i.amount||0); rows[a].n++;
     });
@@ -79,7 +82,7 @@ function render(){
     '<div class="stat"><div class="l">House rate</div><div class="v">'+(comm.default||0)+'%</div><div class="s">when an agent has no rate of their own</div></div>'+
     '<div class="stat"><div class="l">Agents with their own rate</div><div class="v">'+nAgentRates+' <span style="font-size:.9rem;color:var(--faint);">of '+agentList.length+'</span></div><div class="s">the rest use the house rate</div></div>'+
     '<div class="stat"><div class="l">Products with a rate</div><div class="v">'+nProdRates+'</div><div class="s">'+(realP?'of your '+products.length+' biggest sellers':'to push the lines you want sold')+'</div></div>'+
-    '<div class="stat"><div class="l">Commission this month</div><div class="v">'+(live? money(total) : '—')+'</div><div class="s">'+(live? 'on '+money(invTotal)+' invoiced so far' : 'worked out once your accounting system is read')+'</div></div>'+
+    (live? '<a class="stat tap" href="sales-report.html?view=agent" data-detail="cmMonth">' : '<div class="stat">')+'<div class="l">Commission this month</div><div class="v">'+(live? money(total) : '—')+'</div><div class="s">'+(live? 'on '+money(invTotal)+' invoiced so far' : 'worked out once your accounting system is read')+'</div>'+(live?'</a>':'</div>')+
   '</div>';
 
   // ---- this month, worked out ----
@@ -104,7 +107,10 @@ function render(){
     if(keys.length) chartJob = function(){ BB.chart.hbar('#chComm',{ money:true,
       rows:keys.map(function(k){ var r=rows[k]; return { label:agentName(k==='none'?null:k), sub:r.rate? r.rate+'%' : 'no rate', value:r.v,
         parts:[{name:'Commission',value:r.c,color:'#22431a'},{name:'Rest of the invoice',value:r.v-r.c,color:'#8fbf5a'}] }; }),
-      legend:[{name:'Commission',color:'#22431a'},{name:'Rest of the invoice',color:'#8fbf5a'}] }); };
+      legend:[{name:'Commission',color:'#22431a'},{name:'Rest of the invoice',color:'#8fbf5a'}],
+      detail:function(ctx){ var k=keys[ctx.index], r=rows[k], x=invoiceDetail(monthInv.filter(function(i){ return akeyOf(i)===k; }), false);
+        return merge(x, { sub:(r.rate? r.rate+'% on ' : 'no rate set · ')+r.n+' invoice'+(r.n===1?'':'s')+' this month'+(k==='none'?' · accounts with no agent':''),
+          stats:[{ l:'Invoiced', v:money(r.v) }, { l:'Rate', v:(r.rate||0)+'%', s:(k!=='none' && !(comm.byAgent&&comm.byAgent[k]!=null))? 'the house rate' : null }, { l:'Commission', v:r.rate? money(r.c) : '—' }] }); } }); };
     else chartJob = function(){ var el=document.getElementById('chComm'); if(el) el.innerHTML='<div class="empty">Nothing invoiced yet this month.</div>'; };
     if(keys.length) html += '<div class="cm-note faint">Based on invoices, not on orders, so nobody earns commission on something that was never billed. Accounts with no agent are listed so they can be allocated in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales, by customer</a>.</div>';
   }
@@ -140,6 +146,23 @@ function render(){
 
   html += '<div class="grid g2" style="margin-top:16px;align-items:start;">'+left+right+'</div>';
 
+  // ---- popups: the invoices commission is worked out on ----
+  function merge(a,b){ Object.keys(b).forEach(function(k){ a[k]=b[k]; }); return a; }
+  function rateFor(k){ return k==='none'? 0 : ((comm.byAgent&&comm.byAgent[k]!=null)? comm.byAgent[k] : (comm.default||0)); }
+  function invoiceDetail(list, withAgent){
+    var farmOf={}; try{ d.allUnscoped('farmers').forEach(function(f){ if(f.sageId!=null) farmOf[f.sageId]=f.id; }); }catch(e){}
+    list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var cols=['Date','Invoice','Customer'].concat(withAgent?['Agent']:[]).concat(['Invoiced','Commission']), tv=0, tc=0;
+    var out=list.map(function(i){ var k=akeyOf(i), c=(i.amount||0)*rateFor(k)/100; tv+=(i.amount||0); tc+=c;
+      return { href:farmOf[i.customer]? 'farm-detail.html?farmer='+encodeURIComponent(farmOf[i.customer]) : null,
+        cells:[BB.date(i.date), i.label||i.ref||'—', custOf(i).name||'—'].concat(withAgent?[agentName(k==='none'?null:k)]:[]).concat([money(i.amount||0), c? money(c) : '—']) }; });
+    if(list.length>1) out.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-2).map(function(){ return ''; })).concat([{ html:'<b>'+money(tv)+'</b>' }, { html:'<b>'+money(tc)+'</b>' }]) });
+    return { wide:true, table:{ columns:cols, rows:out, num:[cols.length-2, cols.length-1] },
+      note:'Worked out per invoice at the agent\u2019s rate, or the house rate when they have none.'+(Object.keys(farmOf).length? ' Tap an invoice to open the farm file.' : '') };
+  }
+  if(live) BB.statDetail('cmMonth', function(){ var x=invoiceDetail(monthInv, true);
+    return merge(x, { sub:'every invoice this month, with what it earns', stats:[{ l:'Commission', v:money(total) }, { l:'Invoiced', v:money(invTotal), s:monthInv.length+' invoices' }],
+      actions:[{ label:'Open the full list', href:'sales-report.html?view=agent', primary:true }] }); });
   host.innerHTML = html;
   if(chartJob){ try{ chartJob(); }catch(e){ console.warn('chart', e); } }
 

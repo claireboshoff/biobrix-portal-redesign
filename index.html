@@ -23,6 +23,9 @@
 .alert .sv{width:8px;height:8px;border-radius:50%;flex:none;margin-top:7px;}
 .alert .tx{flex:1;min-width:0;font-size:.86rem;line-height:1.45;}
 .alert .badge{flex:none;}
+/* rows that open a preview over the page */
+.pop-row{cursor:pointer;transition:background .12s;}
+.pop-row:hover{background:#fafcf7;}
 .health-list{max-height:440px;overflow:auto;}
 .cover .bar-cell{min-width:150px;}
 .cover .bar-cell span{font-size:.8rem;white-space:nowrap;min-width:64px;text-align:right;}
@@ -56,36 +59,124 @@ var myFarmers = u.rep ? d.where('farmers',function(f){return f.rep===u.rep;}).le
 var fhSeat = /@freedomhub\.io$/i.test(u.email||'');
 var clientLive = !!(BB.auth && BB.auth.tenantLive ? BB.auth.tenantLive() : (sage && sage.live));
 
+// ---- Popups: the records behind a figure, a chart part or a row (CONVENTIONS: clicks open popups) ----
+// Built only from what this page already reads; a page a seat may not open is never offered.
+var canGo = function(href){ try{ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }catch(e){ return true; } };
+var farmHref = function(id){ return id && canGo('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(id) : null; };
+var bold = function(t){ return { html:'<b>'+BB.esc(t)+'</b>' }; };
+var POP_CAP = 100;
+var capNote = function(n){ return n>POP_CAP ? 'Showing the first '+POP_CAP+' of '+n+'. The totals count all '+n+'.' : null; };
+// the same markup BB.popup draws, for popups that carry more than one table
+var popTableHtml = function(title, t){
+  var nc=t.num||[];
+  return (title?'<div class="eyebrow" style="margin:14px 0 6px;">'+BB.esc(title)+'</div>':'')+
+    '<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+    (t.rows.length? t.rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+BB.esc(r.href)+'"':'')+'>'+r.cells.map(function(c,i){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c==null?'—':c))+'</td>'; }).join('')+'</tr>'; }).join('')
+      : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody></table></div>';
+};
+// Orders: ref, farmer, rep, status, value — biggest first, with a total.
+var orderTable = function(list){
+  var href = canGo('orders.html') ? 'orders.html' : null, tot=0;
+  var rows = list.slice().sort(function(a,b){ return d.orderValue(b)-d.orderValue(a); }).map(function(o){
+    var f=d.farmer(o.farmer), v=d.orderValue(o); tot+=v;
+    return { cells:[o.ref||'—', f.name+(f.farm&&f.farm!==f.name?' · '+f.farm:''), d.rep(o.rep).name, { html:BB.statusBadge(o.status) }, BB.money(v)], href:href };
+  });
+  if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' orders'),'','','',bold(BB.money(tot))] });
+  return { columns:['Order','Farmer','Rep','Status','Value'], rows:rows, num:[4] };
+};
+// Invoices, from either source: the portal store (farmer id) or the raw ledger snapshot (customer id).
+var sgCust = {}, sgFarm = {};
+if(sage && sage.live){ (sage.customers||[]).forEach(function(c){ sgCust[c.id]=c; }); d.all('farmers').forEach(function(f){ if(f.sageId!=null) sgFarm[f.sageId]=f.id; }); }
+var openAmt = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+var invFromStore = function(i){ var f=d.farmer(i.farmer); return { ref:i.label||i.ref, who:f.name, farmer:i.farmer, date:i.date, due:i.dueDate, amount:i.amount||0, open:openAmt(i), status:i.status }; };
+var invFromSage = function(i){ var c=sgCust[i.customer]||{}; return { ref:i.label||i.ref, who:c.name||'—', farmer:sgFarm[i.customer]||null, date:i.date, due:i.dueDate, amount:i.amount||0, open:openAmt(i), status:i.status }; };
+var invTable = function(list, oneCust){
+  var t0=new Date(new Date().toISOString().slice(0,10)), ta=0, to=0;
+  list.forEach(function(x){ ta+=x.amount; to+=x.open; });
+  var rows = list.slice(0,POP_CAP).map(function(x){
+    var dd = x.due ? Math.round((t0-new Date(x.due))/86400000) : 0;
+    return { cells:[x.ref||'—', x.who, BB.date(x.date), { html:BB.esc(BB.date(x.due))+(x.open>0.5&&dd>0?' <span class="faint">· '+dd+' d over</span>':'') }, BB.money(x.amount), x.open>0.5?BB.money(x.open):'—', { html:BB.statusBadge(x.status) }], href:farmHref(x.farmer) };
+  });
+  if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' invoices'),'','','',bold(BB.money(ta)),bold(BB.money(to)),''] });
+  var t = { columns:['Invoice','Customer','Date','Due','Amount','Outstanding','Status'], rows:rows, num:[4,5] };
+  // one customer's invoices: the name is in the title, not on every line
+  if(oneCust){ t.columns.splice(1,1); t.rows.forEach(function(r){ r.cells.splice(1,1); }); t.num=[3,4]; }
+  return t;
+};
+var receiptTable = function(list){
+  var tot=0; list.forEach(function(x){ tot+=(x.amount||0); });
+  var rows = list.slice(0,POP_CAP).map(function(x){ var c=sgCust[x.customer]||d.farmer(x.farmer)||{}; return { cells:[x.ref||'—', c.name||'—', BB.date(x.date), BB.money(x.amount||0)], href:farmHref(sgFarm[x.customer]||x.farmer) }; });
+  if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' receipts'),'','',bold(BB.money(tot))] });
+  return { columns:['Receipt','Customer','Date','Amount'], rows:rows, num:[3] };
+};
+// Ledger customers: balance against limit.
+var custTable = function(list){
+  return { columns:['Customer','Town','Balance','Limit','Over by'], num:[2,3,4], rows:list.slice(0,POP_CAP).map(function(c){
+    var over = c.creditLimit>0 ? (c.balance||0)-c.creditLimit : 0;
+    return { cells:[{ html:BB.esc(c.name||'—')+(c.onHold?' <span class="badge b-bad">On hold</span>':'') }, c.town||'—', BB.money(c.balance||0), c.creditLimit>0?BB.money(c.creditLimit):'—', over>0?BB.money(over):'—'], href:farmHref(sgFarm[c.id]) }; }) };
+};
+var sampleTable = function(soil, leaf){
+  var bl=function(id){ return (d.by('blocks',id)||{name:'—'}).name; };
+  var rows = soil.map(function(s){ return { cells:['Soil', d.farmer(s.farmer).farm, bl(s.block), BB.date(s.date), { html:BB.statusBadge(s.status) }], href:canGo('bioanalyze-soil.html')?'bioanalyze-soil.html?block='+s.block:null }; })
+    .concat(leaf.map(function(l){ return { cells:['Leaf', d.farmer(l.farmer).farm, bl(l.block), BB.date(l.date), { html:BB.statusBadge(l.status) }], href:canGo('bioanalyze-leaf.html')?'bioanalyze-leaf.html?block='+l.block:null }; }));
+  return { columns:['Sample','Farm','Block','Taken','Status'], rows:rows };
+};
+var stockTable = function(list){
+  return { columns:['Product','Depot','On hand','Reorder at'], num:[2,3], rows:list.map(function(i){ return { cells:[d.product(i.prod).name, d.depot(i.depot).name, BB.num(i.qty), BB.num(i.reorder)] }; }) };
+};
+
 // ---- pulse tiles per role ----
+// Each tile that counts a list carries `href` (the page that holds the list) and `pop` (that list, in a popup).
+var awaitingQ = orders.filter(function(o){return d.quoteStatus(o)==='Awaiting approval';});
+var confirmedO = orders.filter(function(o){return o.status==='Confirmed'||o.status==='Delivered';});
+var soilIn = d.all('soil').filter(function(s){return s.status==='New'||s.status==='Awaiting lab';}), leafIn = d.all('leaf').filter(function(l){return l.status==='New';});
+var lowInv = d.all('inventory').filter(function(i){return i.qty<i.reorder;});
+var transitD = d.where('deliveries',function(x){return x.status==='In transit';});
+var uninvO = orders.filter(function(o){return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id);});
+var chainO = orders.filter(function(o){return !!d.quoteStatus(o) && !d.orderInvoiced(o.id);});
+var draftsO = d.all('outbox').filter(function(x){return x.status==='Draft';});
+var unpaidI = d.all('invoices').filter(function(i){return i.status!=='Paid';});
+var myOrders = orders.filter(function(o){return o.rep===u.rep;});
+var myProgs = d.where('programs',function(p){return p.advisor===u.rep&&p.status==='Active';});
+var blendHref = canGo('operations.html') ? 'operations.html' : 'depots.html';
+var popOrders = function(list, sub){ return function(){ return { sub:sub, wide:true, table:orderTable(list) }; }; };
+var popSamples = function(){ return { sub:'soil and leaf samples waiting for a person', table:sampleTable(soilIn, leafIn) }; };
+var popStock = function(){ return { sub:'below the reorder level, per depot', table:stockTable(lowInv) }; };
+var popBlend = function(list){ return function(){ return { sub:'blending and mixing jobs', table:{ columns:['Recipe','Depot','Batch','For','Due','Status'], rows:list.map(function(b){ return { cells:[b.recipe, d.depot(b.depot).name, b.batch, d.farmer(b.for).farm, BB.date(b.due), { html:BB.statusBadge(b.status) }] }; }) } }; }; };
+var popDeliv = function(){ return { sub:'on the road now', table:{ columns:['Order','Farm','Depot','ETA','Transport'], rows:transitD.map(function(x){ var o=d.by('orders',x.order)||{}; return { cells:[o.ref||'—', d.farmer(x.farmer).farm, d.depot(x.depot).name, BB.date(x.eta), x.transport||'—'], href:canGo('deliveries.html')?'deliveries.html':null }; }) } }; };
 var PULSE = {
   director: [
-    {l:'Pipeline (forecast)', v:BB.money(forecastVal), s:openForecast.length+' open orders'},
-    {l:'Confirmed value', v:BB.money(confirmedVal), s:'this season', ok:1},
-    {l:'Quotes to approve', v:orders.filter(function(o){return d.quoteStatus(o)==='Awaiting approval';}).length, s:'in Orders — tap to approve', warn:orders.filter(function(o){return d.quoteStatus(o)==='Awaiting approval';}).length>0},
-    {l:'Samples in', v:(newSoil+newLeaf), s:'soil + leaf to action', warn:(newSoil+newLeaf)>0}
+    {l:'Pipeline (forecast)', v:BB.money(forecastVal), s:openForecast.length+' open orders', href:canGo('forecast.html')?'forecast.html':'orders.html', pop:popOrders(openForecast,'forecast and pending orders')},
+    {l:'Confirmed value', v:BB.money(confirmedVal), s:'this season', ok:1, href:'orders.html', pop:popOrders(confirmedO,'confirmed and delivered orders')},
+    {l:'Quotes to approve', v:awaitingQ.length, s:'in Orders — tap to approve', warn:awaitingQ.length>0, href:'orders.html', pop:popOrders(awaitingQ,'quotes waiting for your approval')},
+    {l:'Samples in', v:(newSoil+newLeaf), s:'soil + leaf to action', warn:(newSoil+newLeaf)>0, href:'bioanalyze-soil.html', pop:popSamples}
   ],
   advisor: [
-    {l:'My farmers', v:myFarmers, s:u.region},
-    {l:'Samples to interpret', v:(newSoil+newLeaf), s:'soil + leaf', warn:(newSoil+newLeaf)>0},
-    {l:'Active programmes', v:d.where('programs',function(p){return p.advisor===u.rep&&p.status==='Active';}).length, s:'BioConsult'},
-    {l:'My pipeline', v:BB.money(orders.filter(function(o){return o.rep===u.rep;}).reduce(function(s,o){return s+d.orderValue(o);},0)), s:'this season'}
+    {l:'My farmers', v:myFarmers, s:u.region, href:'farms.html', pop:function(){ var fs=u.rep ? d.where('farmers',function(f){return f.rep===u.rep;}) : d.all('farmers');
+      return { sub:'the farmers you look after', table:{ columns:['Farmer','Farm','Town','Status'], rows:fs.map(function(f){ return { cells:[f.name, f.farm, f.town||'—', { html:BB.statusBadge(f.status||'') }], href:farmHref(f.id) }; }) } }; }},
+    {l:'Samples to interpret', v:(newSoil+newLeaf), s:'soil + leaf', warn:(newSoil+newLeaf)>0, href:'bioanalyze-soil.html', pop:popSamples},
+    {l:'Active programmes', v:myProgs.length, s:'BioConsult', href:'bioconsult.html', pop:function(){
+      return { sub:'your active BioConsult programmes', table:{ columns:['Farm','Crop','Season','Goal'], rows:myProgs.map(function(p){ return { cells:[d.farmer(p.farmer).farm, p.crop||'—', p.season||'—', p.goal||'—'], href:farmHref(p.farmer) }; }) } }; }},
+    {l:'My pipeline', v:BB.money(myOrders.reduce(function(s,o){return s+d.orderValue(o);},0)), s:'this season', href:'orders.html', pop:popOrders(myOrders,'every order you have captured this season')}
   ],
   finance: [
-    {l:'Outstanding', v:BB.money(d.all('invoices').filter(function(i){return i.status!=='Paid';}).reduce(function(s,i){return s+(i.amount||0);},0)), s:d.all('invoices').filter(function(i){return i.status==='Overdue';}).length+' overdue', warn:d.all('invoices').some(function(i){return i.status==='Overdue';})},
-    {l:'Delivered, uninvoiced', v:orders.filter(function(o){return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id);}).length, s:'reported as sales', warn:orders.some(function(o){return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id);})},
-    {l:'Quotes in the chain', v:orders.filter(function(o){return !!d.quoteStatus(o) && !d.orderInvoiced(o.id);}).length, s:'awaiting approval → invoice'},
-    {l:'Reminders drafted', v:d.all('outbox').filter(function(x){return x.status==='Draft';}).length, s:'check & send', warn:d.all('outbox').some(function(x){return x.status==='Draft';})}
+    {l:'Outstanding', v:BB.money(unpaidI.reduce(function(s,i){return s+(i.amount||0);},0)), s:d.all('invoices').filter(function(i){return i.status==='Overdue';}).length+' overdue', warn:d.all('invoices').some(function(i){return i.status==='Overdue';}),
+      href:'finance.html?show=open', pop:function(){ return { sub:'invoices not yet paid', table:invTable(unpaidI.map(invFromStore).sort(function(a,b){ return b.open-a.open; })) }; }},
+    {l:'Delivered, uninvoiced', v:uninvO.length, s:'reported as sales', warn:uninvO.length>0, href:'finance.html', pop:popOrders(uninvO,'delivered or confirmed, with no invoice yet')},
+    {l:'Quotes in the chain', v:chainO.length, s:'awaiting approval → invoice', href:'orders.html', pop:popOrders(chainO,'quoted and not yet invoiced')},
+    {l:'Reminders drafted', v:draftsO.length, s:'check & send', warn:draftsO.length>0, href:'finance.html#outbox', pop:function(){
+      return { sub:'drafts waiting in the Finance outbox', table:{ columns:['To','Subject','Channel','Drafted'], rows:draftsO.map(function(x){ return { cells:[d.farmer(x.to).name, x.subject||'—', x.channel||'—', BB.date(x.created)] }; }) } }; }}
   ],
   operations: [
-    {l:'Orders to action', v:orders.filter(function(o){return o.status==='Pending'||o.status==='Awaiting stock';}).length, s:'new + awaiting', warn:1},
-    {l:'Stock alerts', v:lowStock, s:'below reorder', warn:lowStock>0},
-    {l:'Blending jobs', v:d.all('blending').length, s:'across depots'},
-    {l:'In transit', v:d.where('deliveries',function(x){return x.status==='In transit';}).length, s:'deliveries'}
+    {l:'Orders to action', v:orders.filter(function(o){return o.status==='Pending'||o.status==='Awaiting stock';}).length, s:'new + awaiting', warn:1, href:'orders.html', pop:popOrders(orders.filter(function(o){return o.status==='Pending'||o.status==='Awaiting stock';}),'pending or awaiting stock')},
+    {l:'Stock alerts', v:lowStock, s:'below reorder', warn:lowStock>0, href:'stock.html', pop:popStock},
+    {l:'Blending jobs', v:d.all('blending').length, s:'across depots', href:blendHref, pop:popBlend(d.all('blending'))},
+    {l:'In transit', v:transitD.length, s:'deliveries', href:'deliveries.html', pop:popDeliv}
   ],
   warehouse: [
-    {l:'Low stock', v:lowStock, s:'reorder soon', warn:lowStock>0},
-    {l:'Blending', v:d.all('blending').filter(function(b){return b.status==='Blending';}).length, s:'in progress'},
-    {l:'Deliveries out', v:d.where('deliveries',function(x){return x.status==='In transit';}).length, s:'today'},
+    {l:'Low stock', v:lowStock, s:'reorder soon', warn:lowStock>0, href:'stock.html', pop:popStock},
+    {l:'Blending', v:d.all('blending').filter(function(b){return b.status==='Blending';}).length, s:'in progress', href:blendHref, pop:popBlend(d.all('blending').filter(function(b){return b.status==='Blending';}))},
+    {l:'Deliveries out', v:transitD.length, s:'today', href:'deliveries.html', pop:popDeliv},
     {l:'Depots', v:d.all('depots').length, s:'network'}
   ]
 };
@@ -117,17 +208,22 @@ if(sage && sage.live && !sage.productsOnly && (sage.customers||[]).length && (BB
   html += '<div class="sec"><h2>From your accounting system</h2><span class="ln"></span><span class="cnt">read-only · last read '+BB.esc(m.lastSast||'—')+'</span></div>';
   html += BB.staleNote();
   // Each tile opens the list behind it — a number you cannot act on is decoration.
-  var tile = function(href, cls, label, value, sub){
+  var tile = function(href, cls, label, value, sub, key){
     // A seat that may not open Finance must not be handed a Finance link that will refuse it.
-    var canGo = !(BB.auth && typeof BB.auth.canPage === 'function') || BB.auth.canPage(href);
-    if(!canGo) return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+'</div></div>';
-    return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+' ›</div></a>';
+    if(!canGo(href)) return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+'</div></div>';
+    return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'" data-detail="'+key+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+' ›</div></a>';
   };
+  var openSinv = sinv.filter(function(i){return open_(i)>0.5;});
+  var byOpen = function(a,b){ return b.open-a.open; };
+  BB.statDetail('h-owed', function(){ return { sub:'open invoices, largest first · from your accounting system', wide:true, table:invTable(openSinv.map(invFromSage).sort(byOpen)), note:capNote(openSinv.length) }; });
+  BB.statDetail('h-overdue', function(){ return { sub:'past their due date, largest first', wide:true, table:invTable(od.map(invFromSage).sort(byOpen)), note:capNote(od.length) }; });
+  BB.statDetail('h-overlimit', function(){ return { sub:'balance above the credit limit in your accounts', table:custTable(overLimit.slice().sort(function(a,b){ return (b.balance-b.creditLimit)-(a.balance-a.creditLimit); })), note:capNote(overLimit.length) }; });
+  BB.statDetail('h-customers', function(){ return { sub:'largest balance first', table:custTable(scust.slice().sort(function(a,b){ return (b.balance||0)-(a.balance||0); })), note:capNote(scust.length) }; });
   html += '<div class="grid g4">'+
-    tile('finance.html?show=open', '', 'Owed to you', BB.money(owed), sinv.filter(function(i){return open_(i)>0.5;}).length+' invoices still open')+
-    tile('finance.html?show=overdue', odVal?'bad':'', 'Overdue', BB.money(odVal), od.length+' invoices past due')+
-    tile('farms.html?show=overlimit', overLimit.length?'warn':'', 'Over their limit', overLimit.length, 'check before a rep drives out')+
-    tile('farms.html?show=accounts', '', 'Customers', scust.length, 'live from '+BB.esc(m.source||'the ledger'))+
+    tile('finance.html?show=open', '', 'Owed to you', BB.money(owed), openSinv.length+' invoices still open', 'h-owed')+
+    tile('finance.html?show=overdue', odVal?'bad':'', 'Overdue', BB.money(odVal), od.length+' invoices past due', 'h-overdue')+
+    tile('farms.html?show=overlimit', overLimit.length?'warn':'', 'Over their limit', overLimit.length, 'check before a rep drives out', 'h-overlimit')+
+    tile('farms.html?show=accounts', '', 'Customers', scust.length, 'live from '+BB.esc(m.source||'the ledger'), 'h-customers')+
   '</div>';
   if(BB.auth.can('finance')) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Every figure here comes from your own accounts, refreshed three times a day. <a href="finance.html" style="color:var(--green-dark);">Open Finance ›</a></div>';
 }
@@ -157,10 +253,14 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
   var held = scust2.filter(function(c){ return c.onHold; });
   var delta = invPv? Math.round((invMv-invPv)/invPv*100) : null;
   ledgerPulse = [
-    {l:'Invoiced this month', v:BB.money(invMv), s:invM.length+' invoices'+(delta!==null? ' · '+(delta>=0?'+':'')+delta+'% on the same days last month':'')},
-    {l:'Received this month', v:BB.money(payMv), s:payM.length+' receipts', ok:1},
-    {l:'90 days and older', v:BB.money(aged90v), s:aged90.length+' invoices — chase first', warn:aged90v>0},
-    {l:'Accounts on hold', v:held.length, s:'flagged in your accounts', warn:held.length>0}
+    {l:'Invoiced this month', v:BB.money(invMv), s:invM.length+' invoices'+(delta!==null? ' · '+(delta>=0?'+':'')+delta+'% on the same days last month':''),
+      href:'finance.html', pop:function(){ return { sub:'raised so far this month, newest first', wide:true, table:invTable(invM.map(invFromSage).sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })), note:capNote(invM.length) }; }},
+    {l:'Received this month', v:BB.money(payMv), s:payM.length+' receipts', ok:1,
+      href:'finance.html', pop:function(){ return { sub:'payments received so far this month, newest first', table:receiptTable(payM.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })), note:capNote(payM.length) }; }},
+    {l:'90 days and older', v:BB.money(aged90v), s:aged90.length+' invoices — chase first', warn:aged90v>0,
+      href:'finance.html?show=overdue', pop:function(){ return { sub:'open 90 days or more past due, largest first', wide:true, table:invTable(aged90.map(invFromSage).sort(function(a,b){ return b.open-a.open; })), note:capNote(aged90.length) }; }},
+    {l:'Accounts on hold', v:held.length, s:'flagged in your accounts', warn:held.length>0,
+      href:'farms.html?show=accounts', pop:function(){ return { sub:'on hold in your accounting system', table:custTable(held) }; }}
   ];
 }
 // A seat without ledger access still has its own figures: what has actually moved. Better a small
@@ -192,8 +292,11 @@ if(pulseSet){
 html += '<div class="sec"><h2>'+(ledgerPulse?'This month':(movePulse?'What has moved':'Live pulse'))+'</h2><span class="ln"></span><span class="cnt">'+
   (ledgerPulse? 'from your accounting system' : (movePulse? 'from your own invoices' : 'updates as you work'))+'</span>'+((ledgerPulse||movePulse)?BB.liveChip():'')+'</div>';
 html += '<div class="grid g4">';
-pulseSet.forEach(function(p){
-  html += '<div class="stat'+(p.warn?' warn':'')+'"><div class="l">'+p.l+'</div><div class="v">'+p.v+'</div><div class="s">'+BB.esc(p.s)+'</div>'+(p.spark?'<div class="spark">'+BB.chart.spark(p.spark,{color:p.warn?'#b06d0f':'#68a53e'})+'</div>':'')+'</div>';
+pulseSet.forEach(function(p, pi){
+  var inner = '<div class="l">'+p.l+'</div><div class="v">'+p.v+'</div><div class="s">'+BB.esc(p.s)+(p.pop&&p.href&&canGo(p.href)?' ›':'')+'</div>'+(p.spark?'<div class="spark">'+BB.chart.spark(p.spark,{color:p.warn?'#b06d0f':'#68a53e'})+'</div>':'');
+  // a tile that counts a list opens that list over the page; the page that holds it is one tap further
+  if(p.pop && p.href && canGo(p.href)){ BB.statDetail('pulse'+pi, p.pop); html += '<a class="stat tap'+(p.warn?' warn':'')+'" href="'+p.href+'" data-detail="pulse'+pi+'">'+inner+'</a>'; }
+  else html += '<div class="stat'+(p.warn?' warn':'')+'">'+inner+'</div>';
 });
 html += '</div>';
 }
@@ -214,9 +317,24 @@ if(ledgerPulse){
   var ageB = [{label:'Current',value:0,color:'#3f6b28'},{label:'1–30 days',value:0,color:'#8fbf5a'},{label:'31–60 days',value:0,color:'#c77d17'},{label:'61–90 days',value:0,color:'#a3533f'},{label:'90+ days',value:0,color:'#b8382a'}];
   (sage.invoices||[]).forEach(function(i){ var v=openA(i); if(v<=0.5) return; var dd=i.dueDate?Math.round((t0a-new Date(i.dueDate))/86400000):0;
     ageB[dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4].value+=v; });
+  var byDateDesc = function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); };
+  var ageBand = function(i){ var dd=i.dueDate?Math.round((t0a-new Date(i.dueDate))/86400000):0; return dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4; };
   chartJobs.push(function(){ BB.chart.bar('#chTrend',{ labels:MONTHS6.map(function(m){return m.l;}), money:true, height:230, table:true,
-    series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}] }); });
-  chartJobs.push(function(){ BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed' }); });
+    series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}],
+    // a month → the invoices raised and the payments received in it
+    detail:function(ctx){ var m=MONTHS6[ctx.index]; if(!m) return null;
+      var iv=(sage.invoices||[]).filter(function(i){ return (i.date||'').slice(0,7)===m.ym; }).sort(byDateDesc);
+      var py=(sage.payments||[]).filter(function(x){ return (x.date||'').slice(0,7)===m.ym; }).sort(byDateDesc);
+      return { sub:iv.length+' invoice'+(iv.length===1?'':'s')+' · '+py.length+' receipt'+(py.length===1?'':'s')+' · from your accounting system', wide:true,
+        html:popTableHtml('Invoices', invTable(iv.map(invFromSage)))+popTableHtml('Receipts', receiptTable(py)),
+        note:(iv.length>POP_CAP||py.length>POP_CAP)?'Long lists show their first '+POP_CAP+' lines; the totals count them all.':null,
+        actions:canGo('finance.html')?[{ label:'Open Finance', href:'finance.html', primary:true }]:[] }; } }); });
+  chartJobs.push(function(){ BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed',
+    // an age band → the open invoices in it
+    detail:function(ctx){ var bi=ageB.indexOf(ctx.row); if(bi<0) return null;
+      var list=(sage.invoices||[]).filter(function(i){ return openA(i)>0.5 && ageBand(i)===bi; }).map(invFromSage).sort(function(a,b){ return b.open-a.open; });
+      return { sub:list.length+' open invoice'+(list.length===1?'':'s')+' · largest first', wide:true, table:invTable(list), note:capNote(list.length),
+        actions:canGo('finance.html')?[{ label:'Open the full list', href:bi>0?'finance.html?show=overdue':'finance.html?show=open', primary:true }]:[] }; } }); });
 } else if(showPortalPulse && (isDir || isFin || isOps || isAdvisor)){
   var scopeOrders = isAdvisor ? orders.filter(function(o){ return o.rep===u.rep; }) : orders;
   var mIdx = []; for(var mi=0; mi<12; mi++) mIdx.push(mi);
@@ -231,14 +349,24 @@ if(ledgerPulse){
       '<div class="card-p"><div id="chBook"></div></div></div>'+
     '<div class="card"><div class="card-h"><div><h3>'+(isAdvisor?'Your orders by status':'Season sales by rep')+'</h3><div class="sub">order value</div></div></div><div class="card-p"><div id="chSplit"></div></div></div>'+
   '</div>';
+  var bookHref = canGo('forecast.html')?'forecast.html':'orders.html';
   chartJobs.push(function(){ BB.chart.bar('#chBook',{ labels:span.map(BB.monthName), money:true, stacked:true, height:230, table:true,
-    series:[{name:'Confirmed',values:sumWhere(won),color:'#22431a'},{name:'Pipeline',values:sumWhere(function(o){ return !won(o); }),color:'#68a53e'}] }); });
+    series:[{name:'Confirmed',values:sumWhere(won),color:'#22431a'},{name:'Pipeline',values:sumWhere(function(o){ return !won(o); }),color:'#68a53e'}],
+    // a delivery month → the orders delivering in it
+    detail:function(ctx){ var mi=span[ctx.index]; var list=scopeOrders.filter(function(o){ return o.deliverMonth===mi; });
+      return { sub:list.length+' order'+(list.length===1?'':'s')+' delivering in '+BB.monthName(mi), wide:true, table:orderTable(list), actions:[{ label:'Open '+(bookHref==='forecast.html'?'the forecast':'orders'), href:bookHref, primary:true }] }; } }); });
   if(isAdvisor){
     var st={}; scopeOrders.forEach(function(o){ st[o.status]=(st[o.status]||0)+d.orderValue(o); });
-    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'your book', rows:Object.keys(st).map(function(k){ return {label:k, value:st[k]}; }) }); });
+    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'your book', rows:Object.keys(st).map(function(k){ return {label:k, value:st[k]}; }),
+      // a status → your orders in it
+      detail:function(ctx){ var list=scopeOrders.filter(function(o){ return o.status===ctx.row.label; });
+        return { sub:list.length+' of your orders', wide:true, table:orderTable(list), actions:[{ label:'Open orders', href:'orders.html', primary:true }] }; } }); });
   } else {
-    var reps = d.all('reps').map(function(r){ return { label:r.name, value:orders.filter(function(o){ return o.rep===r.id; }).reduce(function(t,o){ return t+d.orderValue(o); },0), color:r.colour }; });
-    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'season', rows:reps }); });
+    var reps = d.all('reps').map(function(r){ return { id:r.id, label:r.name, value:orders.filter(function(o){ return o.rep===r.id; }).reduce(function(t,o){ return t+d.orderValue(o); },0), color:r.colour }; });
+    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'season', rows:reps,
+      // a rep → that rep's orders this season
+      detail:function(ctx){ var list=orders.filter(function(o){ return o.rep===ctx.row.id; });
+        return { sub:list.length+' order'+(list.length===1?'':'s')+' this season', wide:true, table:orderTable(list), actions:canGo('orders.html')?[{ label:'Open orders', href:'orders.html', primary:true }]:[] }; } }); });
   }
 }
 
@@ -264,8 +392,8 @@ if(BB.intel && BB.auth.can('intelligence')){
   html += '<div class="split" id="insights" style="margin-top:16px;">'+
     '<div class="card"><div class="card-h"><div><h3>What needs you today</h3><div class="sub">most urgent first · across money, stock, samples and the field</div></div>'+
       '<span class="badge '+(nHigh?'b-bad':al.length?'b-warn':'b-ok')+'">'+(nHigh?nHigh+' high · ':'')+al.length+' total</span></div>'+
-      (al.length? '<div class="alert-list">'+alShown.map(function(a){ var s=SEV[a.sev]||SEV.low;
-        return '<a href="'+a.to+'" class="alert"><span class="sv" style="background:'+s.c+';"></span><span class="tx">'+BB.esc(a.txt)+'</span><span class="badge '+s.b+'">'+s.t+'</span></a>'; }).join('')+'</div>'+
+      (al.length? '<div class="alert-list">'+alShown.map(function(a, ai){ var s=SEV[a.sev]||SEV.low;
+        return '<a href="'+a.to+'" class="alert" data-al="'+ai+'"><span class="sv" style="background:'+s.c+';"></span><span class="tx">'+BB.esc(a.txt)+'</span><span class="badge '+s.b+'">'+s.t+'</span></a>'; }).join('')+'</div>'+
         (alRest>0?'<div class="card-f">and '+alRest+' more of lower priority.</div>':'')
       : '<div class="empty">Nothing needs you right now.</div>')+
     '</div>'+
@@ -273,6 +401,20 @@ if(BB.intel && BB.auth.can('intelligence')){
       '<div class="card-p health-list"><div id="health"></div></div>'+
       (notCaptured?'<div class="card-f">'+notCaptured+' customer'+(notCaptured===1?'':'s')+' have no agronomy captured yet, so they are not scored.</div>':'')+'</div>'+
   '</div>';
+  var latest = function(list){ return list.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })[0]; };
+  var blk = function(id){ return (d.by('blocks',id)||{name:'—'}).name; };
+  var farmHealthPop = function(x){
+    var fid=x.f.id, s=latest(d.where('soil',function(r){return r.farmer===fid;})), l=latest(d.where('leaf',function(r){return r.farmer===fid;})), w=latest(d.where('watch',function(r){return r.farmer===fid;}));
+    var rows=[];
+    if(s) rows.push({ cells:['Soil', BB.date(s.date), blk(s.block), { html:BB.statusBadge(s.status||'') }, (s.ph!=null?'pH '+s.ph+' · ':'')+(s.microbial?'biology '+String(s.microbial).toLowerCase()+' · ':'')+(s.flag||'')], href:canGo('bioanalyze-soil.html')?'bioanalyze-soil.html?block='+s.block:null });
+    if(l) rows.push({ cells:['Leaf', BB.date(l.date), blk(l.block), { html:BB.statusBadge(l.status||'') }, (l.crop?l.crop+' · ':'')+(l.flag||'')], href:canGo('bioanalyze-leaf.html')?'bioanalyze-leaf.html?block='+l.block:null });
+    if(w) rows.push({ cells:['Monitoring', BB.date(w.date), blk(w.block), w.vigour?w.vigour+' vigour':'—', (w.stage?w.stage+' · ':'')+(w.pest&&!/none/i.test(w.pest)?'pest: '+w.pest+' · ':'')+(w.note||'')], href:canGo('biowatch.html')?'biowatch.html?block='+w.block:null });
+    return { sub:x.f.name+(x.f.town?' · '+x.f.town:'')+' · '+x.h.samples+' sample'+(x.h.samples===1?'':'s')+', '+x.h.visits+' visit'+(x.h.visits===1?'':'s'), wide:true,
+      html:'<div class="eyebrow" style="margin:0 0 6px;">What drives the score</div><div style="font-size:.88rem;margin-bottom:6px;">'+
+        (x.h.drivers.length? x.h.drivers.map(function(t){ return '<span class="badge b-warn" style="margin:0 6px 6px 0;">'+BB.esc(t)+'</span>'; }).join('') : 'Nothing pulling it down — healthy and on programme.')+'</div>'+
+        '<div class="eyebrow" style="margin:10px 0 6px;">Latest readings</div>',
+      table:{ columns:['Source','Date','Block','Status','Finding'], rows:rows } };
+  };
   var maxCover=Math.max.apply(null, rf.map(function(r){ return r.daysCover; }).concat([1]));
   html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Reorder forecast</h3><div class="sub">days of cover against supplier lead time</div></div>'+
     (urgent?'<span class="badge b-bad">'+urgent+' to order now</span>':'<span class="badge b-ok">cover is healthy</span>')+'</div>'+
@@ -286,8 +428,10 @@ if(BB.intel && BB.auth.can('intelligence')){
     }).join('') : '<tr><td colspan="6"><div class="empty">All stock lines have healthy cover.</div></td></tr>')+
     '</tbody></table></div></div>';
   insightJobs.push(function(){
-    if(ranked.length) BB.chart.hbar('#health',{ max:100, fmt:function(v){ return v+'/100'; },
-      rows:ranked.map(function(x){ return { label:x.f.farm, sub:(x.h.drivers.length? x.h.drivers.join(' · ') : 'healthy, on programme'), value:x.h.score, color:scoreCol(x.h.score), href:'farm-detail.html?farmer='+x.f.id }; }) });
+    if(ranked.length) BB.chart.hbar('#health',{ max:100, fmt:function(v){ return v+'/100'; }, valueLabel:'Health', openLabel:'Open full record',
+      rows:ranked.map(function(x){ return { label:x.f.farm, sub:(x.h.drivers.length? x.h.drivers.join(' · ') : 'healthy, on programme'), value:x.h.score, color:scoreCol(x.h.score), href:farmHref(x.f.id) }; }),
+      // a farm → what drives its score, and the latest soil, leaf and monitoring behind it
+      detail:function(ctx){ var x=ranked[ctx.index]; if(!x) return null; return farmHealthPop(x); } });
     else document.getElementById('health').innerHTML='<div class="empty">No soil, leaf or monitoring captured yet, so no farm is scored.</div>';
   });
 }
@@ -308,13 +452,13 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
     chase.forEach(function(x, ix){
       var tel = String(x.c.phone||'').replace(/\D/g,'').replace(/^0/,'27');
       var msg = encodeURIComponent('Good day '+(x.c.name||'')+', a friendly reminder from BioBrix about invoice '+(x.i.ref||'')+'. May we arrange payment?');
-      html += '<div class="row between" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(ix?'border-top:1px solid var(--line-soft);':'')+'">'+
+      html += '<div class="row between pop-row" data-chase="'+ix+'" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(ix?'border-top:1px solid var(--line-soft);':'')+'">'+
         '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge b-bad">'+x.d+' days over</span><b style="font-size:.92rem;">'+BB.esc(x.c.name)+'</b></div>'+
           '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(x.i.label||x.i.ref)+(x.i.kind==='opening'?' <span class="faint">(carried over from your previous system)</span>':'')+' · <b>'+BB.money(x.v)+'</b> outstanding · due '+BB.date(x.i.dueDate)+'</div>'+
           '<div class="faint" style="font-size:.74rem;margin-top:2px;">'+BB.esc(x.i.kind==='opening'?'':(x.i.description||''))+(x.c.creditLimit? (x.i.kind==='opening'?'':' · ')+'limit '+BB.money(x.c.creditLimit):'')+'</div></div>'+
         '<div class="row" style="gap:6px;flex:none;">'+
           (tel? '<a class="btn ghost sm" href="tel:+'+tel+'">'+BB.icon('phone')+'Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+tel+'?text='+msg+'">'+BB.icon('message')+'WhatsApp</a>' : '<span class="faint" style="font-size:.74rem;">no number on the account</span>')+
-          '<a class="btn sm" href="finance.html?show=overdue">Open</a></div>'+
+          '<a class="btn sm" href="finance.html?show=overdue" data-chase="'+ix+'">Open</a></div>'+
       '</div>';
     });
     html += '</div></div>';
@@ -334,7 +478,7 @@ if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && BB
       var f=d.farmer(fu.farmer), r=d.rep(fu.rep), pd=d.product(fu.prod), blk=d.by('blocks',fu.block)||{name:''};
       var days=Math.round((new Date(fu.due)-today0)/86400000);
       var cell=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27');
-      html += '<div class="row between" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(i?'border-top:1px solid var(--line-soft);':'')+'">'+
+      html += '<div class="row between pop-row" data-fu="'+i+'" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(i?'border-top:1px solid var(--line-soft);':'')+'">'+
         '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><b>'+BB.esc(f.name)+'</b><span class="faint" style="font-size:.78rem;">'+BB.esc(f.farm)+'</span></div>'+
           '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(fu.what)+' · '+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+' · <span class="faint">'+BB.date(fu.due)+'</span></div>'+
           '<div class="faint" style="font-size:.74rem;margin-top:2px;">Farmer nudge '+(fu.farmerNudge?BB.date(fu.farmerNudge):'3 days before')+' · email + WhatsApp · automated'+(isDir?' · '+BB.esc(r.name):'')+'</div></div>'+
@@ -371,6 +515,85 @@ chartJobs.concat(insightJobs).forEach(function(f){ try{ f(); }catch(e){ console.
 
 Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
   b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Follow-up done · '+d.farmer(fu.farmer).name); location.reload(); };
+});
+// ---- Row previews: alerts, the chase list and follow-ups open over the page ----
+var PAGE_LABEL = { 'finance.html':'Finance', 'farms.html':'Farms & customers', 'stock.html':'Stock', 'bioanalyze-soil.html':'soil analysis', 'orders.html':'Orders', 'biowatch.html':'BioWatch', 'territory.html':'Territory' };
+var openLink = function(href, label){ return canGo(href) ? { label:label||('Open '+(PAGE_LABEL[String(href).split('?')[0].split('#')[0]]||'the page')), href:href, primary:true } : null; };
+// The intel engine (bb-intel.js) hands each alert only its text and a page. Recognise the record by
+// the same names the text was built from; anything unrecognised still gets the text and the page.
+function alertPop(a){
+  var C = [], sg = (sage && sage.live) ? sage : null, t0=new Date(new Date().toISOString().slice(0,10));
+  var custOpen = function(cid){ return ((sg&&sg.invoices)||[]).filter(function(i){ return i.customer===cid && openAmt(i)>0.5; }).map(invFromSage).sort(function(x,y){ return y.open-x.open; }); };
+  if(sg){
+    (sg.customers||[]).forEach(function(c){
+      if(!c.name) return;
+      C.push({ to:'finance.html?show=overdue', key:c.name, build:function(){ var l=custOpen(c.id); return { sub:'open invoices on this account', wide:true, table:invTable(l, true), actions:[farmHref(sgFarm[c.id])?{ label:'Open full record', href:farmHref(sgFarm[c.id]) }:null, openLink('finance.html?show=overdue','Overdue invoices')].filter(Boolean).map(function(x,k){ x.primary=!k; return x; }) }; } });
+      C.push({ to:'farms.html?show=overlimit', key:c.name, build:function(){ var l=custOpen(c.id); return { sub:'balance against the credit limit', wide:true, html:popTableHtml('', custTable([c]))+popTableHtml('Open invoices', invTable(l, true)) }; } });
+    });
+    C.push({ to:'farms.html?show=accounts', key:'', build:function(){ return { sub:'on hold in your accounting system', table:custTable((sg.customers||[]).filter(function(c){ return c.onHold; })) }; } });
+  }
+  d.all('inventory').forEach(function(i){ var pn=d.product(i.prod).name, dn=d.depot(i.depot).name;
+    C.push({ to:'stock.html', key:pn+' at '+dn, build:function(){ return { stats:[{l:'On hand',v:BB.num(i.qty)},{l:'Reorder at',v:BB.num(i.reorder)},{l:'Short by',v:BB.num(Math.max(0,i.reorder-i.qty)),cls:'warn'}], table:stockTable(lowInv.filter(function(x){ return x.depot===i.depot; })), note:'Every line below reorder at '+dn+'.' }; } }); });
+  soilIn.forEach(function(s){ var fm=d.farmer(s.farmer).farm;
+    C.push({ to:'bioanalyze-soil.html', key:fm, build:function(){ return { sub:d.farmer(s.farmer).name, table:sampleTable(soilIn.filter(function(x){ return x.farmer===s.farmer; }), []) }; } }); });
+  orders.forEach(function(o){
+    C.push({ to:'orders.html', key:o.ref, must:'awaiting stock', build:function(){
+      return { sub:d.farmer(o.farmer).name+' · '+d.farmer(o.farmer).farm+' · '+d.depot(o.depot).name,
+        stats:[{l:'Status',html:BB.statusBadge(o.status)},{l:'Value',v:BB.money(d.orderValue(o))},{l:'Delivery',v:BB.monthName(o.deliverMonth)}],
+        table:{ columns:['Product','Qty','Value'], num:[1,2], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod); return { cells:[p.name, BB.num(l.qty), BB.money((p.price||0)*(l.qty||0))] }; }) } }; } }); });
+  d.all('watch').forEach(function(w){ var fm=d.farmer(w.farmer).farm;
+    C.push({ to:'biowatch.html', key:fm, build:function(){ return { sub:d.farmer(w.farmer).name+' · '+blk(w.block)+' · '+BB.date(w.date),
+      stats:[{l:'Vigour',v:w.vigour||'—',cls:(w.vigour==='Poor'||w.vigour==='Fair')?'warn':''},{l:'Stage',v:w.stage||'—'},{l:'Soil moisture',v:w.soilMoist||'—'},{l:'Pests',v:w.pest||'—'}],
+      html:w.note?'<div style="font-size:.88rem;line-height:1.5;">'+BB.esc(w.note)+'</div>':'' }; } }); });
+  d.all('farmers').forEach(function(f){
+    var facts = function(){ return [{l:'Balance',v:BB.money(d.accountBalance(f.id))},{l:'Credit limit',v:d.creditLimit(f.id)?BB.money(d.creditLimit(f.id)):'—'},{l:'Rep',v:d.rep(f.rep).name}]; };
+    var invs = function(){ return invTable(d.where('invoices',function(i){ return i.farmer===f.id && openAmt(i)>0.5; }).map(invFromStore), true); };
+    C.push({ to:'territory.html', key:f.farm, build:function(){ return { sub:f.name+(f.town?' · '+f.town:'')+(f.region?' · '+f.region:''), stats:[{l:'Status',v:f.status||'—'},{l:'Hectares',v:f.ha?BB.num(f.ha):'—'},{l:'Crops',v:(f.crops||[]).join(', ')||'—'},{l:'Rep',v:d.rep(f.rep).name}] }; } });
+    C.push({ to:'orders.html', key:f.farm, must:'account overdue', build:function(){ return { sub:f.name, stats:facts(), table:invs(), wide:true }; } });
+    C.push({ to:'orders.html', key:f.farm, must:'over credit limit', build:function(){ return { sub:f.name, stats:facts(), table:invs(), wide:true }; } });
+  });
+  var hit = null;
+  C.forEach(function(c){ if(c.to===a.to && a.txt.indexOf(c.key)>=0 && (!c.must || a.txt.indexOf(c.must)>=0) && (!hit || c.key.length>hit.key.length)) hit=c; });
+  var s = SEV[a.sev]||SEV.low, p = {};
+  try{ if(hit) p = hit.build()||{}; }catch(e){ console.warn('alert', e); }
+  var out = { eyebrow:'What needs you today · '+s.t+' priority', title:a.txt, color:a.sev==='high'?'#b8382a':a.sev==='med'?'#c77d17':null, actions:[openLink(a.to)].filter(Boolean) };
+  Object.keys(p).forEach(function(k){ out[k]=p[k]; });
+  if(!out.actions || !out.actions.length) out.actions=[openLink(a.to)].filter(Boolean);
+  return out;
+}
+document.addEventListener('click', function(e){
+  if(e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  var al = e.target.closest('a.alert[data-al]');
+  if(al && typeof alShown!=='undefined'){ var a=alShown[+al.getAttribute('data-al')]; if(!a) return; e.preventDefault(); BB.popup(alertPop(a)); return; }
+  var ch = e.target.closest('[data-chase]');
+  if(ch && typeof chase!=='undefined'){
+    var hitA = e.target.closest('a,button'); if(hitA && !hitA.hasAttribute('data-chase')) return;   // Call / WhatsApp stay as they are
+    var x = chase[+ch.getAttribute('data-chase')]; if(!x) return; e.preventDefault();
+    var cid = x.i.customer, all = (sage.invoices||[]).filter(function(i){ return i.customer===cid && openAmt(i)>0.5; }).map(invFromSage).sort(function(p,q){ return q.open-p.open; });
+    var tot = all.reduce(function(t,y){ return t+y.open; },0), rec = farmHref(sgFarm[cid]);
+    var tel = String(x.c.phone||'').replace(/\D/g,'').replace(/^0/,'27');
+    BB.popup({ eyebrow:'Chase these first', title:x.c.name||'—', sub:(x.i.label||x.i.ref||'')+' · due '+BB.date(x.i.dueDate)+(x.c.phone?' · '+x.c.phone:''), color:'#b8382a', wide:true,
+      stats:[{l:'This invoice',v:BB.money(x.v),s:x.d+' days over',cls:'bad'},{l:'Open on the account',v:BB.money(tot),s:all.length+' invoice'+(all.length===1?'':'s')},{l:'Credit limit',v:x.c.creditLimit?BB.money(x.c.creditLimit):'—',s:x.c.onHold?'on hold':null}],
+      table:invTable(all, true),
+      actions:[ rec?{ label:'Open full record', href:rec, primary:true }:openLink('finance.html?show=overdue','Open overdue invoices'),
+        rec&&canGo('finance.html')?{ label:'Overdue invoices', href:'finance.html?show=overdue' }:null,
+        tel?{ label:'Call', href:'tel:+'+tel }:null ].filter(Boolean) });
+    return;
+  }
+  var fr = e.target.closest('[data-fu]');
+  if(fr && typeof fups!=='undefined'){
+    if(e.target.closest('a,button')) return;   // Call / WhatsApp / Done keep their own jobs
+    var fu = fups[+fr.getAttribute('data-fu')]; if(!fu) return;
+    var f=d.farmer(fu.farmer), b=d.by('blocks',fu.block)||{name:'—'}, days=Math.round((new Date(fu.due)-new Date(new Date().toISOString().slice(0,10)))/86400000);
+    var more = d.all('followups').filter(function(y){ return y.farmer===fu.farmer && y.status!=='Done'; }).sort(function(p,q){ return (p.due||'').localeCompare(q.due||''); });
+    var prog = d.all('programs').filter(function(pr){ return pr.farmer===fu.farmer && pr.block===fu.block; })[0];
+    BB.popup({ eyebrow:'Follow-up', title:fu.what, sub:f.name+' · '+f.farm+' · '+b.name+' · '+d.product(fu.prod).name+(prog?' · programme: '+prog.goal:''), wide:true,
+      stats:[{l:'Due',v:BB.shortDate(fu.due),s:days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'),cls:days<=3?'warn':''},{l:'Rate',v:fu.rate&&fu.rate!=='—'?fu.rate:'—'},{l:'Farmer nudge',v:fu.farmerNudge?BB.shortDate(fu.farmerNudge):'3 days before',s:'email + WhatsApp'},{l:'Advisor',v:d.rep(fu.rep).name}],
+      html:'<div class="eyebrow" style="margin:0 0 6px;">Open follow-ups on this farm</div>',
+      table:{ columns:['What','Block','Due','Rate'], rows:more.map(function(y){ return { cells:[y.what, (d.by('blocks',y.block)||{name:'—'}).name, BB.date(y.due), y.rate||'—'] }; }) },
+      actions:[ farmHref(fu.farmer)?{ label:'Open full record', href:farmHref(fu.farmer), primary:true }:null,
+        { label:'Mark done', onClick:function(){ BB.closePopup(); var btn=document.querySelector('button[data-fudone="'+fu.id+'"]'); if(btn) btn.click(); } } ].filter(Boolean) });
+  }
 });
 // These two only exist on a demonstration seat — a live client seat gets a plain Sign out instead.
 var swBtn = document.getElementById('switch');

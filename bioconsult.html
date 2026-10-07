@@ -19,6 +19,7 @@ var d = BB.data, u = BB.user;
 var params = new URLSearchParams(location.search);
 var preFarmer = params.get('farmer') || '';
 var preBlock = params.get('block') || '';
+var preOpen = params.get('open') || '';   // a programme opened from a popup elsewhere (farm record)
 
 var css=''+
 '.prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}'+
@@ -44,6 +45,35 @@ function progValue(p){ return (p.lines||[]).reduce(function(s,l){ return s+(l.co
 
 var state={ view:'list', open:null };
 var chartJobs=[];
+
+// ---- popups: the programmes behind a figure or a chart part. A row opens that programme here. ----
+function openProg(id){ BB.closePopup(); state.view='detail'; state.open=id; paint(); window.scrollTo(0,0); }
+function progRows(list, valueOf){
+  valueOf=valueOf||progValue;
+  return list.map(function(p){ var f=d.farmer(p.farmer), b=d.by('blocks',p.block)||{name:'—'};
+    return [{ html:'<b>'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, (p.crop||'—')+' · '+(p.season||'—'), { html:BB.statusBadge(p.status) }, BB.money(valueOf(p))]; });
+}
+function progDetail(list, opts){
+  opts=opts||{}; var valueOf=opts.valueFn||progValue;
+  list=list.slice().sort(function(a,b){ return valueOf(b)-valueOf(a); });
+  var tot=list.reduce(function(t,p){ return t+valueOf(p); },0);
+  var rows=progRows(list, valueOf);
+  if(list.length>1) rows.push([{ html:'<b>'+list.length+' programmes</b>' }, '', '', { html:'<b>'+BB.money(tot)+'</b>' }]);
+  return { table:{ columns:['Farm · block','Crop · season','Status',opts.valueLabel||'Value'], rows:rows, num:[3] },
+    note: list.length? 'Tap a programme to open it.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=list[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ openProg(p.id); }; }); },
+    total:tot, count:list.length };
+}
+function toProgList(){ BB.closePopup(); var el=document.getElementById('progList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+['pcActive','pcDraft'].forEach(function(k){
+  BB.statDetail(k, function(){
+    var want=k==='pcActive'?'Active':'Draft', list=d.all('programs').filter(inMyScope).filter(function(p){ return p.status===want; });
+    var x=progDetail(list);
+    return Object.assign(x, { sub:k==='pcActive'?'running this season':'awaiting sign-off', stats:[{ l:'Programmes', v:String(x.count) }, { l:'Value', v:BB.money(x.total) }],
+      actions:[{ label:'Open the full list', primary:true, onClick:toProgList }] });
+  });
+});
+function leverValue(lever){ return function(p){ return (p.lines||[]).filter(function(l){ return (d.product(l.prod).lever||'Other')===lever; }).reduce(function(t,l){ return t+(l.cost||0); },0); }; }
 var LEVER_COL={ Biology:'#3f6b28', Chemistry:'#2f6f9e', Physics:'#c77d17' };
 function leverSplit(list){
   var t={};
@@ -65,8 +95,8 @@ function statRow(){
   var seen={}, ha=0;
   list.forEach(function(p){ if(seen[p.block]) return; seen[p.block]=1; var b=d.by('blocks',p.block); ha+=(b&&b.ha)||0; });
   return '<div class="grid g4" style="margin-top:14px;">'+
-    '<div class="stat"><div class="l">Active programmes</div><div class="v">'+active+'</div><div class="s">running this season</div></div>'+
-    '<div class="stat'+(drafts?' warn':'')+'"><div class="l">Drafts</div><div class="v">'+drafts+'</div><div class="s">awaiting sign-off</div></div>'+
+    '<a class="stat tap" href="#progList" data-detail="pcActive"><div class="l">Active programmes</div><div class="v">'+active+'</div><div class="s">running this season</div></a>'+
+    '<a class="stat tap'+(drafts?' warn':'')+'" href="#progList" data-detail="pcDraft"><div class="l">Drafts</div><div class="v">'+drafts+'</div><div class="s">awaiting sign-off</div></a>'+
     '<div class="stat"><div class="l">Programme value</div><div class="v">'+BB.money(tot)+'</div><div class="s">across all programmes</div></div>'+
     '<div class="stat"><div class="l">Hectares on a programme</div><div class="v">'+BB.num(ha)+'</div><div class="s">'+Object.keys(seen).length+' block'+(Object.keys(seen).length===1?'':'s')+'</div></div>'+
   '</div>';
@@ -86,7 +116,7 @@ function renderList(){
 
   html += '<div class="split" style="margin-top:16px;align-items:start;">';
   html += '<div style="display:grid;gap:16px;min-width:0;">';
-  html += '<div class="card"><div class="card-h"><div><h3>Programmes</h3><div class="sub">active first · tap one for the full programme</div></div><span class="badge b-grey">'+list.length+'</span></div>';
+  html += '<div class="card" id="progList" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Programmes</h3><div class="sub">active first · tap one for the full programme</div></div><span class="badge b-grey">'+list.length+'</span></div>';
   if(!list.length){
     html += '<div class="empty">No programmes yet. Build the first recommendation.</div>';
   } else {
@@ -110,11 +140,24 @@ function renderList(){
   // which products the programmes lean on, by value
   var byProd={};
   list.forEach(function(p){ (p.lines||[]).forEach(function(l){ byProd[l.prod]=(byProd[l.prod]||0)+(l.cost||0); }); });
-  var prodRows=Object.keys(byProd).map(function(k){ var pr=d.product(k); return { label:pr.name, sub:pr.lever||'', value:byProd[k], color:LEVER_COL[pr.lever]||'#3f6b28' }; })
+  var prodRows=Object.keys(byProd).map(function(k){ var pr=d.product(k); return { id:k, label:pr.name, sub:pr.lever||'', value:byProd[k], color:LEVER_COL[pr.lever]||'#3f6b28' }; })
     .sort(function(a,b){ return b.value-a.value; }).slice(0,8);
   if(prodRows.length){
     html += '<div class="card"><div class="card-h"><div><h3>Products recommended</h3><div class="sub">programme value per product</div></div></div><div class="card-p"><div id="chProd"></div></div></div>';
-    chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:prodRows, money:true, legend:[{name:'Biology',color:LEVER_COL.Biology},{name:'Chemistry',color:LEVER_COL.Chemistry},{name:'Physics',color:LEVER_COL.Physics}] }); });
+    chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:prodRows, money:true, valueLabel:'Programme value', legend:[{name:'Biology',color:LEVER_COL.Biology},{name:'Chemistry',color:LEVER_COL.Chemistry},{name:'Physics',color:LEVER_COL.Physics}],
+      // the programmes that use this product, with its rate and timing in each
+      detail:function(ctx){
+        var pid=ctx.row.id, pr=d.product(pid), uses=list.filter(function(p){ return (p.lines||[]).some(function(l){ return l.prod===pid; }); });
+        var lineOf=function(p){ return (p.lines||[]).filter(function(l){ return l.prod===pid; }); };
+        var cost=function(p){ return lineOf(p).reduce(function(t,l){ return t+(l.cost||0); },0); };
+        uses.sort(function(a,b){ return cost(b)-cost(a); });
+        return { sub:[pr.code, pr.lever, pr.pack, BB.money(pr.price)+' per '+(pr.unit||'unit')].filter(Boolean).join(' · '),
+          table:{ columns:['Farm · block','Status','Rate','Timing','Cost'], rows:uses.map(function(p){ var f=d.farmer(p.farmer), b=d.by('blocks',p.block)||{name:'—'}, ls=lineOf(p);
+            return [{ html:'<b>'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, { html:BB.statusBadge(p.status) }, ls.map(function(l){ return l.rate||'—'; }).join(', '), ls.map(function(l){ return l.timing||'—'; }).join(', '), BB.money(cost(p))]; }), num:[4] },
+          note: pr.sheet || null,
+          onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=uses[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ openProg(p.id); }; }); },
+          actions: BB.auth && BB.auth.canPage && BB.auth.canPage('products-library.html') ? [{ label:'Product library', href:'products-library.html' }] : [] };
+      } }); });
   }
   html += '</div>';
 
@@ -127,8 +170,12 @@ function renderList(){
   html += '<div class="card"><div class="card-h"><div><h3>Programme status</h3><div class="sub">number of programmes</div></div></div><div class="card-p">'+(list.length?'<div id="chStatus"></div>':'<div class="empty" style="padding:20px;">Nothing yet.</div>')+'</div></div>';
   html += '<div class="card"><div class="card-h"><div><h3>The three levers</h3><div class="sub">programme value by lever</div></div></div><div class="card-p">'+(lv.length?'<div id="chLever"></div>':'<div class="empty" style="padding:20px;">Nothing yet.</div>')+'</div></div>';
   html += '</div></div>';
-  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chStatus',{ rows:stRows, centreLabel:'total', size:136 }); });
-  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lv, money:true, centreLabel:'value', size:136 }); });
+  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chStatus',{ rows:stRows, centreLabel:'total', size:136, valueLabel:'Programmes',
+    detail:function(ctx){ return progDetail(list.filter(function(p){ return p.status===ctx.row.label; })); } }); });
+  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lv, money:true, centreLabel:'value', size:136, valueLabel:'Programme value',
+    // the programmes that carry this lever, valued by their lines in it
+    detail:function(ctx){ var vf=leverValue(ctx.row.label);
+      return progDetail(list.filter(function(p){ return vf(p)>0; }), { valueFn:vf, valueLabel:ctx.row.label+' value' }); } }); });
   return html;
 }
 
@@ -181,7 +228,10 @@ function renderDetail(id){
   '</div></div><div class="card-f"><a href="biowatch.html?block='+encodeURIComponent(p.block)+'" style="color:var(--green-dark);font-weight:600;">BioWatch visits on this block ›</a></div></div>';
   html += '<div class="card"><div class="card-h"><div><h3>Where the money goes</h3><div class="sub">by lever</div></div></div><div class="card-p">'+(lv.length?'<div id="chPLever"></div>':'<div class="empty" style="padding:20px;">No product lines.</div>')+'</div></div>';
   html += '</div></div>';
-  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chPLever',{ rows:lv, money:true, centreLabel:'total', size:136 }); });
+  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chPLever',{ rows:lv, money:true, centreLabel:'total', size:136, valueLabel:'Value',
+    // this programme's product lines in that lever
+    detail:function(ctx){ var ls=(p.lines||[]).filter(function(l){ return (d.product(l.prod).lever||'Other')===ctx.row.label; });
+      return { table:{ columns:['Product','Rate','Timing','Cost'], rows:ls.map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+BB.esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(pr.code||'')+'</div>' }, l.rate||'—', l.timing||'—', BB.money(l.cost||0)]; }), num:[3] } }; } }); });
   return html;
 }
 
@@ -337,7 +387,9 @@ function saveProg(){
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
 // if arriving from a report with a farmer/block, drop straight into the builder
-if(preFarmer || preBlock){ state.view='form'; }
+var preProg = preOpen ? d.by('programs', preOpen) : null;
+if(preProg && inMyScope(preProg) && d.where('programs', function(x){ return x.id===preOpen; }).length){ state.view='detail'; state.open=preOpen; }
+else if(preFarmer || preBlock){ state.view='form'; }
 paint();
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }

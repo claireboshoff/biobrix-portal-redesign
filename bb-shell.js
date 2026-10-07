@@ -346,6 +346,10 @@
   .bbp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
   .bbp-stats .stat{box-shadow:none;background:var(--panel-2);padding:11px 13px;} .bbp-stats .stat .v{font-size:1.2rem;}
   .bbp-b table.bb th{position:static;}
+  .bbp-b table.bb td:first-child{white-space:nowrap;}
+  .bbp-b table.bb td{overflow-wrap:normal;word-break:keep-all;}
+  .bbp-tt{font-family:var(--display);font-weight:600;font-size:.9rem;color:var(--green-darkest);margin:14px 0 8px;}
+  .bbp-b > .bbp-tt:first-child{margin-top:0;}
   .bbp-b .scroll{border:1px solid var(--line);border-radius:10px;}
   .bbp-b .bbp-note{font-size:.8rem;color:var(--faint);margin-top:10px;}
   .bbp-f{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 20px 16px;border-top:1px solid var(--line-soft);}
@@ -1021,11 +1025,16 @@
   function popKey(e){ if(e.key==='Escape') closePopup(); }
   function popup(o){
     closePopup(); o=o||{};
-    var tbl='';
-    if(o.table && o.table.rows){ var nc=o.table.num||[];
-      tbl='<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+o.table.columns.map(function(c,i){ return '<th'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-        (o.table.rows.length? o.table.rows.map(function(r){ var cells=r.cells||r; return '<tr'+(r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+cells.map(function(c,i){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:esc(c==null?'—':c))+'</td>'; }).join('')+'</tr>'; }).join('')
-          : '<tr><td colspan="'+o.table.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody></table></div>'; }
+    // o.table, or o.tables:[{title, columns, rows:[{cells, href, onClick}], num:[i], foot:[cells]}]
+    var rowFns=[];
+    var cell=function(c,i,nc){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:esc(c==null||c===''?'—':c))+'</td>'; };
+    var oneTable=function(t){ var nc=t.num||[];
+      return (t.title?'<div class="bbp-tt">'+esc(t.title)+'</div>':'')+'<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+        (t.rows.length? t.rows.map(function(r){ var cells=r.cells||r, k=-1; if(typeof r.onClick==='function'){ rowFns.push(r.onClick); k=rowFns.length-1; }
+          return '<tr'+(k>=0?' class="click" data-row="'+k+'"':r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+cells.map(function(c,i){ return cell(c,i,nc); }).join('')+'</tr>'; }).join('')
+          : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody>'+
+        (t.foot? '<tfoot><tr>'+t.foot.map(function(c,i){ return cell(c,i,nc); }).join('')+'</tr></tfoot>' : '')+'</table></div>'; };
+    var tbl=(o.tables||(o.table&&o.table.rows?[o.table]:[])).map(oneTable).join('');
     var stats = (o.stats&&o.stats.length) ? '<div class="bbp-stats">'+o.stats.map(function(x){ return '<div class="stat'+(x.cls?' '+x.cls:'')+'"><div class="l">'+esc(x.l)+'</div><div class="v">'+(x.html||esc(x.v))+'</div>'+(x.s?'<div class="s">'+esc(x.s)+'</div>':'')+'</div>'; }).join('')+'</div>' : '';
     var acts=(o.actions||[]).filter(Boolean);
     var el=document.createElement('div'); el.className='bbp-back';
@@ -1033,13 +1042,19 @@
       '<div class="bbp-h">'+(o.color?'<span class="sw" style="background:'+esc(o.color)+'"></span>':'')+'<div class="t">'+(o.eyebrow?'<div class="eb">'+esc(o.eyebrow)+'</div>':'')+'<h3>'+esc(o.title||'')+'</h3>'+(o.sub?'<div class="sub">'+esc(o.sub)+'</div>':'')+'</div>'+
         '<button type="button" class="bbp-x" aria-label="Close">×</button></div>'+
       '<div class="bbp-b">'+stats+(o.html||'')+tbl+(o.note?'<div class="bbp-note">'+esc(o.note)+'</div>':'')+'</div>'+
-      '<div class="bbp-f">'+acts.map(function(a,i){ return a.href ? '<a class="btn '+(a.primary?'':'ghost')+'" href="'+esc(a.href)+'">'+esc(a.label)+icon('chevron')+'</a>'
+      '<div class="bbp-f">'+acts.map(function(a,i){ return (a.href && !a.scrollTo && !a.onClick) ? '<a class="btn '+(a.primary?'':'ghost')+'" href="'+esc(a.href)+'">'+esc(a.label)+icon('chevron')+'</a>'
         : '<button type="button" class="btn '+(a.primary?'':'ghost')+'" data-act="'+i+'">'+esc(a.label)+'</button>'; }).join('')+'</div></div>';
     document.body.appendChild(el); popOpen=el;
     requestAnimationFrame(function(){ el.classList.add('show'); });
     el.addEventListener('click', function(e){
       if(e.target===el || e.target.closest('.bbp-x')){ closePopup(); return; }
-      var b=e.target.closest('[data-act]'); if(b){ var a=acts[+b.getAttribute('data-act')]; if(a&&a.onClick) a.onClick(e); return; }
+      var b=e.target.closest('[data-act]'); if(b){ var a=acts[+b.getAttribute('data-act')]; if(!a) return;
+        if(a.scrollTo){ closePopup(); var t=document.querySelector(a.scrollTo); if(t) setTimeout(function(){ t.scrollIntoView({behavior:'smooth',block:'start'}); },160); }
+        if(a.onClick) a.onClick(e);
+        if(a.close) closePopup();
+        return; }
+      if(e.target.closest('a[href^="tel:"],a[href^="https://wa.me"],a[target]')) return;
+      var rr=e.target.closest('tr[data-row]'); if(rr){ var fn=rowFns[+rr.getAttribute('data-row')]; if(fn){ closePopup(); setTimeout(fn,160); } return; }
       var tr=e.target.closest('tr[data-href]'); if(tr) location.href=tr.getAttribute('data-href');
     });
     document.addEventListener('keydown', popKey);
@@ -1057,13 +1072,16 @@
   function chartTitle(el, o){ if(o.title) return o.title; var c=el&&el.closest&&el.closest('.card'), h=c&&c.querySelector('.card-h h3'); return h? h.textContent.trim() : ''; }
   function pct(a,b){ return b? Math.round(a/b*100)+'%' : '—'; }
   function colDetail(o, i, fmt){
+    var blank=function(v){ return v==null || (typeof v==='number' && isNaN(v)); };
+    var f2=function(v){ return blank(v)? '—' : fmt(v); };
     var tot=o.series.reduce(function(t,s){ return t+(s.values[i]||0); },0);
     var all=o.series.reduce(function(t,s){ return t+s.values.reduce(function(a,v){ return a+(v||0); },0); },0);
     var prev=i>0? o.series.reduce(function(t,s){ return t+(s.values[i-1]||0); },0) : null;
-    var stats=o.series.map(function(s){ return { l:s.name||'Value', v:fmt(s.values[i]||0), s:(o.series.length>1&&tot? pct(s.values[i]||0,tot)+' of '+o.labels[i] : null) }; });
-    if(o.series.length>1) stats.push({ l:'Total', v:fmt(tot) });
-    stats.push({ l:'Share of the chart', v:pct(tot,all), s:'across all '+o.labels.length });
-    if(prev!=null) stats.push({ l:'vs '+o.labels[i-1], html:(prev? (delta(tot,prev)||'—') : '—'), s:(tot-prev>=0? fmt(tot-prev)+' more' : fmt(prev-tot)+' less') });
+    var stats=o.series.map(function(s){ return { l:s.name||'Value', v:f2(s.values[i]), s:(o.series.length>1&&tot&&!o._line&&!blank(s.values[i])? pct(s.values[i]||0,tot)+' of '+o.labels[i] : null) }; });
+    if(o.series.length>1 && !o._line) stats.push({ l:'Total', v:fmt(tot) });
+    // a share of the whole means something for bars of one kind of thing; not for lines or mixed series
+    if(!o._line && o.share!==false) stats.push({ l:'Share of the chart', v:pct(tot,all), s:'across all '+o.labels.length });
+    if(prev!=null && (o.series.length===1 || o.stacked) && o.series.every(function(s){ return !blank(s.values[i]) && !blank(s.values[i-1]); })) stats.push({ l:'vs '+o.labels[i-1], html:(prev? (delta(tot,prev)||'—') : '—'), s:(tot-prev>=0? fmt(tot-prev)+' more' : fmt(prev-tot)+' less') });
     return { ctx:{ kind:'column', index:i, label:o.labels[i], values:o.series.map(function(s){ return s.values[i]||0; }), total:tot },
       base:{ eyebrow:chartTitle(o._el,o), title:o.labels[i], stats:stats, color:o.series.length===1?o.series[0].color:null } };
   }
@@ -1107,7 +1125,7 @@
     });
   }
   function line(el, o){
-    el=$el(el); if(!el) return; o.series=o.series.map(function(s,i){ s.color=s.color||PAL[i%PAL.length]; return s; });
+    el=$el(el); if(!el) return; o._line=true; o.series=o.series.map(function(s,i){ s.color=s.color||PAL[i%PAL.length]; return s; });
     var fmt=o.fmt||(o.money?money:num);
     el.classList.add('bbc');
     watch(el, function(){

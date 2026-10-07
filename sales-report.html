@@ -86,6 +86,33 @@ function render(){
     agCol[k] = (r && r.colour) || AG_PAL[Object.keys(agCol).length % AG_PAL.length];
     return agCol[k];
   }
+  // ---- popups: the invoices behind a chart part or a figure ----
+  function merge(a,b){ Object.keys(b).forEach(function(k){ a[k]=b[k]; }); return a; }
+  var farmOf = {}; try{ d.allUnscoped('farmers').forEach(function(f){ if(f.sageId!=null) farmOf[f.sageId]=f.id; }); }catch(e){}
+  function custHref(id){ return farmOf[id]? 'farm-detail.html?farmer='+encodeURIComponent(farmOf[id]) : null; }
+  function akey(i){ return agentOf(byId[i.customer]||{})||'none'; }
+  function invoiceDetail(list, o){
+    o=o||{}; list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var cols=['Date','Invoice','Customer'].concat(o.agent?['Agent']:[]).concat(['Amount']), tot=0;
+    list.forEach(function(i){ tot+=(i.amount||0); });
+    var rows=list.slice(0,200).map(function(i){ var c=byId[i.customer]||{};
+      return { href:custHref(i.customer), cells:[BB.date(i.date), i.label||i.ref||'—', c.name||'—'].concat(o.agent?[agentLabel(akey(i)==='none'?null:akey(i))]:[]).concat([money(i.amount||0)]) }; });
+    if(list.length>1) rows.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-1).map(function(){ return ''; })).concat([{ html:'<b>'+money(tot)+'</b>' }]) });
+    var nc={}; list.forEach(function(i){ nc[i.customer]=1; });
+    return { wide:true, table:{ columns:cols, rows:rows, num:[cols.length-1] }, total:tot, customers:Object.keys(nc).length,
+      note:list.length>200? 'Showing the 200 newest of '+list.length+'.' : (list.length && Object.keys(farmOf).length? 'Tap an invoice to open that customer’s farm file.' : null) };
+  }
+  // the customers behind a share: name, town, invoices, invoiced, agent
+  function customerDetail(list){
+    var by={}; list.forEach(function(i){ var x=by[i.customer]=by[i.customer]||{ id:i.customer, v:0, n:0 }; x.v+=(i.amount||0); x.n++; });
+    var cs=Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return b.v-a.v; }), tot=0;
+    var rows=cs.slice(0,150).map(function(x){ var c=byId[x.id]||{}; tot+=x.v;
+      return { href:custHref(x.id), cells:[{ html:'<b>'+BB.esc(c.name||'—')+'</b>' }, c.town||'—', BB.num(x.n), money(x.v)] }; });
+    if(cs.length>1) rows.push({ cells:[{ html:'<b>'+cs.length+' customers</b>' }, '', { html:'<b>'+BB.num(list.length)+'</b>' }, { html:'<b>'+money(cs.reduce(function(t,x){ return t+x.v; },0))+'</b>' }] });
+    return { table:{ columns:['Customer','Town','Invoices','Invoiced'], rows:rows, num:[2,3] }, count:cs.length,
+      note:cs.length>150? 'Showing the 150 largest of '+cs.length+'.' : null };
+  }
+  function tapStat(key, href, l, v, sub, cls){ return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'" data-detail="'+key+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></a>'; }
   function stat(l, v, sub, cls, spk){ return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div>'+(spk&&spk.length>1?'<div class="spark">'+BB.chart.spark(spk)+'</div>':'')+'</div>'; }
   function card(title, sub, body, extra){ return '<div class="card"><div class="card-h"><div><h3>'+title+'</h3><div class="sub">'+sub+'</div></div>'+(extra||'')+'</div>'+body+'</div>'; }
   var chartJobs = [];
@@ -120,8 +147,8 @@ function render(){
     var agTot = {}; wk.forEach(function(w){ Object.keys(weeks[w].byAgent).forEach(function(k){ agTot[k]=(agTot[k]||0)+weeks[w].byAgent[k]; }); });
     var agKeys = Object.keys(agTot).sort(function(a,b){ return agTot[b]-agTot[a]; });
     html += '<div class="grid g4">'+
-      stat('This week', money(cur?cur.total:0), (cur?cur.n:0)+' invoices · week of '+BB.date(thisW))+
-      stat('Last week', prevW? money(weeks[prevW].total) : '—', prevW? weeks[prevW].n+' invoices · week of '+BB.date(prevW) : 'no invoices')+
+      tapStat('srThisW', 'sales-report.html?view=weekly', 'This week', money(cur?cur.total:0), (cur?cur.n:0)+' invoices · week of '+BB.date(thisW))+
+      tapStat('srLastW', 'sales-report.html?view=weekly', 'Last week', prevW? money(weeks[prevW].total) : '—', prevW? weeks[prevW].n+' invoices · week of '+BB.date(prevW) : 'no invoices')+
       stat('Last 12 weeks', money(tot12), n12+' invoices', '', chron.map(function(w){ return weeks[w].total; }))+
       stat('Average week', money(wk.length? tot12/wk.length : 0), 'over the weeks with sales')+
     '</div>';
@@ -129,13 +156,25 @@ function render(){
       card('The last 12 weeks', 'invoiced per week · week starts Monday · split by agent', '<div class="card-p"><div id="chWeeks"></div></div>')+
       card('By agent', 'the same 12 weeks', '<div class="card-p"><div id="chWkAg"></div></div>')+
     '</div>';
+    var inWeek = function(w){ return invoices.filter(function(i){ return i.date && monday(i.date)===w; }); };
+    var weekTile = function(w, what){ if(!w) return { sub:'no invoices', table:{ columns:['Date','Invoice','Customer','Amount'], rows:[] } };
+      var list=inWeek(w), x=invoiceDetail(list, { agent:true });
+      return merge(x, { sub:what+' · week of '+BB.date(w), stats:[{ l:'Invoiced', v:money(x.total) }, { l:'Invoices', v:BB.num(list.length) }, { l:'Customers', v:BB.num(x.customers) }],
+        actions:[{ label:'Open the full list', primary:true, onClick:function(){ BB.closePopup(); var t=document.querySelector('.sr-table'); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' }); } }] }); };
+    BB.statDetail('srThisW', function(){ return weekTile(cur? thisW : null, 'this week'); });
+    BB.statDetail('srLastW', function(){ return weekTile(prevW, 'last week'); });
+    var twelve = invoices.filter(function(i){ return i.date && wk.indexOf(monday(i.date))>=0; });
     if(chron.length){
       // stack the four biggest agents; everyone else together, so the bars stay readable
       var topAg = agKeys.slice(0,4), rest = agKeys.slice(4);
       var ser = topAg.map(function(k){ return { name:agentLabel(k==='none'?null:k), color:agentColour(k), values:chron.map(function(w){ return weeks[w].byAgent[k]||0; }) }; });
       if(rest.length) ser.push({ name:'Everyone else', color:'#6b7a5e', values:chron.map(function(w){ return rest.reduce(function(t,k){ return t+(weeks[w].byAgent[k]||0); },0); }) });
-      chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:chron.map(function(w){ return BB.shortDate? BB.shortDate(w) : w.slice(5); }), money:true, stacked:true, height:250, table:true, series:ser }); });
-      chartJobs.push(function(){ BB.chart.hbar('#chWkAg',{ money:true, rows:agKeys.slice(0,8).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agTot[k], color:agentColour(k) }; }) }); });
+      chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:chron.map(function(w){ return BB.shortDate? BB.shortDate(w) : w.slice(5); }), money:true, stacked:true, height:250, table:true, series:ser,
+        detail:function(ctx){ var w=chron[ctx.index], list=inWeek(w);
+          return merge(invoiceDetail(list, { agent:true }), { title:'Week of '+BB.date(w), sub:list.length+' invoice'+(list.length===1?'':'s')+' · Monday to Sunday' }); } }); });
+      chartJobs.push(function(){ BB.chart.hbar('#chWkAg',{ money:true, rows:agKeys.slice(0,8).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agTot[k], color:agentColour(k), key:k }; }),
+        detail:function(ctx){ var k=ctx.row.key, list=twelve.filter(function(i){ return akey(i)===k; });
+          return merge(invoiceDetail(list), { sub:list.length+' invoice'+(list.length===1?'':'s')+' in the last 12 weeks'+(k==='none'?' · accounts with no agent':'') }); } }); });
     }
     var tb = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Week</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th>Split by agent</th></tr></thead><tbody>';
     if(!wk.length) tb += '<tr><td colspan="5"><div class="empty">Nothing invoiced yet.</div></td></tr>';
@@ -175,7 +214,9 @@ function render(){
     if(chronM.length) chartJobs.push(function(){
       var ser=[{name:'Invoiced',values:chronM.map(function(k){ return months[k]; }),color:'#3f6b28'}];
       if(budN) ser.push({name:'Budget',values:chronM.map(function(k){ return budgets[k]||0; }),color:'#c77d17'});
-      BB.chart.bar('#chMonths',{ labels:chronM.map(function(k){ return monthLabel(k).replace(/ (\d\d)(\d\d)$/,' $2'); }), money:true, height:250, table:true, series:ser });
+      BB.chart.bar('#chMonths',{ labels:chronM.map(function(k){ return monthLabel(k).replace(/ (\d\d)(\d\d)$/,' $2'); }), money:true, height:250, table:true, series:ser,
+        detail:function(ctx){ var k=chronM[ctx.index], list=invoices.filter(function(i){ return ym(i.date)===k; });
+          return merge(invoiceDetail(list, { agent:true }), { title:monthLabel(k), sub:list.length+' invoice'+(list.length===1?'':'s')+(budgets[k]? ' · budget '+money(budgets[k]) : ' · no budget set') }); } });
     });
     var tbm = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Month</th><th class="num">Invoiced</th><th class="num">Budget</th><th class="num">Against budget</th><th>Progress</th></tr></thead><tbody>';
     var sumA=0, sumB=0;
@@ -218,8 +259,12 @@ function render(){
       stat('Invoiced, three months', money(totA), totN+' invoices')+
       stat('Agents selling', ak.filter(function(k){ return k!=='none'; }).length, 'with invoices in the period')+
       stat('Commission', totC? money(totC) : '—', totC? 'at the rates set' : 'no rate set yet')+
-      stat('Not allocated', none? money(none.total) : 'R0', none? Object.keys(none.customers).length+' accounts carry no agent' : 'every account has an agent', none?'warn':'')+
+      tapStat('srNoAgent3', 'sales-report.html?view=customer', 'Not allocated', none? money(none.total) : 'R0', none? Object.keys(none.customers).length+' accounts carry no agent' : 'every account has an agent', none?'warn':'')+
     '</div>';
+    var period = invoices.filter(function(i){ return (i.date||'') >= cut; });
+    BB.statDetail('srNoAgent3', function(){ var list=period.filter(function(i){ return akey(i)==='none'; }), x=customerDetail(list);
+      return merge(x, { sub:'accounts with no agent, invoiced in the last three months', stats:[{ l:'Accounts', v:BB.num(x.count) }, { l:'Invoiced', v:money(list.reduce(function(t,i){ return t+(i.amount||0); },0)) }],
+        actions:[{ label:'Allocate them', href:'sales-report.html?view=customer', primary:true }] }); });
     var tba = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th class="num">Customers</th><th class="num">Commission</th><th></th></tr></thead><tbody>';
     if(!ak.length) tba += '<tr><td colspan="7"><div class="empty">Nothing invoiced in the last three months.</div></td></tr>';
     ak.forEach(function(k){
@@ -238,10 +283,14 @@ function render(){
       card('Share of sales', 'invoiced, last three months', '<div class="card-p"><div id="chAgShare"></div></div>')+
     '</div>';
     if(ak.length) chartJobs.push(function(){
-      var rows = ak.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agents[k].total, color:agentColour(k) }; });
+      var rows = ak.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agents[k].total, color:agentColour(k), keys:[k] }; });
       var restV = ak.slice(5).reduce(function(t,k){ return t+agents[k].total; },0);
-      if(restV) rows.push({ label:'Everyone else', value:restV, color:'#6b7a5e' });
-      BB.chart.donut('#chAgShare',{ money:true, centreLabel:'3 months', rows:rows });
+      if(restV) rows.push({ label:'Everyone else', value:restV, color:'#6b7a5e', keys:ak.slice(5) });
+      BB.chart.donut('#chAgShare',{ money:true, centreLabel:'3 months', rows:rows,
+        detail:function(ctx){ var ks=ctx.row.keys, list=period.filter(function(i){ return ks.indexOf(akey(i))>=0; });
+          var x=invoiceDetail(list, { agent:ks.length>1 }), r=ks.length===1? rateOf(ks[0]) : 0;
+          var st=ctx.row && ks.length===1 ? [{ l:'Invoiced', v:money(x.total), s:BB.num(list.length)+' invoices' }, { l:'Customers', v:BB.num(x.customers) }, { l:'Commission', v:r? money(x.total*r/100) : '—', s:r? 'at '+r+'%' : 'no rate set' }] : null;
+          return merge(x, st? { stats:st.concat([{ l:'Share', v:Math.round(ctx.value/ctx.total*100)+'%', s:'of '+money(ctx.total) }]), sub:'invoices, last three months' } : { sub:ks.length+' agents · invoices, last three months' }); } });
     });
     html += '<div class="sr-note faint">Commission is worked out on what was invoiced. Rates live under <a href="commission.html" style="color:var(--green-dark);">Commission</a>. Per-product rates switch on as soon as the line detail is pulled from your accounting system.</div>';
   }
@@ -266,8 +315,12 @@ function render(){
       stat('Customers with sales', rows.length, 'last 12 months')+
       stat('Invoiced', money(totCu), 'to these customers, last 12 months')+
       stat('Top ten', totCu? Math.round(top10/totCu*100)+'%' : '—', 'of the year\'s sales')+
-      stat('Not allocated', unalloc.length, unalloc.length? money(unalloc.reduce(function(t,r){ return t+r.total; },0))+' with no agent' : 'every customer has an agent', unalloc.length?'warn':'')+
+      tapStat('srNoAgent', 'sales-report.html?view=customer', 'Not allocated', unalloc.length, unalloc.length? money(unalloc.reduce(function(t,r){ return t+r.total; },0))+' with no agent' : 'every customer has an agent', unalloc.length?'warn':'')+
     '</div>';
+    var year = invoices.filter(function(i){ return (i.date||'')>=cut2; });
+    BB.statDetail('srNoAgent', function(){ var list=year.filter(function(i){ return !agentOf(byId[i.customer]||{}); }), x=customerDetail(list);
+      return merge(x, { sub:'customers with sales in the last 12 months and no agent', stats:[{ l:'Customers', v:BB.num(x.count) }, { l:'Invoiced', v:money(list.reduce(function(t,i){ return t+(i.amount||0); },0)) }],
+        actions:[{ label:'Open the full list', primary:true, onClick:function(){ BB.closePopup(); var t=document.querySelector('.sr-table'); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' }); } }] }); });
     var tbc = '<div class="scroll tall"><table class="bb sr-table"><thead><tr><th>Customer</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th>Agent</th></tr></thead><tbody>';
     if(!rows.length) tbc += '<tr><td colspan="5"><div class="empty">No customer has been invoiced in the last 12 months.</div></td></tr>';
     rows.slice(0,150).forEach(function(r){
@@ -291,11 +344,15 @@ function render(){
       '</div>'+
     '</div>';
     if(rows.length){
-      chartJobs.push(function(){ BB.chart.hbar('#chCu',{ money:true, rows:rows.slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.total, color:agentColour(r.agent||'none') }; }) }); });
+      chartJobs.push(function(){ BB.chart.hbar('#chCu',{ money:true, openLabel:'Open farm file', rows:rows.slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.total, color:agentColour(r.agent||'none'), cid:r.c.id, agent:r.agent, href:custHref(r.c.id) }; }),
+        detail:function(ctx){ var id=ctx.row.cid, list=year.filter(function(i){ return i.customer===id; });
+          return merge(invoiceDetail(list), { sub:(ctx.row.sub? ctx.row.sub+' · ' : '')+'looked after by '+agentLabel(ctx.row.agent)+' · last 12 months', note:null }); } }); });
       chartJobs.push(function(){
-        var dr = agK.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:byAg[k], color:agentColour(k) }; });
-        var rv = agK.slice(5).reduce(function(t,k){ return t+byAg[k]; },0); if(rv) dr.push({ label:'Everyone else', value:rv, color:'#6b7a5e' });
-        BB.chart.donut('#chCuAg',{ money:true, centreLabel:'12 months', rows:dr });
+        var dr = agK.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:byAg[k], color:agentColour(k), keys:[k] }; });
+        var rv = agK.slice(5).reduce(function(t,k){ return t+byAg[k]; },0); if(rv) dr.push({ label:'Everyone else', value:rv, color:'#6b7a5e', keys:agK.slice(5) });
+        BB.chart.donut('#chCuAg',{ money:true, centreLabel:'12 months', rows:dr,
+          detail:function(ctx){ var ks=ctx.row.keys, list=year.filter(function(i){ return ks.indexOf(akey(i))>=0; }), x=customerDetail(list);
+            return merge(x, { sub:x.count+' customer'+(x.count===1?'':'s')+' · last 12 months'+(ks[0]==='none'?' · set the agent in the table on this page':'') }); } });
       });
     }
     if(rows.length>150) html += '<div class="sr-note faint">Showing the 150 largest. The rest are in Farms &amp; farmers.</div>';

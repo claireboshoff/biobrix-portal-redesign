@@ -50,6 +50,31 @@ document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 var KINDS = ['All','Soil','Leaf','Programme','Monitoring','Delivery'];
 var KIND_IC = { All:'folder', Soil:'flask', Leaf:'leaf', Programme:'clipboard', Monitoring:'eye', Delivery:'truck' };
 var state = { q:'', kind:'All', farmer:'' };
+// arriving from a farm record (?farmer=) opens that farm's folder
+(function(){ var pf=new URLSearchParams(location.search).get('farmer'); if(pf && d.all('files').some(function(f){ return f.farmer===pf; })) state.farmer=pf; })();
+
+// ---- popups: the files or farms behind a figure. A farm row opens its folder here. ----
+function pickFarm(id){ BB.closePopup(); state.farmer=id||''; render(); var el=document.getElementById('fileList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+function docHref(f){ return 'document.html?farmer='+encodeURIComponent(f.farmer||'')+'&kind='+encodeURIComponent(f.kind||'Document')+'&name='+encodeURIComponent(f.name||''); }
+function fileDetail(list){
+  list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return { table:{ columns:['File','Kind','Farm','Date'], rows:list.map(function(f){ var fm=d.farmer(f.farmer);
+      return { cells:[{ html:'<b>'+BB.esc(f.name)+'</b>' }, { html:'<span class="kind k-'+BB.esc(f.kind)+'">'+BB.esc(f.kind)+'</span>' }, fm.farm, BB.shortDate(f.date)], href:docHref(f) }; }) },
+    note: list.length? 'Tap a file to open it.' : null };
+}
+function toFiles(){ BB.closePopup(); var el=document.getElementById('fileList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+var TILE={};
+BB.statDetail('ffMonth', function(){ return Object.assign(fileDetail(TILE.month||[]), { sub:'filed since the 1st of this month', actions:[{ label:'Open the full list', primary:true, onClick:toFiles }] }); });
+BB.statDetail('ffFarms', function(){
+  var all=TILE.all||[], by={};
+  all.forEach(function(f){ var k=f.farmer; if(!by[k]) by[k]={ n:0, last:'' }; by[k].n++; if((f.date||'')>by[k].last) by[k].last=f.date||''; });
+  var ids=Object.keys(by).sort(function(a,b){ return by[b].n-by[a].n; });
+  return { sub:'farms with at least one document',
+    table:{ columns:['Farm','Files','Last filed'], rows:ids.map(function(id){ var fm=d.farmer(id); return [{ html:'<b>'+BB.esc(fm.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(fm.name)+'</div>' }, String(by[id].n), by[id].last?BB.shortDate(by[id].last):'—']; }), num:[1] },
+    note: ids.length? 'Tap a farm to open its folder.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var id=ids[i]; if(!id) return; tr.classList.add('click'); tr.onclick=function(){ pickFarm(id); }; }); },
+    actions:[{ label:'Open the full list', primary:true, onClick:toFiles }] };
+});
 
 function files(){
   return d.all('files').filter(function(f){
@@ -64,12 +89,13 @@ function statRow(){
   var all=d.all('files');
   var withFiles=all.map(function(f){ return f.farmer; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
   var now=new Date(); var monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
-  var thisMonth=all.filter(function(f){ return (f.date||'') >= monthStart; }).length;
+  var monthL=all.filter(function(f){ return (f.date||'') >= monthStart; }), thisMonth=monthL.length;
+  TILE={ all:all, month:monthL };
   var newest=all.map(function(f){ return f.date||''; }).sort().pop();
   return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Total files</div><div class="v">'+all.length+'</div><div class="s">one indexed place</div></div>'+
-    '<div class="stat"><div class="l">Farms with files</div><div class="v">'+withFiles+'</div><div class="s">tagged to a farm</div></div>'+
-    '<div class="stat"><div class="l">Filed this month</div><div class="v">'+thisMonth+'</div><div class="s">since the 1st</div></div>'+
+    '<a class="stat tap" href="#fileList" data-detail="ffFarms"><div class="l">Farms with files</div><div class="v">'+withFiles+'</div><div class="s">tagged to a farm</div></a>'+
+    '<a class="stat tap" href="#fileList" data-detail="ffMonth"><div class="l">Filed this month</div><div class="v">'+thisMonth+'</div><div class="s">since the 1st</div></a>'+
     '<div class="stat"><div class="l">Last filed</div><div class="v">'+(newest?BB.shortDate(newest):'—')+'</div><div class="s">newest document</div></div>'+
   '</div>';
 }
@@ -97,10 +123,9 @@ function folders(){
 
 function controls(){
   var html='<div class="toolbar">';
+  // the farm picker that sat here duplicated the Farms folder list beside it; kind, farm and date also have funnels
   html += '<label class="srch">'+BB.icon('search')+'<input id="search" type="search" placeholder="Search file name…" value="'+BB.esc(state.q)+'" aria-label="Search file name"></label>';
-  html += '<select id="farmerFilter" class="tsel" aria-label="Farm"><option value="">All farms</option>'+
-    farmers.map(function(f){ return '<option value="'+f.id+'"'+(f.id===state.farmer?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(f.name)+'</option>'; }).join('')+
-    '</select>';
+  if(state.farmer) html += '<button class="chip on" id="clearFarm" title="Show every farm">'+BB.esc(d.farmer(state.farmer).farm)+' ×</button>';
   html += '</div>';
   return html;
 }
@@ -153,7 +178,7 @@ function render(){
   html += '<div class="lib">';
   html += '<div class="side">'+folders()+'</div>';
   html += '<div class="main">';
-  html += '<div class="card"><div class="card-h"><div><h3>'+(state.kind==='All'?'All files':BB.esc(state.kind)+' files')+'</h3><div class="sub">newest first</div></div><span class="badge b-grey">'+shown+' shown</span>'+controls()+'</div>';
+  html += '<div class="card" id="fileList" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>'+(state.kind==='All'?'All files':BB.esc(state.kind)+' files')+'</h3><div class="sub">newest first</div></div><span class="badge b-grey">'+shown+' shown</span>'+controls()+'</div>';
   html += table();
   html += '</div>';
   html += uploadForm();
@@ -171,8 +196,8 @@ function wire(){
   Array.prototype.forEach.call(document.querySelectorAll('.farm-pick'), function(c){
     c.onclick=function(){ state.farmer=c.getAttribute('data-farm')||''; render(); };
   });
-  var ff=document.getElementById('farmerFilter');
-  if(ff) ff.onchange=function(){ state.farmer=ff.value; refreshList(); };
+  var cf=document.getElementById('clearFarm');
+  if(cf) cf.onclick=function(){ state.farmer=''; render(); };
   wireRowButtons();
 
   var fb=document.getElementById('fileIt');

@@ -67,6 +67,32 @@ function hasPest(w){ var p=String(w.pest||'').trim().toLowerCase(); return !!p &
 var state = { view:'list', open:null };
 var chartJobs = [];
 
+// ---- popups: the visits behind a figure or a chart part. A row opens that visit's field report here. ----
+function openVisit(id){ BB.closePopup(); state.view='report'; state.open=id; paint(); window.scrollTo(0,0); }
+function visitDetail(list){
+  list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return { table:{ columns:['Date','Farm · block','Stage','Vigour','Pest & disease'], rows:list.map(function(w){ var b=d.by('blocks',w.block)||{name:'—'}, f=d.farmer(w.farmer);
+      return [BB.shortDate(w.date), { html:'<b>'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, w.stage||'—', { html:vigourBadge(w.vigour) }, { html:hasPest(w)?'<span style="color:var(--amber);font-weight:600;">'+BB.esc(w.pest)+'</span>':'<span class="faint">'+BB.esc(w.pest||'—')+'</span>' }]; }) },
+    note: list.length? 'Tap a visit for its field report.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var w=list[i]; if(!w) return; tr.classList.add('click'); tr.onclick=function(){ openVisit(w.id); }; }); } };
+}
+function toVisits(){ BB.closePopup(); var el=document.getElementById('visitList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+var TILE = {};
+['bwWeek','bwWeak'].forEach(function(k){
+  BB.statDetail(k, function(){ return Object.assign(visitDetail(TILE[k]||[]), { sub:k==='bwWeek'?'field checks in the last 7 days':'fair or poor vigour — follow these up', actions:[{ label:'Open the full list', primary:true, onClick:toVisits }] }); });
+});
+BB.statDetail('bwFarms', function(){
+  var list=TILE.bwFarms||[], by={};
+  list.forEach(function(w){ var k=w.farmer; if(!by[k]) by[k]={ n:0, last:null }; by[k].n++; if(!by[k].last || (w.date||'')>(by[k].last.date||'')) by[k].last=w; });
+  var ids=Object.keys(by).sort(function(a,b){ return by[b].n-by[a].n; });
+  var go=function(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } };
+  return { sub:'farms with at least one field check',
+    table:{ columns:['Farm','Visits','Last check','Vigour'], rows:ids.map(function(id){ var f=d.farmer(id), x=by[id];
+      return { cells:[{ html:'<b>'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(f.name)+'</div>' }, String(x.n), BB.shortDate(x.last.date), { html:vigourBadge(x.last.vigour) }],
+        href: go('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(id) : null }; }), num:[1] },
+    actions:[{ label:'Open the full list', primary:true, onClick:toVisits }] };
+});
+
 function visits(){
   var list = d.all('watch').filter(inMyScope);
   if(blockFilter) list = list.filter(function(w){ return w.block===blockFilter; });
@@ -78,12 +104,13 @@ function statRow(){
   var farms = list.map(function(w){ return w.farmer; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
   var now = new Date(); var weekAgo = new Date(now.getTime()-7*864e5).toISOString().slice(0,10);
   var thisWeek = list.filter(function(w){ return (w.date||'') >= weekAgo; }).length;
-  var weak = list.filter(function(w){ return w.vigour==='Fair' || w.vigour==='Poor'; }).length;
+  var weakL = list.filter(function(w){ return w.vigour==='Fair' || w.vigour==='Poor'; }), weak = weakL.length;
+  TILE = { bwWeek:list.filter(function(w){ return (w.date||'') >= weekAgo; }), bwWeak:weakL, bwFarms:list };
   return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Visits logged</div><div class="v">'+list.length+'</div><div class="s">field checks captured</div></div>'+
-    '<div class="stat"><div class="l">Farms monitored</div><div class="v">'+farms+'</div><div class="s">under your watch</div></div>'+
-    '<div class="stat"><div class="l">Checks this week</div><div class="v">'+thisWeek+'</div><div class="s">last 7 days</div></div>'+
-    '<div class="stat'+(weak?' warn':'')+'"><div class="l">Fair or poor vigour</div><div class="v">'+weak+'</div><div class="s">visits to follow up</div></div>'+
+    '<a class="stat tap" href="#visitList" data-detail="bwFarms"><div class="l">Farms monitored</div><div class="v">'+farms+'</div><div class="s">under your watch</div></a>'+
+    '<a class="stat tap" href="#visitList" data-detail="bwWeek"><div class="l">Checks this week</div><div class="v">'+thisWeek+'</div><div class="s">last 7 days</div></a>'+
+    '<a class="stat tap'+(weak?' warn':'')+'" href="#visitList" data-detail="bwWeak"><div class="l">Fair or poor vigour</div><div class="v">'+weak+'</div><div class="s">visits to follow up</div></a>'+
   '</div>';
 }
 
@@ -112,10 +139,10 @@ function renderList(){
   // visits per week, only when there are enough weeks to make a trend
   var weeks = {};
   list.forEach(function(w){ var k=weekOf(w.date); if(k) weeks[k]=(weeks[k]||0)+1; });
-  var wk = Object.keys(weeks).sort(), weekLabels=[], weekVals=[];
+  var wk = Object.keys(weeks).sort(), weekLabels=[], weekVals=[], weekKeys=[];
   if(wk.length){
     var cur=new Date(wk[0]+'T00:00:00'), last=new Date(wk[wk.length-1]+'T00:00:00'), guard=0;
-    while(cur<=last && guard<60){ var key=cur.toISOString().slice(0,10); weekLabels.push(BB.shortDate(key)); weekVals.push(weeks[key]||0); cur.setDate(cur.getDate()+7); guard++; }
+    while(cur<=last && guard<60){ var key=cur.toISOString().slice(0,10); weekLabels.push(BB.shortDate(key)); weekVals.push(weeks[key]||0); weekKeys.push(key); cur.setDate(cur.getDate()+7); guard++; }
   }
   var showTrend = weekLabels.length>=3;
 
@@ -129,9 +156,11 @@ function renderList(){
   html += '<div style="display:grid;gap:16px;min-width:0;">';
   if(showTrend){
     html += '<div class="card"><div class="card-h"><div><h3>Field checks per week</h3><div class="sub">visits logged'+(blockFilter?' on this block':'')+'</div></div></div><div class="card-p"><div id="chWeeks"></div></div></div>';
-    chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:weekLabels, height:200, table:true, series:[{name:'Visits', values:weekVals, color:'#3f6b28'}] }); });
+    chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:weekLabels, height:200, table:true, series:[{name:'Visits', values:weekVals, color:'#3f6b28'}],
+      // the visits logged that week
+      detail:function(ctx){ var k=weekKeys[ctx.index]; return Object.assign(visitDetail(list.filter(function(w){ return weekOf(w.date)===k; })), { sub:'week of '+BB.date(k) }); } }); });
   }
-  html += '<div class="card"><div class="card-h"><div><h3>Monitoring visits</h3><div class="sub">newest first · tap a visit for the field report</div></div><span class="badge b-grey">'+list.length+'</span></div>';
+  html += '<div class="card" id="visitList" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Monitoring visits</h3><div class="sub">newest first · tap a visit for the field report</div></div><span class="badge b-grey">'+list.length+'</span></div>';
   if(!list.length){
     html += '<div class="empty">No monitoring visits yet. Log the first field check.</div>';
   } else {
@@ -157,15 +186,17 @@ function renderList(){
   var advKeys = Object.keys(byAdv);
   if(advKeys.length>1){
     html += '<div class="card"><div class="card-h"><div><h3>Visits by advisor</h3><div class="sub">field checks logged</div></div></div><div class="card-p"><div id="chAdv"></div></div></div>';
-    var advRows = advKeys.map(function(k){ var r=d.rep(k); return { label:r.name, sub:r.region||'', value:byAdv[k], color:r.colour||'#3f6b28' }; }).sort(function(a,b){ return b.value-a.value; });
-    chartJobs.push(function(){ BB.chart.hbar('#chAdv',{ rows:advRows }); });
+    var advRows = advKeys.map(function(k){ var r=d.rep(k); return { id:k, label:r.name, sub:r.region||'', value:byAdv[k], color:r.colour||'#3f6b28' }; }).sort(function(a,b){ return b.value-a.value; });
+    chartJobs.push(function(){ BB.chart.hbar('#chAdv',{ rows:advRows, valueLabel:'Visits',
+      detail:function(ctx){ return visitDetail(list.filter(function(w){ return w.advisor===ctx.row.id; })); } }); });
   }
   html += '</div>';
 
   html += '<div style="display:grid;gap:16px;min-width:0;">';
   html += '<div class="card"><div class="card-h"><div><h3>Crop vigour</h3><div class="sub">across the visits shown</div></div></div><div class="card-p">'+
     (list.length? '<div id="chVigour"></div>' : '<div class="empty" style="padding:20px;">Nothing logged yet.</div>')+'</div></div>';
-  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chVigour',{ rows:vigRows, centreLabel:'visits', size:136 }); });
+  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chVigour',{ rows:vigRows, centreLabel:'visits', size:136, valueLabel:'Visits',
+    detail:function(ctx){ return visitDetail(list.filter(function(w){ return w.vigour===ctx.row.label; })); } }); });
 
   html += '<div class="card"><div class="card-h"><div><h3>Pest watch</h3><div class="sub">pressure noted on the walk</div></div><span class="badge '+(pests.length?'b-warn':'b-ok')+'">'+pests.length+'</span></div>';
   if(!pests.length){
@@ -352,6 +383,8 @@ function wireDictation(){
 }
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
+// a visit opened from a popup elsewhere (?open=)
+(function(){ var o=params.get('open'); if(o && d.all('watch').filter(inMyScope).some(function(w){ return w.id===o; })){ state.view='report'; state.open=o; } })();
 paint();
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }

@@ -75,7 +75,7 @@ function render(){
 
   // Money received. Live: the payments read from the ledger. Demo: the paid date on each invoice.
   var pays=d.all('payments')||[];
-  var paySrc = pays.length ? pays : invs.filter(function(i){ return i.paidDate; }).map(function(i){ return { date:i.paidDate, amount:i.amount||0 }; });
+  var paySrc = pays.length ? pays : invs.filter(function(i){ return i.paidDate; }).map(function(i){ return { date:i.paidDate, amount:i.amount||0, ref:i.ref, farmer:i.farmer, forInv:i.label||i.ref }; });
   var sumMonth = function(list, key, ym){ return list.filter(function(x){ return String(x[key]||'').slice(0,7)===ym; }).reduce(function(t,x){ return t+(x.amount||0); },0); };
   var invByM = MONTHS6.map(function(m){ return sumMonth(invs,'date',m.ym); });
   var payByM = MONTHS6.map(function(m){ return sumMonth(paySrc,'date',m.ym); });
@@ -99,6 +99,47 @@ function render(){
   var debtors=Object.keys(byCust).map(function(k){ return byCust[k]; }).sort(function(a,b){ return (b.od+b.nd)-(a.od+a.nd); });
   var canFarm = BB.auth.canPage('farm-detail.html');
 
+  // ---- Popups: the records behind each figure and chart part (CONVENTIONS: clicks open popups) ----
+  var POP_CAP=100, farmHref=function(id){ return canFarm && id ? 'farm-detail.html?farmer='+encodeURIComponent(id) : null; };
+  var bold=function(t){ return { html:'<b>'+BB.esc(t)+'</b>' }; };
+  var capNote=function(n){ return n>POP_CAP ? 'Showing the first '+POP_CAP+' of '+n+'. The totals count all '+n+'.' : null; };
+  var byOpen=function(a,b){ return open_(b)-open_(a); }, byDate=function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); };
+  var invTable=function(list, oneCust){
+    var ta=0, to=0; list.forEach(function(i){ ta+=(i.amount||0); to+=open_(i); });
+    var rows=list.slice(0,POP_CAP).map(function(i){ var f=d.farmer(i.farmer), op=open_(i), dd=daysOver(i);
+      return { cells:[i.label||i.ref||'—', f.name, BB.date(i.date), { html:BB.esc(BB.date(i.dueDate))+(op>0.5&&dd>0?' <span class="faint">· '+dd+' d over</span>':'') }, BB.money(i.amount), op>0.5?BB.money(op):'—', { html:BB.statusBadge(i.status) }], href:farmHref(i.farmer) }; });
+    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' invoices'),'','','',bold(BB.money(ta)),bold(BB.money(to)),''] });
+    var t={ columns:['Invoice','Customer','Date','Due','Amount','Outstanding','Status'], rows:rows, num:[4,5] };
+    // one customer's invoices: the name is in the title, not on every line
+    if(oneCust){ t.columns.splice(1,1); t.rows.forEach(function(r){ r.cells.splice(1,1); }); t.num=[3,4]; }
+    return t;
+  };
+  var payTable=function(list){
+    var tot=0; list.forEach(function(x){ tot+=(x.amount||0); });
+    var rows=list.slice(0,POP_CAP).map(function(x){ return { cells:[x.ref||'—', d.farmer(x.farmer).name, BB.date(x.date), x.forInv||x.description||'—', BB.money(x.amount||0)], href:farmHref(x.farmer) }; });
+    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' receipts'),'','','',bold(BB.money(tot))] });
+    return { columns:['Receipt','Customer','Date','For','Amount'], rows:rows, num:[4] };
+  };
+  // the same markup BB.popup draws, for a popup that carries two tables
+  var tableHtml=function(title, t){ var nc=t.num||[];
+    return '<div class="eyebrow" style="margin:14px 0 6px;">'+BB.esc(title)+'</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      (t.rows.length? t.rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+BB.esc(r.href)+'"':'')+'>'+r.cells.map(function(c,i){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c==null?'—':c))+'</td>'; }).join('')+'</tr>'; }).join('')
+        : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody></table></div>'; };
+  var toInvoices=function(){ BB.closePopup(); var el=document.getElementById('invoices'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };
+  // The tiles' list is the invoices table below under its ?show= preset: already there → scroll; otherwise load it.
+  var curShow=(new URLSearchParams(location.search).get('show')||'all').toLowerCase();
+  var listAction=function(k){ return [{ label:'Open the full list', primary:true, onClick:function(){ if(curShow===k) toInvoices(); else location.href='finance.html?show='+k+'#invoices'; } }]; };
+  var openInvs=invs.filter(function(i){ return open_(i)>0.5; });
+  var recvList=paySrc.filter(function(x){ return String(x.date||'').slice(0,7)===thisYm; }).sort(byDate);
+  BB.statDetail('f-owed', function(){ return { sub:'open invoices, largest first', wide:true, table:invTable(openInvs.slice().sort(byOpen)), note:capNote(openInvs.length), actions:listAction('open') }; });
+  BB.statDetail('f-overdue', function(){ return { sub:'past their due date, largest first · deliveries on hold', wide:true, table:invTable(overdueInvs.slice().sort(byOpen)), note:capNote(overdueInvs.length), actions:listAction('overdue') }; });
+  BB.statDetail('f-recv', function(){ return { sub:'payments received this month, newest first', wide:true, table:payTable(recvList), note:capNote(recvList.length),
+    actions:[{ label:'Go to the invoices', primary:true, onClick:toInvoices }] }; });
+  BB.statDetail('f-overlimit', function(){
+    var rows=overL.map(function(f){ var b=d.accountBalance(f.id), l=d.creditLimit(f.id); return { f:f, b:b, l:l, o:b-l }; }).sort(function(a,b){ return b.o-a.o; });
+    return { sub:'balance above the credit limit', table:{ columns:['Customer','Balance','Limit','Over by'], num:[1,2,3],
+      rows:rows.map(function(r){ return { cells:[r.f.name+(r.f.farm&&r.f.farm!==r.f.name?' · '+r.f.farm:''), BB.money(r.b), BB.money(r.l), BB.money(r.o)], href:farmHref(r.f.id) }; }) } }; });
+
   var html='';
   html+='<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Finance</div><h1>Finance &amp; reconciliation</h1>'+
     '<p>What the reps report, what was actually invoiced, what has been paid — with the accounting system mirrored alongside, so nobody types a number twice.</p></div>'+
@@ -109,16 +150,16 @@ function render(){
   html+=BB.staleNote();
 
   // ---- KPI strip ----
-  var tile=function(href, cls, label, value, sub, spark){
+  var tile=function(href, cls, label, value, sub, spark, key){
     var inner='<div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+'</div>'+(spark?'<div class="spark">'+spark+'</div>':'');
-    if(href && BB.auth.canPage(href)) return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'">'+inner+'</a>';
+    if(href && BB.auth.canPage(href)) return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'"'+(key?' data-detail="'+key+'"':'')+'>'+inner+'</a>';
     return '<div class="stat'+(cls?' '+cls:'')+'">'+inner+'</div>';
   };
   html+='<div class="grid g4" style="margin-top:14px;">'+
-    tile('finance.html?show=open#invoices', '', 'Owed to you', BB.money(owing), openCount+' invoice'+(openCount===1?'':'s')+' open · '+BB.money(billed)+' invoiced')+
-    tile('finance.html?show=overdue#invoices', overdue?'bad':'', 'Overdue', BB.money(overdue), overdueInvs.length+' invoice'+(overdueInvs.length===1?'':'s')+' past due · deliveries on hold')+
-    tile('', '', 'Received this month', BB.money(recvMonth), recvCount+' receipt'+(recvCount===1?'':'s')+' · '+BB.money(paid)+' paid in all', BB.chart.spark(payByM,{color:'#68a53e'}))+
-    tile('farms.html?show=overlimit', overL.length?'warn':'', 'Over their limit', overL.length, overL.length? BB.money(overAmt)+' over in total' : 'every account inside its limit')+
+    tile('finance.html?show=open#invoices', '', 'Owed to you', BB.money(owing), openCount+' invoice'+(openCount===1?'':'s')+' open · '+BB.money(billed)+' invoiced', null, 'f-owed')+
+    tile('finance.html?show=overdue#invoices', overdue?'bad':'', 'Overdue', BB.money(overdue), overdueInvs.length+' invoice'+(overdueInvs.length===1?'':'s')+' past due · deliveries on hold', null, 'f-overdue')+
+    tile('finance.html#invoices', '', 'Received this month', BB.money(recvMonth), recvCount+' receipt'+(recvCount===1?'':'s')+' · '+BB.money(paid)+' paid in all', BB.chart.spark(payByM,{color:'#68a53e'}), 'f-recv')+
+    tile('farms.html?show=overlimit', overL.length?'warn':'', 'Over their limit', overL.length, overL.length? BB.money(overAmt)+' over in total' : 'every account inside its limit', null, 'f-overlimit')+
   '</div>';
 
   // ---- The picture: money in and out, and how old the open money is ----
@@ -230,11 +271,23 @@ function render(){
   try{
     if(invByM.some(function(v){return v>0;}) || payByM.some(function(v){return v>0;}))
       BB.chart.bar('#chTrend',{ labels:MONTHS6.map(function(m){return m.l;}), money:true, height:240, table:true,
-        series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}] });
+        series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}],
+        // a month → the invoices raised and the payments received in it
+        detail:function(ctx){ var m=MONTHS6[ctx.index]; if(!m) return null;
+          var iv=invs.filter(function(i){ return String(i.date||'').slice(0,7)===m.ym; }).sort(byDate);
+          var py=paySrc.filter(function(x){ return String(x.date||'').slice(0,7)===m.ym; }).sort(byDate);
+          return { sub:iv.length+' invoice'+(iv.length===1?'':'s')+' · '+py.length+' receipt'+(py.length===1?'':'s'), wide:true,
+            html:tableHtml('Invoices', invTable(iv))+tableHtml('Receipts', payTable(py)),
+            note:(iv.length>POP_CAP||py.length>POP_CAP)?'Long lists show their first '+POP_CAP+' lines; the totals count them all.':null }; } });
     else document.getElementById('chTrend').innerHTML='<div class="chart-empty">Nothing invoiced or received in the last six months.</div>';
   }catch(e){ console.warn('chart', e); }
   try{
-    if(ageB.some(function(b){return b.value>0;})) BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed' });
+    if(ageB.some(function(b){return b.value>0;})) BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed',
+      // an age band → the open invoices in it
+      detail:function(ctx){ var bi=ageB.indexOf(ctx.row); if(bi<0) return null;
+        var list=openInvs.filter(function(i){ var dd=daysOver(i); return (dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4)===bi; }).sort(byOpen);
+        return { sub:list.length+' open invoice'+(list.length===1?'':'s')+' · largest first', wide:true, table:invTable(list), note:capNote(list.length),
+          actions:[{ label:'Go to the invoices', primary:true, onClick:toInvoices }] }; } });
     else document.getElementById('chAge').innerHTML='<div class="chart-empty">Nothing open. Every invoice is paid.</div>';
   }catch(e){ console.warn('chart', e); }
   try{
@@ -242,7 +295,13 @@ function render(){
         var f=d.farmer(r.id);
         return { label:f.name||'—', sub:(f.farm&&f.farm!==f.name?f.farm:(r.n+' open')), href:(canFarm&&r.id?'farm-detail.html?farmer='+r.id:null),
           parts:[{name:'Overdue',value:r.od,color:'#b8382a'},{name:'Not yet overdue',value:r.nd,color:'#3f6b28'}] }; }),
-        legend:[{name:'Overdue',color:'#b8382a'},{name:'Not yet overdue',color:'#3f6b28'}] });
+        legend:[{name:'Overdue',color:'#b8382a'},{name:'Not yet overdue',color:'#3f6b28'}], valueLabel:'Open', openLabel:'Open full record',
+        // a customer → their open invoices
+        detail:function(ctx){ var r=debtors[ctx.index]; if(!r) return null;
+          var list=openInvs.filter(function(i){ return (i.farmer||null)===(r.id||null); }).sort(byOpen);
+          var out={ sub:list.length+' open invoice'+(list.length===1?'':'s')+(r.od?' · '+BB.money(r.od)+' overdue':''), wide:true, table:invTable(list, true), note:capNote(list.length) };
+          if(!farmHref(r.id)) out.actions=[{ label:'Go to the invoices', primary:true, onClick:toInvoices }];
+          return out; } });
     else document.getElementById('chDebtors').innerHTML='<div class="chart-empty">Nobody owes anything right now.</div>';
   }catch(e){ console.warn('chart', e); }
   wire();

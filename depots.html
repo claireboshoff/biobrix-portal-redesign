@@ -70,6 +70,31 @@ function panel(title, sub, actions, body){
   return '<div class="card"><div class="card-h"><div><h3>'+title+'</h3>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(actions||'')+'</div>'+body+'</div>';
 }
 
+// ---- popups ----
+function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
+function go(label, href, primary){ return href && can(href) ? { label:label, href:href, primary:!!primary } : null; }
+function farmHref(fid){ return fid && can('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(fid) : null; }
+function depShort(id){ return String(d.depot(id).name||'').replace(/ Depot$/,''); }
+function stStatus(i){ return i.qty<=0?'Out of stock':(i.qty<i.reorder?'Low stock':'In stock'); }
+var many = function(){ return !scopeDepot && depots.length>1; };
+function stockTable(list, w){ if(w==null) w=many();
+  return { columns:['Product'].concat(w?['Depot']:[]).concat(['On hand','Reorder','Status']), num:w?[2,3]:[1,2],
+    rows:list.slice().sort(function(a,b){ return (a.qty/(a.reorder||1))-(b.qty/(b.reorder||1)); }).map(function(i){ var p=d.product(i.prod);
+      return { cells:[p.name].concat(w?[depShort(i.depot)]:[]).concat([BB.num(i.qty)+' '+(p.unit||''), BB.num(i.reorder), { html:BB.statusBadge(stStatus(i)) }]) }; }) };
+}
+function jobTable(list, w){ if(w==null) w=many();
+  return { columns:['Recipe','Batch'].concat(w?['Depot']:[]).concat(['For','Due','Status']),
+    rows:list.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).map(function(b){
+      return { cells:[b.recipe, b.batch].concat(w?[depShort(b.depot)]:[]).concat([d.farmer(b['for']).name, BB.date(b.due), { html:BB.statusBadge(b.status) }]), href:farmHref(b['for']) }; }) };
+}
+function delTable(list, w){ if(w==null) w=many();
+  return { columns:['Order','Farmer'].concat(w?['Depot']:[]).concat(['Transport','ETA','Status']),
+    rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(x){ var o=d.by('orders', x.order);
+      return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o?o.ref:'—')+'</span>' }, d.farmer(x.farmer).name].concat(w?[depShort(x.depot)]:[]).concat([x.transport||'—', BB.date(x.eta), { html:BB.statusBadge(x.status) }]), href:farmHref(x.farmer) }; }) };
+}
+// open a depot on this page (the same as tapping its card)
+function openDepot(id){ return { label:'Open the depot', primary:true, onClick:function(){ BB.closePopup(); selected=id; render(); var el=document.getElementById('detail'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); } }; }
+
 function renderDetail(id){
   var dep = d.depot(id);
   var s = depotSummary(id);
@@ -185,12 +210,18 @@ function render(){
   // network totals (or the one depot's, for a depot seat)
   var tot = { inv:0, low:0, jobs:0, dels:0 }, sums = {};
   depots.forEach(function(dep){ var s=depotSummary(dep.id); sums[dep.id]=s; tot.inv+=s.inv.length; tot.low+=s.low.length; tot.jobs+=s.jobs.length; tot.dels+=s.dels.filter(function(x){ return x.status!=='Delivered'; }).length; });
+  var tile = function(key, href, cls, l, v, sub){ return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+(can(href)?href:'#')+'" data-detail="'+key+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+' ›</div></a>'; };
   html += '<div class="grid g4" style="margin-top:14px;">'+
-    '<div class="stat"><div class="l">Stock lines</div><div class="v">'+tot.inv+'</div><div class="s">'+(scopeDepot?'at this depot':'across '+depots.length+' depots')+'</div></div>'+
-    '<div class="stat'+(tot.low?' bad':'')+'"><div class="l">Below reorder</div><div class="v">'+tot.low+'</div><div class="s">lines to reorder</div></div>'+
-    '<div class="stat"><div class="l">Blending jobs</div><div class="v">'+tot.jobs+'</div><div class="s">on the floor</div></div>'+
-    '<div class="stat"><div class="l">Deliveries open</div><div class="v">'+tot.dels+'</div><div class="s">not yet at the farm</div></div>'+
+    tile('dp-lines', 'stock.html', '', 'Stock lines', tot.inv, scopeDepot?'at this depot':'across '+depots.length+' depots')+
+    tile('dp-low', 'stock.html', tot.low?'bad':'', 'Below reorder', tot.low, 'lines to reorder')+
+    tile('dp-jobs', '#detail', '', 'Blending jobs', tot.jobs, 'on the floor')+
+    tile('dp-dels', 'deliveries.html', '', 'Deliveries open', tot.dels, 'not yet at the farm')+
   '</div>';
+  var every = function(k){ return [].concat.apply([], depots.map(function(x){ return sums[x.id][k]; })); };
+  BB.statDetail('dp-lines', function(){ return { table:stockTable(every('inv')), actions:[go('Open the full list','stock.html',true)] }; });
+  BB.statDetail('dp-low', function(){ return { table:stockTable(every('low')), actions:[go('Open the full list','stock.html',true), go('Reorder radar','suppliers.html')] }; });
+  BB.statDetail('dp-jobs', function(){ return { table:jobTable(every('jobs')), actions:[] }; });
+  BB.statDetail('dp-dels', function(){ return { table:delTable(every('dels').filter(function(x){ return x.status!=='Delivered'; })), actions:[go('Open the full list','deliveries.html',true)] }; });
 
   // A depot seat has one depot, always open: its detail header says everything the card would.
   if(!scopeDepot) html += '<div class="grid g3" style="margin-top:16px;">';
@@ -236,7 +267,19 @@ function render(){
           {name:'Stock lines', values:depots.map(function(x){ return sums[x.id].inv.length; }), color:'#3f6b28'},
           {name:'Below reorder', values:depots.map(function(x){ return sums[x.id].low.length; }), color:'#b8382a'},
           {name:'Blending jobs', values:depots.map(function(x){ return sums[x.id].jobs.length; }), color:'#c77d17'},
-          {name:'Deliveries', values:depots.map(function(x){ return sums[x.id].dels.length; }), color:'#2f6f9e'}] });
+          {name:'Deliveries', values:depots.map(function(x){ return sums[x.id].dels.length; }), color:'#2f6f9e'}],
+        // that depot's stock, blending and deliveries
+        detail:function(ctx){ var dep=depots[ctx.index], s=sums[dep.id];
+          var mini=function(title, t){ if(!t.rows.length) return '<div class="sub" style="margin:12px 0 4px;font-weight:600;">'+title+'</div><div class="faint" style="font-size:.84rem;">None.</div>';
+            return '<div class="sub" style="margin:12px 0 6px;font-weight:600;">'+title+'</div>'+
+            '<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+            (t.rows.length? t.rows.map(function(r){ return '<tr>'+r.cells.map(function(c,i){ return '<td'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c))+'</td>'; }).join('')+'</tr>'; }).join('')
+              : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing here.</div></td></tr>')+'</tbody></table></div>'; };
+          // the four counts measure different things, so no shares of a total
+          return { title:dep.name, sub:dep.region+' · '+dep.manager, wide:true,
+            stats:[{l:'Stock lines', v:s.inv.length}, {l:'Below reorder', v:s.low.length, cls:s.low.length?'bad':''}, {l:'Blending jobs', v:s.jobs.length}, {l:'Deliveries', v:s.dels.length, s:s.dels.filter(function(x){ return x.status!=='Delivered'; }).length+' not yet at the farm'}],
+            html:mini('Stock on hand · lowest first', stockTable(s.inv, false))+mini('Mixing &amp; blending', jobTable(s.jobs, false)),
+            actions:[openDepot(dep.id)] }; } });
     }catch(e){ console.warn('chart', e); }
   }
 }

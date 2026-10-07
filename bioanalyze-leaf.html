@@ -31,6 +31,8 @@ table.bb tr.detail-row td{padding-top:0;background:#f3f8ec;}
 .empty .big .ico{width:30px;height:30px;color:var(--faint);}
 .card .empty{padding:26px 20px;}
 .fld:last-of-type{margin-bottom:12px;}
+.bbp .interp{margin-top:0;}
+.flagl .f.click{cursor:pointer;border-radius:6px;} .flagl .f.click:hover{background:var(--panel-2);}
 </style>
 </head>
 <body>
@@ -59,7 +61,7 @@ function formBlocks(){
   return blocks;
 }
 
-var filter = 'All';
+// Status used to be chips above the samples; the funnel on the Status column does that now.
 var openId = null;
 var blockCtx = blockParam ? d.by('blocks', blockParam) : null;
 
@@ -67,14 +69,48 @@ var blockCtx = blockParam ? d.by('blocks', blockParam) : null;
 function numOf(v){ var n=parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)? n : null; }
 function shortBlock(b){ var n=String(b.name||'—'); var parts=n.split(' — '); return parts.length>1? parts[1] : n; }
 
+// ---- popups: one sample's full reading, or the samples behind a figure / chart part ----
+function canGo(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } }
+function interpOk(l){ return /balanced|hold|good/i.test(l.flag||''); }
+function showSample(id){
+  BB.closePopup(); openId=id; render();
+  setTimeout(function(){ var tr=document.querySelector('#leafMain tr.click[data-id="'+id+'"]'); if(!tr) return;
+    if(tr.style.display==='none'){ BB.toast('That sample is hidden by a filter on the table'); return; }
+    tr.scrollIntoView({ behavior:'smooth', block:'center' }); }, 120);
+}
+// the block's full reading and what it means
+function sampleInfo(l){
+  var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'}, adv=d.rep(l.advisor), isI=l.status==='Interpreted';
+  var acts=[{ label:'Open full record', primary:true, onClick:function(){ showSample(l.id); } }];
+  if(isI && canGo('bioconsult.html')) acts.push({ label:'Create BioConsult recommendation', href:'bioconsult.html?farmer='+encodeURIComponent(l.farmer)+'&block='+encodeURIComponent(l.block) });
+  if(canGo('biowatch.html')) acts.push({ label:'Monitor this block', href:'biowatch.html?block='+encodeURIComponent(l.block) });
+  return { eyebrow:'Leaf-sap sample · '+(f.farm||f.name), title:b.name, sub:[f.name, l.crop, 'sampled '+BB.date(l.date), 'advisor '+adv.name].filter(Boolean).join(' · '),
+    stats: isI ? [{ l:'Nitrogen (N)', v:l.n||'—' }, { l:'Potassium (K)', v:l.k||'—' }, { l:'Calcium (Ca)', v:l.ca||'—' }]
+               : [{ l:'Status', html:BB.statusBadge(l.status) }, { l:'Sampled', v:BB.date(l.date) }],
+    html:'<div class="interp'+(isI&&interpOk(l)?' ok':'')+'"><b>'+(isI?'Interpretation':'Status')+':</b> '+esc(l.flag||(isI?'—':'Sap collected — readings appear once interpreted.'))+'</div>',
+    actions:acts };
+}
+function sampleDetail(list){
+  list=list.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  return { table:{ columns:['Date','Farmer / block','Crop','Status','Reading'], rows:list.map(function(l){ var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'};
+      return [BB.shortDate(l.date), { html:'<b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div>' }, l.crop||'—', { html:BB.statusBadge(l.status) }, { html:'<span style="font-size:.78rem;">'+esc(l.flag||'—')+'</span>' }]; }) },
+    note: list.length? 'Tap a sample to open it in the list.' : null,
+    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var l=list[i]; if(!l) return; tr.classList.add('click'); tr.onclick=function(){ showSample(l.id); }; }); } };
+}
+function toSamples(){ BB.closePopup(); var el=document.getElementById('sampleList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+var TILE={};
+BB.statDetail('leafAwait', function(){ return Object.assign(sampleDetail(TILE.await||[]), { sub:'collected or at the lab, waiting to be read', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+BB.statDetail('leafInterp', function(){ return Object.assign(sampleDetail(TILE.interp||[]), { sub:'read and interpreted', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+
 function statBar(rows){
-  var awaiting = rows.filter(function(l){ return l.status!=='Interpreted'; }).length;
-  var interp = rows.filter(function(l){ return l.status==='Interpreted'; }).length;
+  var awaitL = rows.filter(function(l){ return l.status!=='Interpreted'; }), awaiting = awaitL.length;
+  var interpL = rows.filter(function(l){ return l.status==='Interpreted'; }), interp = interpL.length;
   var crops = rows.map(function(l){ return l.crop; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
+  TILE = { await:awaitL, interp:interpL };
   var html='<div class="grid g4" style="margin-top:12px;">';
   html += '<div class="stat"><div class="l">Samples</div><div class="v">'+rows.length+'</div><div class="s">'+(blockCtx?'on this block':'in view')+'</div></div>';
-  html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting interpretation</div><div class="v">'+awaiting+'</div><div class="s">new + at lab</div></div>';
-  html += '<div class="stat"><div class="l">Interpreted</div><div class="v">'+interp+'</div><div class="s">this season</div></div>';
+  html += '<a class="stat tap'+(awaiting>0?' warn':'')+'" href="#sampleList" data-detail="leafAwait"><div class="l">Awaiting interpretation</div><div class="v">'+awaiting+'</div><div class="s">new + at lab</div></a>';
+  html += '<a class="stat tap" href="#sampleList" data-detail="leafInterp"><div class="l">Interpreted</div><div class="v">'+interp+'</div><div class="s">this season</div></a>';
   html += '<div class="stat"><div class="l">Crops</div><div class="v">'+crops.length+'</div><div class="s">'+(crops.length? esc(crops.join(' · ')) : 'none sampled yet')+'</div></div>';
   html += '</div>';
   return html;
@@ -126,7 +162,7 @@ function logForm(){
 
 function render(){
   var rows = baseRows();
-  var shown = filter==='All' ? rows : rows.filter(function(l){ return l.status===filter; });
+  var shown = rows;
 
   var html='';
   html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">BioServices · BioAnalyze</div><h1>BioAnalyze — Leaf</h1><p>'+
@@ -150,7 +186,7 @@ function render(){
     html += '<div id="chNut"></div>';
     html += '<div class="flagl">'+interp.map(function(l){
       var b=d.by('blocks',l.block)||{name:'—'}, ok=/balanced|hold|good/i.test(l.flag||'');
-      return '<div class="f'+(ok?' ok':'')+'"><span><b>'+esc(shortBlock(b))+'</b> · '+esc(l.crop)+' — '+esc(l.flag)+'</span></div>';
+      return '<div class="f click'+(ok?' ok':'')+'" data-reading="'+esc(l.id)+'" role="button" tabindex="0"><span><b>'+esc(shortBlock(b))+'</b> · '+esc(l.crop)+' — '+esc(l.flag)+'</span></div>';
     }).join('')+'</div>';
   } else if(interp.length===1){
     var l1=interp[0], b1=d.by('blocks',l1.block)||{name:'—'};
@@ -169,13 +205,8 @@ function render(){
 
   // The work: the sample queue beside the log form
   html += '<div class="split" style="margin-top:16px;align-items:start;">';
-  html += '<div class="card"><div class="card-h"><div><h3>Samples</h3><div class="sub">newest first · tap a row for the full result</div></div>'+
-    '<div class="row" style="gap:6px;">';
-  ['All','New','Awaiting lab','Interpreted'].forEach(function(st){
-    var n = st==='All'?rows.length:rows.filter(function(l){ return l.status===st; }).length;
-    html += '<button class="chip'+(filter===st?' on':'')+'" data-f="'+esc(st)+'">'+esc(st)+' <span style="opacity:.7;">'+n+'</span></button>';
-  });
-  html += '</div></div>';
+  html += '<div class="card" id="sampleList" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Samples</h3><div class="sub">newest first · tap a row for the full result · filter by status with the funnel</div></div>'+
+    '<span class="badge b-grey">'+rows.length+'</span></div>';
 
   html += '<div class="scroll"><table class="bb"><thead><tr>'+
     '<th>Date</th><th>Farmer / block</th><th>Crop</th><th class="num">N</th><th class="num">K</th><th class="num">Ca</th><th>Status</th></tr></thead><tbody>';
@@ -219,7 +250,9 @@ function render(){
           { name:'Nitrogen (N)',  values: interp.map(function(l){ return numOf(l.n)||0; }),  color:'#3f6b28' },
           { name:'Potassium (K)', values: interp.map(function(l){ return numOf(l.k)||0; }),  color:'#c77d17' },
           { name:'Calcium (Ca)',  values: interp.map(function(l){ return numOf(l.ca)||0; }), color:'#2f6f9e' }
-        ] });
+        ],
+        // that block's full reading and its interpretation (the readings say more than a share of the chart)
+        detail:function(ctx){ var l=interp[ctx.index]; return l? sampleInfo(l) : null; } });
     }
   }catch(e){ console.warn('chart', e); }
   try{
@@ -228,15 +261,18 @@ function render(){
       var stRows = ST.map(function(x){ return { label:x[0], value:rows.filter(function(l){ return l.status===x[0]; }).length, color:x[1] }; });
       var other = rows.filter(function(l){ return ST.every(function(x){ return x[0]!==l.status; }); }).length;
       if(other) stRows.push({ label:'Other', value:other, color:'#6b7a5e' });
-      BB.chart.donut('#chStatus', { rows:stRows, centreLabel:'samples' });
+      BB.chart.donut('#chStatus', { rows:stRows, centreLabel:'samples', valueLabel:'Samples',
+        detail:function(ctx){ var lbl=ctx.row.label;
+          return sampleDetail(rows.filter(function(l){ return lbl==='Other' ? ST.every(function(x){ return x[0]!==l.status; }) : l.status===lbl; })); } });
     }
   }catch(e){ console.warn('chart', e); }
 }
 
 function bind(){
   var main=document.getElementById('leafMain');
-  Array.prototype.forEach.call(main.querySelectorAll('.chip[data-f]'), function(c){
-    c.onclick=function(){ filter=this.dataset.f; render(); };
+  Array.prototype.forEach.call(main.querySelectorAll('[data-reading]'), function(el){
+    var go=function(){ var l=d.by('leaf', el.dataset.reading); if(l) BB.popup(sampleInfo(l)); };
+    el.onclick=go; el.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
   });
   Array.prototype.forEach.call(main.querySelectorAll('tr.click[data-id]'), function(row){
     row.onclick=function(){ var rid=this.dataset.id; openId = openId===rid ? null : rid; render(); };
@@ -265,7 +301,7 @@ function bind(){
       };
       d.add('leaf', rec);
       BB.toast('Leaf-sap sample saved');
-      openId=null; filter='All'; render();
+      openId=null; render();
     };
   }
 }
