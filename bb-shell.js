@@ -1401,7 +1401,7 @@
       var r=o.rows[i], parts=r.parts||null, tot=(r.total!=null?r.total:(parts?parts.reduce(function(a,p){return a+p.value;},0):r.value))||0;
       var stats=[{ l:o.valueLabel||'Value', v:r.display||fmt(tot), s:r.sub||null }];
       if(parts && parts.length>1) parts.forEach(function(p){ stats.push({ l:p.name||'Part', v:fmt(p.value), s:pct(p.value,tot)+' of the total' }); });
-      if(o.rows.length>1){ stats.push({ l:'Rank', v:'#'+(i+1)+' of '+o.rows.length }); if(o.max!==100) stats.push({ l:'Share of the list', v:pct(tot,all) }); }
+      if(o.rows.length>1 && o.max!==100) stats.push({ l:'Share of the list', v:pct(tot,all) });
       openDetail(o, { kind:'row', index:i, row:r, value:tot }, { eyebrow:chartTitle(el,o), title:r.label, color:(parts&&parts.length===1?parts[0].color:r.color)||null, stats:stats,
         actions: r.href? [{ label:o.openLabel||'Open', href:r.href, primary:true }] : [] });
     };
@@ -1426,9 +1426,8 @@
       '<div class="donut-legend">'+rows.map(function(x,i){ return '<div class="r" role="button" tabindex="0" data-i="'+i+'"><i style="background:'+x.color+'"></i><span>'+esc(x.label)+'</span><b>'+fmt(x.value)+'</b><em>'+(tot?Math.round(x.value/tot*100):0)+'%</em></div>'; }).join('')+'</div></div>';
     el.classList.add('bbc');
     var open=function(i){ var x=rows[i]; if(!x) return;
-      var sorted=rows.slice().sort(function(a,b){ return b.value-a.value; });
       openDetail(o, { kind:'slice', index:i, row:x, value:x.value, total:tot }, { eyebrow:chartTitle(el,o), title:x.label, color:x.color,
-        stats:[{ l:o.valueLabel||'Value', v:fmt(x.value) }, { l:'Share', v:pct(x.value,tot), s:'of '+fmt(tot) }, { l:'Rank', v:'#'+(sorted.indexOf(x)+1)+' of '+rows.length }],
+        stats:[{ l:o.valueLabel||'Value', v:fmt(x.value) }, { l:'Share', v:pct(x.value,tot), s:'of '+fmt(tot) }],
         actions: x.href? [{ label:o.openLabel||'Open', href:x.href, primary:true }] : [] });
     };
     el.querySelectorAll('.arc,.donut-legend .r').forEach(function(a){
