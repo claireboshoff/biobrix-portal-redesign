@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Capture an order · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -22,6 +22,17 @@ var css = ''+
 '.mic-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px;}'+
 '.mic-btn{width:126px;height:126px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(140deg,var(--green-bright),var(--green-mid));'+
 'color:#fff;font-size:2.9rem;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 26px rgba(63,107,40,.34);transition:.18s;position:relative;}'+
+'.mic-btn .ico{width:46px;height:46px;stroke-width:1.6;}'+
+'.mic-btn.off{background:linear-gradient(140deg,#9aa88f,#6b7a5e);box-shadow:none;}'+
+'.mic-btn .stop{width:30px;height:30px;border-radius:6px;background:#fff;display:block;}'+
+'.mic-card{position:sticky;top:76px;}'+
+'.x-ico{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}'+
+'.acct{display:flex;gap:10px;align-items:flex-start;} .acct .ico{flex:none;margin-top:1px;}'+
+'.how{display:grid;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft);text-align:left;}'+
+'.how div{display:flex;gap:10px;font-size:.8rem;color:var(--muted);align-items:flex-start;} .how b{color:var(--ink);font-weight:600;}'+
+'.how .n{width:22px;height:22px;border-radius:50%;background:#eef4e4;color:var(--green-dark);font-weight:700;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex:none;}'+
+'@media(max-width:1100px){.mic-card{position:static;}}'+
+'@media(max-width:700px){.how{display:none;} .line-row{grid-template-columns:1fr 84px 44px;}}'+
 '.mic-btn:active{transform:scale(.96);}'+
 '.mic-btn.live{background:linear-gradient(140deg,var(--amber),#e0902a);box-shadow:0 0 0 0 rgba(199,125,23,.5);animation:micpulse 1.3s infinite;}'+
 '@keyframes micpulse{0%{box-shadow:0 0 0 0 rgba(199,125,23,.45);}70%{box-shadow:0 0 0 22px rgba(199,125,23,0);}100%{box-shadow:0 0 0 0 rgba(199,125,23,0);}}'+
@@ -29,13 +40,15 @@ var css = ''+
 '.mic-eg{font-size:.78rem;color:var(--faint);margin-top:6px;font-style:italic;}'+
 '.transcript{margin-top:14px;background:#f7faf1;border:1px dashed var(--line);border-radius:12px;padding:13px 15px;font-size:.95rem;min-height:52px;color:var(--ink);text-align:left;}'+
 '.transcript .interim{color:var(--faint);}'+
-'.line-row{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:end;margin-bottom:9px;}'+
+'.line-row{display:grid;grid-template-columns:1fr 110px 44px;gap:8px;align-items:end;margin-bottom:9px;}'+
 '.line-row .fld{margin-bottom:0;}'+
-'.line-del{height:44px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--red);cursor:pointer;font-size:1rem;}'+
+'.line-del{height:44px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}'+
+'.line-del:hover{border-color:var(--red);background:var(--red-bg);}'+
 '.tot-band{display:flex;align-items:center;justify-content:space-between;background:var(--green-darkest);color:#eaf4d8;border-radius:12px;padding:14px 18px;margin-top:6px;}'+
 '.tot-band .v{font-family:var(--display);font-size:1.5rem;font-weight:600;}'+
 '.chk{display:flex;align-items:flex-start;gap:11px;padding:11px 0;}'+
-'.chk .tk{width:26px;height:26px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;}'+
+'.chk .tk{width:28px;height:28px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;} .chk .tk .ico{width:15px;height:15px;stroke-width:2.4;}'+
+'.chk + .chk{border-top:1px solid var(--line-soft);}'+
 '.acct{border-radius:12px;padding:12px 15px;margin-top:12px;font-size:.86rem;line-height:1.5;border:1px solid var(--line);}'+
 '.acct.ok{background:var(--ok-bg);border-color:#cfe6d3;color:var(--ok);}'+
 '.acct.warn{background:var(--amber-bg);border-color:#f0dcb0;color:var(--amber);}'+
@@ -43,6 +56,8 @@ var css = ''+
 '.acct b{font-weight:700;}';
 document.head.insertAdjacentHTML('beforeend', '<style>'+css+'</style>');
 
+var X_ICON = '<svg class="x-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+function micFace(){ return speechOK? BB.icon('mic') : BB.icon('clipboard'); }
 var farmers = d.all('farmers');
 var products = d.all('products');
 var MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
@@ -170,15 +185,15 @@ function accountStripHTML(){
   var farm = f.farm || f.name || 'this farm';
   var total = draftTotal();
   if(d.isOverdue(fid)){
-    return '<div class="acct bad">⚠ <b>Account overdue</b> — delivery on hold until settled. '+
-      'Order can be captured but will be flagged for finance.</div>';
+    return '<div class="acct bad">'+BB.icon('alert')+'<div><b>Account overdue</b>: delivery on hold until settled. '+
+      'The order can be captured but will be flagged for finance.</div></div>';
   }
   if(d.overLimit(fid, total)){
-    return '<div class="acct warn">⚠ This order takes <b>'+BB.esc(farm)+'</b> over their credit limit ('+
-      BB.money(d.creditLimit(fid))+'). Needs approval. Available credit: '+BB.money(d.availableCredit(fid))+'.</div>';
+    return '<div class="acct warn">'+BB.icon('alert')+'<div>This order takes <b>'+BB.esc(farm)+'</b> over their credit limit ('+
+      BB.money(d.creditLimit(fid))+'). Needs approval. Available credit: '+BB.money(d.availableCredit(fid))+'.</div></div>';
   }
-  return '<div class="acct ok">✓ Account in good standing · available credit '+
-    BB.money(d.availableCredit(fid))+'.</div>';
+  return '<div class="acct ok">'+BB.icon('check')+'<div>Account in good standing · available credit '+
+    BB.money(d.availableCredit(fid))+'.</div></div>';
 }
 
 function refreshAccountStrip(){
@@ -189,37 +204,45 @@ function refreshAccountStrip(){
 // ---- render capture screen ----
 function renderCapture(){
   var html = '';
-  html += '<div class="page-head"><h1>Capture an order</h1>'+
-    '<p>Standing with the farmer? Tap the mic and say it plainly. It fills the order in, then flows straight to Operations.</p></div>';
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Capture an order</h1>'+
+    '<p>Standing with the farmer? Tap the mic and say it plainly. It fills the order in, then flows straight to Operations.</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn ghost" href="orders.html">'+BB.icon('receipt')+'Order pipeline</a></div></div>';
+
+  html += '<div class="split-r" style="margin-top:16px;align-items:start;">';
 
   // mic card
-  html += '<div class="card card-p" id="micCard">';
+  html += '<div class="card mic-card" id="micCard"><div class="card-h"><div><h3>Speak it</h3><div class="sub">'+(speechOK?'voice fills the form for you':'voice needs signal')+'</div></div></div><div class="card-p">';
   html += '<div class="mic-wrap">'+
-    '<button class="mic-btn" id="mic" aria-label="Push to talk">'+(speechOK?'🎙':'⌨')+'</button>'+
-    '<div class="mic-hint" id="micHint">'+(speechOK?'Tap to speak the order':'Voice needs signal — you can type it below and it still saves offline.')+'</div>'+
+    '<button class="mic-btn'+(speechOK?'':' off')+'" id="mic" aria-label="Push to talk">'+micFace()+'</button>'+
+    '<div class="mic-hint" id="micHint">'+(speechOK?'Tap to speak the order':'Voice needs signal. You can type it in the form and it still saves offline.')+'</div>'+
     (speechOK?'<div class="mic-eg">e.g. "One thousand litres of SoilPrime for Gideon Joubert, deliver in October"</div>':'')+
     '<div class="transcript" id="tr" style="display:none;"></div>'+
     '</div>';
-  html += '</div>';
+  html += '<div class="how">'+
+    '<div><span class="n">1</span><span><b>Say who, what and when.</b> Farmer, product and quantity, delivery month.</span></div>'+
+    '<div><span class="n">2</span><span><b>Check the form.</b> Fix anything it misheard; the total and credit check update as you go.</span></div>'+
+    '<div><span class="n">3</span><span><b>Confirm.</b> It goes to Operations and the right depot.</span></div>'+
+  '</div>';
+  html += '</div></div>';
 
   // the form (always present; voice prepopulates it)
-  html += '<div class="card card-p" style="margin-top:14px;">';
-  html += '<div class="eyebrow" style="margin-bottom:10px;">The order</div>';
+  html += '<div class="card"><div class="card-h"><div><h3>The order</h3><div class="sub">priced at current RenewAg rates</div></div></div><div class="card-p">';
 
+  html += '<div class="grid g2" style="gap:0 14px;">';
   // farmer
   html += '<div class="fld"><label>Farmer</label><select id="fFarmer"><option value="">Select farmer…</option>'+
     farmers.map(function(f){ return '<option value="'+f.id+'"'+(draft.farmer===f.id?' selected':'')+'>'+BB.esc(f.name)+' — '+BB.esc(f.farm)+'</option>'; }).join('')+
     '</select></div>';
-
-  // lines
-  html += '<label style="display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;">Products</label>';
-  html += '<div id="lines"></div>';
-  html += '<button class="btn ghost sm" id="addLine" style="margin-bottom:14px;">+ Add another product</button>';
-
   // month
   html += '<div class="fld"><label>Delivery month</label><select id="fMonth"><option value="">Select month…</option>'+
     MONTHS.map(function(m,i){ return '<option value="'+i+'"'+(draft.month===i?' selected':'')+'>'+BB.monthName(i)+'</option>'; }).join('')+
     '</select></div>';
+  html += '</div>';
+
+  // lines
+  html += '<label style="display:block;font-size:.74rem;font-weight:600;color:var(--muted);margin-bottom:5px;">Products</label>';
+  html += '<div id="lines"></div>';
+  html += '<button class="btn ghost sm" id="addLine" style="margin-bottom:14px;">'+BB.icon('plus')+'Add another product</button>';
 
   // depot readout
   html += '<div class="fld"><label>Depot (auto from farmer region)</label>'+
@@ -233,8 +256,9 @@ function renderCapture(){
   // live account-status strip (credit limit / overdue) — updates as the order changes
   html += '<div id="acctStrip">'+accountStripHTML()+'</div>';
 
-  html += '<button class="btn block" id="confirm" style="margin-top:16px;">Confirm & send to Operations</button>';
-  html += '<p class="faint center" style="font-size:.76rem;margin-top:10px;">Saved on this device — syncs to Operations the moment you have signal.</p>';
+  html += '<button class="btn block" id="confirm" style="margin-top:16px;">'+BB.icon('check')+'Confirm &amp; send to Operations</button>';
+  html += '<p class="faint center" style="font-size:.76rem;margin-top:10px;">Saved on this device. It syncs to Operations the moment you have signal.</p>';
+  html += '</div></div>';
   html += '</div>';
 
   document.getElementById('capMain').innerHTML = html;
@@ -251,7 +275,7 @@ function renderLines(){
         products.map(function(p){ return '<option value="'+p.id+'"'+(l.prod===p.id?' selected':'')+'>'+BB.esc(p.name)+' ('+BB.esc(p.pack)+')</option>'; }).join('')+
       '</select></div>'+
       '<div class="fld"><input type="number" min="0" data-li="'+i+'" class="lQty" placeholder="Qty" value="'+(l.qty!==''&&l.qty!=null?l.qty:'')+'"></div>'+
-      '<button class="line-del" data-li="'+i+'" title="Remove">✕</button>'+
+      '<button class="line-del" data-li="'+i+'" title="Remove" aria-label="Remove product">'+X_ICON+'</button>'+
     '</div>';
   }).join('');
   Array.prototype.forEach.call(wrap.querySelectorAll('.lProd'), function(sel){
@@ -309,7 +333,7 @@ function startMic(){
     var finalText='';
     var mic=document.getElementById('mic'), hint=document.getElementById('micHint'), tr=document.getElementById('tr');
     tr.style.display='block'; tr.innerHTML='<span class="interim">Listening…</span>';
-    mic.classList.add('live'); mic.textContent='■'; hint.textContent='Listening — tap again to stop'; listening=true;
+    mic.classList.add('live'); mic.innerHTML='<span class="stop"></span>'; hint.textContent='Listening — tap again to stop'; listening=true;
     rec.onresult=function(e){
       var interim='';
       for(var i=e.resultIndex;i<e.results.length;i++){
@@ -333,8 +357,8 @@ function stopMic(){
   listening=false;
   try{ if(rec) rec.stop(); }catch(e){}
   var mic=document.getElementById('mic'), hint=document.getElementById('micHint');
-  if(mic){ mic.classList.remove('live'); mic.textContent=speechOK?'🎙':'⌨'; }
-  if(hint) hint.textContent=speechOK?'Tap to speak the order':'Voice needs signal — type it below.';
+  if(mic){ mic.classList.remove('live'); mic.innerHTML=micFace(); }
+  if(hint) hint.textContent=speechOK?'Tap to speak the order':'Voice needs signal. Type it in the form.';
 }
 
 // ---- confirm ----
@@ -370,32 +394,34 @@ function confirmOrder(){
 function renderConfirmed(o){
   var f=d.farmer(o.farmer);
   var html='';
-  html += '<div class="page-head"><h1>Order captured</h1><p>It is on the Operations board now — no week-long wait, no re-typing.</p></div>';
-  html += '<div class="hero-band" style="margin-top:4px;">'+
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Order captured</h1><p>It is on the Operations board now. No week-long wait, no re-typing.</p></div>'+
+    '<div class="row" style="gap:8px;"><button class="btn" id="again">'+BB.icon('mic')+'Capture another</button>'+
+    '<a class="btn ghost" href="orders.html">'+BB.icon('receipt')+'View order pipeline</a>'+
+    '<a class="btn ghost" href="forecast.html">'+BB.icon('chart')+'See the forecast</a></div></div>';
+
+  html += '<div class="split" style="margin-top:16px;align-items:start;"><div class="grid" style="align-content:start;">';
+  html += '<div class="hero-band">'+
     '<div class="eyebrow" style="color:var(--lime);">'+BB.esc(o.ref)+' · '+BB.monthName(o.deliverMonth)+' delivery</div>'+
     '<div style="font-family:var(--display);font-size:1.5rem;font-weight:600;margin:4px 0;">'+BB.money(d.orderValue(o))+'</div>'+
     '<div style="opacity:.9;font-size:.9rem;">'+BB.esc(f.name)+' — '+BB.esc(f.farm)+'</div></div>';
 
-  html += '<div class="card card-p" style="margin-top:14px;">';
-  html += '<div class="eyebrow" style="margin-bottom:8px;">What just happened</div>';
-  [
-    ['Order logged against '+f.name, 'Priced and stamped '+BB.date(o.date)+'.'],
-    ['Routed to '+d.depot(o.depot).name, 'The right depot picks and blends it — no phone tag.'],
-    ['Operations sees it live', 'It shows in their pipeline this second, not a week from now.']
-  ].forEach(function(r){
-    html += '<div class="chk"><div class="tk">✓</div><div><div style="font-weight:600;font-size:.92rem;">'+BB.esc(r[0])+'</div>'+
-      '<div class="faint" style="font-size:.82rem;">'+BB.esc(r[1])+'</div></div></div>';
-  });
-  html += '<div class="divider"></div>';
-  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Pack</th><th class="right">Qty</th><th class="right">Line value</th></tr></thead><tbody>'+
-    o.lines.map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="right">'+BB.num(l.qty)+'</td><td class="right">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
-    '</tbody></table></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>The order</h3><div class="sub">'+o.lines.length+' product'+(o.lines.length===1?'':'s')+'</div></div>'+BB.statusBadge(o.status)+'</div>';
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Line value</th></tr></thead><tbody>'+
+    o.lines.map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
+    '</tbody><tfoot><tr><td colspan="3">Order total</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div></div>';
   html += '</div>';
 
-  html += '<div class="row" style="margin-top:16px;padding-bottom:16px;">'+
-    '<button class="btn" id="again">Capture another</button>'+
-    '<a class="btn ghost" href="orders.html">View order pipeline</a>'+
-    '<a class="btn ghost" href="forecast.html">See the forecast</a></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>What just happened</h3></div></div><div class="card-p" style="padding-top:6px;padding-bottom:6px;">';
+  [
+    ['Order logged against '+f.name, 'Priced and stamped '+BB.date(o.date)+'.'],
+    ['Routed to '+d.depot(o.depot).name, 'The right depot picks and blends it, no phone tag.'],
+    ['Operations sees it live', 'It shows in their pipeline this second, not a week from now.']
+  ].forEach(function(r){
+    html += '<div class="chk"><div class="tk">'+BB.icon('check')+'</div><div><div style="font-weight:600;font-size:.92rem;">'+BB.esc(r[0])+'</div>'+
+      '<div class="faint" style="font-size:.82rem;">'+BB.esc(r[1])+'</div></div></div>';
+  });
+  html += '</div></div>';
+  html += '</div>';
 
   document.getElementById('capMain').innerHTML=html;
   document.getElementById('again').onclick=function(){

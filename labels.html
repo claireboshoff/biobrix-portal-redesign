@@ -7,20 +7,35 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Labels · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <style>
-.lbl{border:2px solid var(--green-dark);border-radius:12px;padding:14px 16px;background:#fff;width:320px;max-width:100%;}
-.lbl .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid var(--line);padding-bottom:8px;margin-bottom:8px;}
+.sheet{background:var(--panel-2);padding:20px;border-top:1px solid var(--line-soft);border-radius:0 0 var(--radius) var(--radius);}
+.lbl-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
+.lbl{border:2px solid var(--green-dark);border-radius:12px;padding:14px 16px;background:#fff;width:100%;max-width:420px;box-shadow:var(--shadow);}
+.lbl .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1.5px solid var(--line);padding-bottom:8px;margin-bottom:8px;}
 .lbl .bw{font-family:var(--display);font-weight:700;font-size:1.1rem;color:var(--green-dark);letter-spacing:.5px;}
 .lbl .bw .os{color:var(--green-bright);}
-.lbl h4{font-family:var(--display);font-size:1.15rem;color:var(--ink);margin:2px 0;}
-.lbl .rowl{display:flex;justify-content:space-between;font-size:.82rem;padding:2px 0;}
-.lbl .rowl b{color:var(--green-dark);}
-.lbl .code{font-family:ui-monospace,monospace;font-size:.9rem;letter-spacing:1px;background:#12210c;color:#b7d97a;padding:3px 8px;border-radius:6px;}
+.lbl .tag{font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--faint);text-align:right;}
+.lbl h4{font-family:var(--display);font-size:1.15rem;color:var(--ink);margin:2px 0 4px;}
+.lbl .rowl{display:flex;justify-content:space-between;gap:12px;font-size:.82rem;padding:3px 0;border-bottom:1px dashed var(--line-soft);}
+.lbl .rowl:last-of-type{border-bottom:0;}
+.lbl .rowl b{color:var(--green-dark);text-align:right;min-width:0;overflow-wrap:anywhere;}
+.lbl .code{font-family:ui-monospace,monospace;font-size:.86rem;letter-spacing:1px;background:#12210c;color:#b7d97a;padding:2px 8px;border-radius:6px;}
 .bars{height:34px;background:repeating-linear-gradient(90deg,#12210c 0 2px,#fff 2px 4px,#12210c 4px 7px,#fff 7px 9px,#12210c 9px 11px,#fff 11px 14px);margin-top:10px;border-radius:3px;}
-@media print{ .bb-head,.bb-nav,.noprint{display:none!important;} body{padding:0;background:#fff;} .lbl{page-break-inside:avoid;} }
+.seg .n{opacity:.65;margin-left:4px;font-weight:600;}
+@media(max-width:560px){ .sheet{padding:14px;} .seg{display:flex;width:100%;} .seg button{flex:1;padding:6px 6px;} }
+@media print{
+  #bbNav,#bbOverlay,.bb-top,.bb-nav,.bb-scope,.bb-sync,.bbc-tip,.toast,.noprint{display:none!important;}
+  body{padding:0!important;background:#fff;}
+  .wrap{max-width:none;padding:0;}
+  .card.lbl-card{border:0;box-shadow:none;background:#fff;}
+  .sheet{background:#fff;padding:0;border:0;}
+  .lbl-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  .lbl{box-shadow:none;max-width:none;page-break-inside:avoid;break-inside:avoid;}
+  .lbl, .lbl .code, .bars{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
 </style>
 </head>
 <body>
@@ -28,18 +43,15 @@
 BB.renderHeader({ active:'ops', back:'index.html' });
 var d = BB.data;
 
+var MODES = {product:'Product labels', blend:'Blend batch labels', delivery:'Delivery labels'};
+
 function render(mode){
   mode = mode || 'product';
+  var counts = { product:d.all('products').length, blend:d.all('blending').length, delivery:d.all('orders').length };
   var html = '';
-  html += '<div class="page-head noprint"><div class="eyebrow">Warehouse &amp; field</div>'+
-    '<h1>Labels</h1><p>The labels reps and depots always ask for — product, blend batches and delivery — generated from live data and ready to print. No re-typing.</p></div>';
-
-  html += '<div class="row noprint" style="gap:8px;margin-bottom:14px;">'+
-    ['product','blend','delivery'].map(function(m){
-      var t={product:'Product labels',blend:'Blend batch labels',delivery:'Delivery labels'}[m];
-      return '<button class="chip'+(m===mode?' on':'')+'" data-m="'+m+'">'+t+'</button>';
-    }).join('')+
-    '<button class="btn ghost sm" id="print" style="margin-left:auto;">🖨 Print sheet</button></div>';
+  html += '<div class="page-head row between noprint" style="gap:16px;"><div><div class="eyebrow">Warehouse &amp; field</div>'+
+    '<h1>Labels</h1><p>The labels reps and depots always ask for — product, blend batches and delivery — generated from live data and ready to print. No re-typing.</p></div>'+
+    '<div class="row"><button class="btn" id="print">'+BB.icon('file')+'Print sheet</button></div></div>';
 
   var cards = '';
   if(mode==='product'){
@@ -77,18 +89,25 @@ function render(mode){
       ], true);
     });
   }
-  html += '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+cards+'</div>';
+  html += '<div class="card lbl-card" style="margin-top:16px;">'+
+    '<div class="card-h noprint"><div><h3>'+MODES[mode]+'</h3><div class="sub">'+counts[mode]+' label'+(counts[mode]===1?'':'s')+' on this sheet · prints two across, without the menu</div></div>'+
+      '<div class="seg" role="tablist">'+['product','blend','delivery'].map(function(m){
+        return '<button class="'+(m===mode?'on':'')+'" data-m="'+m+'" role="tab" aria-selected="'+(m===mode)+'">'+MODES[m].replace(' labels','')+'<span class="n">'+counts[m]+'</span></button>';
+      }).join('')+'</div></div>'+
+    '<div class="sheet">'+(cards?'<div class="lbl-grid">'+cards+'</div>':'<div class="empty">Nothing to label yet.</div>')+'</div>'+
+  '</div>';
+  html += '<div style="height:24px;" class="noprint"></div>';
 
   var main = document.querySelector('main');
   if(main) main.innerHTML = html; else document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
 
-  document.querySelectorAll('.chip[data-m]').forEach(function(c){ c.onclick=function(){ render(c.getAttribute('data-m')); }; });
+  document.querySelectorAll('[data-m]').forEach(function(c){ c.onclick=function(){ render(c.getAttribute('data-m')); }; });
   document.getElementById('print').onclick = function(){ window.print(); };
 }
 
 function label(title, rows, bars){
   return '<div class="lbl">'+
-    '<div class="top"><div class="bw">BIOBRIX <span class="os">·</span></div><div class="faint" style="font-size:.66rem;text-transform:uppercase;letter-spacing:1.5px;">The Biological Way</div></div>'+
+    '<div class="top"><div class="bw">BIOBRIX <span class="os">·</span></div><div class="tag">The Biological Way</div></div>'+
     '<h4>'+BB.esc(title)+'</h4>'+
     rows.map(function(r){ return '<div class="rowl"><span class="faint">'+BB.esc(r[0])+'</span><b>'+r[1]+'</b></div>'; }).join('')+
     (bars?'<div class="bars"></div>':'')+

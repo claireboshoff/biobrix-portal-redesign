@@ -7,9 +7,29 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Team feed · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+  .feed-grid{display:grid;gap:16px;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start;margin-top:14px;}
+  .feed-side{position:sticky;top:76px;display:flex;flex-direction:column;gap:16px;}
+  .post{display:flex;gap:12px;padding:16px 20px;border-top:1px solid var(--line-soft);}
+  .post:first-child{border-top:0;}
+  .post .bb-av{width:38px;height:38px;color:#fff;font-size:.78rem;}
+  .post .hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .post .nm{font-weight:600;font-size:.9rem;color:var(--ink);}
+  .post .meta{font-size:.74rem;color:var(--faint);}
+  .post .bd{margin-top:5px;font-size:.92rem;line-height:1.55;color:var(--ink);}
+  .post .links{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .post .links .chip .ico{width:14px;height:14px;}
+  .composer textarea{resize:vertical;min-height:88px;}
+  .kinds{display:flex;flex-direction:column;gap:8px;}
+  .kinds .r{display:flex;align-items:center;justify-content:space-between;font-size:.84rem;}
+  .kinds .r b{font-variant-numeric:tabular-nums;}
+  .empty .ico{width:28px;height:28px;color:var(--faint);margin-bottom:8px;}
+  @media(max-width:1100px){ .feed-grid{grid-template-columns:minmax(0,1fr);} .feed-side{position:static;order:-1;} }
+  @media(max-width:560px){ .post{padding:14px;} }
+</style>
 </head>
 <body>
 <script>
@@ -24,40 +44,50 @@ function render(){
   var feed = d.all('feed').slice().sort(function(a,b){ return (b.date+b.id).localeCompare(a.date+a.id); });
   var html = '';
   html += '<div class="page-head"><div class="eyebrow">One team, four provinces</div>'+
-    '<h1>Team feed</h1><p>Everyone sees the same thing at the same time — post an update, flag stock, hand a farmer over. No more waiting a week to hear what happened on the ground.</p></div>';
+    '<h1>Team feed</h1><p>Everyone sees the same thing at the same time — post an update, flag stock, hand a farmer over.</p></div>';
 
-  // composer
-  html += '<div class="card card-p" style="margin-bottom:16px;">'+
-    '<div class="fld"><label>Post an update</label><textarea id="txt" rows="2" placeholder="What just happened? e.g. Signed Kobus on citrus programme — 140 L LeafSap for September."></textarea></div>'+
-    '<div class="row" style="gap:8px;">'+
-      '<div class="fld" style="flex:1;min-width:120px;margin:0;"><label>Type</label><select id="kind">'+KINDS.map(function(k){return '<option>'+k+'</option>';}).join('')+'</select></div>'+
-      '<div class="fld" style="flex:1;min-width:150px;margin:0;"><label>Farmer (optional)</label><select id="farmer"><option value="">— none —</option>'+
-        d.all('farmers').map(function(f){return '<option value="'+f.id+'">'+BB.esc(f.name+' · '+f.farm)+'</option>';}).join('')+'</select></div>'+
-      '<div style="align-self:flex-end;"><button class="btn" id="post">Post</button></div>'+
-    '</div></div>';
-
+  html += '<div class="feed-grid">';
   // feed
-  html += '<div class="sec"><h2>Latest</h2><span class="ln"></span><span class="cnt">'+feed.length+' updates</span></div>';
-  if(!feed.length){ html += '<div class="empty"><div class="big">📣</div>No updates yet — be the first.</div>'; }
+  html += '<div class="card"><div class="card-h"><div><h3>Latest</h3><div class="sub">newest first</div></div><span class="badge b-grey">'+feed.length+' update'+(feed.length===1?'':'s')+'</span></div>';
+  if(!feed.length){ html += '<div class="empty">'+BB.icon('message')+'<div>No updates yet — be the first.</div></div>'; }
+  else html += '<div>';
   feed.forEach(function(p){
     var who = d.person(p.from);
     var far = p.farmer ? d.farmer(p.farmer) : null;
-    html += '<div class="card card-p" style="margin-bottom:10px;">'+
-      '<div class="row between" style="align-items:flex-start;">'+
-        '<div class="row" style="gap:9px;align-items:center;">'+
-          '<span class="bb-av" style="background:'+who.colour+';color:#fff;border:none;">'+BB.initials(who.name)+'</span>'+
-          '<div><div style="font-weight:600;font-size:.9rem;">'+BB.esc(who.name)+'</div>'+
-          '<div class="faint" style="font-size:.72rem;">'+BB.esc(who.role||'')+' · '+BB.date(p.date)+'</div></div>'+
+    html += '<div class="post">'+
+      '<span class="bb-av" style="background:'+BB.esc(who.colour)+';">'+BB.initials(who.name)+'</span>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div class="row between" style="align-items:flex-start;gap:8px;">'+
+          '<div class="hd"><span class="nm">'+BB.esc(who.name)+'</span><span class="meta">'+BB.esc(who.role||'')+' · '+BB.date(p.date)+'</span></div>'+
+          '<span class="badge '+(KBADGE[p.kind]||'b-grey')+'">'+BB.esc(p.kind)+'</span>'+
         '</div>'+
-        '<span class="badge '+(KBADGE[p.kind]||'b-grey')+'">'+BB.esc(p.kind)+'</span>'+
-      '</div>'+
-      '<p style="margin:10px 0 0;font-size:.92rem;line-height:1.5;">'+BB.esc(p.text)+'</p>'+
-      (far||p.ref ? '<div class="row" style="gap:8px;margin-top:9px;">'+
-        (far?'<a class="chip" href="farm-detail.html?farmer='+p.farmer+'">🌾 '+BB.esc(far.farm)+'</a>':'')+
-        (p.ref?'<a class="chip" href="orders.html">'+BB.esc(p.ref)+'</a>':'')+
-      '</div>' : '')+
-    '</div>';
+        '<div class="bd">'+BB.esc(p.text)+'</div>'+
+        (far||p.ref ? '<div class="links">'+
+          (far?'<a class="chip" href="farm-detail.html?farmer='+p.farmer+'">'+BB.icon('farm')+BB.esc(far.farm)+'</a>':'')+
+          (p.ref?'<a class="chip" href="orders.html">'+BB.icon('receipt')+BB.esc(p.ref)+'</a>':'')+
+        '</div>' : '')+
+      '</div></div>';
   });
+  if(feed.length) html += '</div>';
+  html += '</div>';
+
+  // composer + what the feed holds
+  var counts = {}; feed.forEach(function(p){ counts[p.kind]=(counts[p.kind]||0)+1; });
+  html += '<div class="feed-side">'+
+    '<div class="card composer"><div class="card-h"><div><h3>Post an update</h3><div class="sub">the whole team sees it at once</div></div></div><div class="card-p">'+
+      '<div class="fld"><label for="txt">What just happened?</label><textarea id="txt" rows="3" placeholder="e.g. Signed Kobus on citrus programme — 140 L LeafSap for September."></textarea></div>'+
+      '<div class="grid g2" style="gap:10px;">'+
+        '<div class="fld" style="margin:0;"><label for="kind">Type</label><select id="kind">'+KINDS.map(function(k){return '<option>'+k+'</option>';}).join('')+'</select></div>'+
+        '<div class="fld" style="margin:0;"><label for="farmer">Farmer (optional)</label><select id="farmer"><option value="">— none —</option>'+
+          d.all('farmers').map(function(f){return '<option value="'+f.id+'">'+BB.esc(f.name+' · '+f.farm)+'</option>';}).join('')+'</select></div>'+
+      '</div>'+
+      '<button class="btn block" id="post" style="margin-top:14px;">'+BB.icon('message')+'Post</button>'+
+    '</div></div>'+
+    (feed.length ? '<div class="card"><div class="card-h"><div><h3>In the feed</h3><div class="sub">updates by type</div></div></div><div class="card-p"><div class="kinds">'+
+      KINDS.filter(function(k){ return counts[k]; }).map(function(k){ return '<div class="r"><span class="badge '+KBADGE[k]+'">'+k+'</span><b>'+counts[k]+'</b></div>'; }).join('')+
+    '</div></div></div>' : '')+
+  '</div>';
+  html += '</div><div style="height:24px;"></div>';
 
   document.querySelector('main')? (document.querySelector('main').innerHTML=html) :
     document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');

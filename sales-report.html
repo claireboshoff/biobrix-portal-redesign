@@ -6,18 +6,21 @@
 <title>Sales — weekly &amp; monthly · BioBrix OS</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <style>
-  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px;}
-  .bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;}
-  .bar > i{display:block;height:100%;border-radius:5px;}
-  td.num,th.num{text-align:right;white-space:nowrap;}
-  .wk{font-variant-numeric:tabular-nums;}
+  .wk{font-variant-numeric:tabular-nums;white-space:nowrap;}
   .mini{font-size:.72rem;color:var(--faint);}
-  .pick{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;}
+  .pick{padding:7px 10px;font-size:.84rem;border:1.5px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-family:inherit;max-width:100%;}
+  .pick:focus{border-color:var(--green-bright);outline:none;box-shadow:0 0 0 3px rgba(104,165,62,.15);}
+  .seg a{display:inline-flex;align-items:center;white-space:nowrap;}
+  .toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:none;}
+  .trk-bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;width:150px;} .trk-bar > i{display:block;height:100%;}
+  .sr-note{font-size:.78rem;margin-top:10px;}
+  .sr-table td:first-child{white-space:nowrap;}
+  .sr-table .bar-cell{min-width:80px;}
+  .sr-table select.pick{max-width:220px;}
 </style>
 </head>
 <body>
@@ -38,19 +41,21 @@ function monthLabel(k){ var p=k.split('-'); return BB.monthName(parseInt(p[1],10
 function render(){
   var sg = d.sage && d.sage();
   var host = document.getElementById('main');
+  var head = '<div class="page-head"><div class="eyebrow">Sales</div><h1>Sales, weekly &amp; monthly</h1>'+
+    '<p>Every sale invoiced, by week and by month, per agent and per customer, straight from your accounting system so it matches what finance sees.</p></div>';
   if(!(sg && sg.live)){
-    host.innerHTML = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1></div>'+
-      '<div class="card card-p"><div class="empty">This report is built from your accounting system. It will fill in as soon as the connection has run.</div></div>';
+    host.innerHTML = head+
+      '<div class="card" style="margin-top:16px;"><div class="empty">'+BB.icon('chart')+'<br>This report is built from your accounting system. It will fill in as soon as the connection has run.</div></div>';
     return;
   }
   // A seat scoped to its own accounts, with none allocated yet, must be told exactly that — not
   // left staring at an empty report wondering whether the connection is broken.
   if(!(sg.customers||[]).length && BB.user.roleKey==='advisor'){
-    host.innerHTML = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1></div>'+
-      '<div class="card card-p"><div class="empty"><b>No accounts are allocated to you yet.</b><br>'+
+    host.innerHTML = head+
+      '<div class="card" style="margin-top:16px;"><div class="empty"><b>No accounts are allocated to you yet.</b><br>'+
       'Your accounting system is connected and read three times a day, but none of its customers '+
       'are marked as yours, so there is nothing to report here.<br><br>'+
-      'Whoever looks after the accounts can allocate them in <b>Sales \u2192 By customer</b>, and this '+
+      'Whoever looks after the accounts can allocate them in <b>Sales → By customer</b>, and this '+
       'page fills in straight away.</div></div>';
     return;
   }
@@ -72,17 +77,28 @@ function render(){
     if(key.indexOf('sage_rep_')===0) return repName[parseInt(key.slice(9),10)] || ('Rep '+key.slice(9));
     var r = d.rep(key); return (r&&r.name) || key;
   }
+  // one colour per agent, stable across the charts on a tab; unallocated is always grey
+  var AG_PAL = ['#3f6b28','#c77d17','#2f6f9e','#7d4f9a','#a3533f','#68a53e','#22431a'], agCol = {};
+  function agentColour(k){
+    if(!k || k==='none') return '#9aa88f';
+    if(agCol[k]) return agCol[k];
+    var r = k.indexOf('sage_rep_')===0 ? null : d.rep(k);
+    agCol[k] = (r && r.colour) || AG_PAL[Object.keys(agCol).length % AG_PAL.length];
+    return agCol[k];
+  }
+  function stat(l, v, sub, cls, spk){ return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div>'+(spk&&spk.length>1?'<div class="spark">'+BB.chart.spark(spk)+'</div>':'')+'</div>'; }
+  function card(title, sub, body, extra){ return '<div class="card"><div class="card-h"><div><h3>'+title+'</h3><div class="sub">'+sub+'</div></div>'+(extra||'')+'</div>'+body+'</div>'; }
+  var chartJobs = [];
 
   var tab = (new URLSearchParams(location.search).get('view')||'weekly').toLowerCase();
-  var html = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1>'+
-    '<p>Every sale invoiced, by week and by month, per agent and per customer — straight from your accounting system, so it matches what finance sees. No spreadsheet to build.</p></div>';
+  var html = head;
   html += BB.staleNote();
 
-  html += '<div class="tabs">'+
+  html += '<div class="toolbar"><div class="seg">'+
     ['weekly|By week','monthly|By month vs budget','agent|By agent','customer|By customer'].map(function(o){
       var k=o.split('|')[0], t=o.split('|')[1];
-      return '<a class="btn sm'+(tab===k?'':' ghost')+'" href="sales-report.html?view='+k+'">'+t+'</a>';
-    }).join('')+'</div>';
+      return '<a class="'+(tab===k?'on':'')+'" href="sales-report.html?view='+k+'">'+t+'</a>';
+    }).join('')+'</div>'+BB.liveChip()+'</div>';
 
   // ---------------- by week ----------------
   if(tab==='weekly'){
@@ -98,17 +114,42 @@ function render(){
     });
     var wk = Object.keys(weeks).sort().reverse().slice(0,12);
     var max = Math.max.apply(null, wk.map(function(w){ return weeks[w].total; }).concat([1]));
-    html += '<div class="sec"><h2>The last 12 weeks</h2><span class="ln"></span><span class="cnt">week starts Monday</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Week</th><th class="num">Invoiced</th><th class="num">Invoices</th><th>Split by agent</th></tr></thead><tbody>';
+    var chron = wk.slice().reverse();
+    var tot12 = wk.reduce(function(t,w){ return t+weeks[w].total; },0), n12 = wk.reduce(function(t,w){ return t+weeks[w].n; },0);
+    var thisW = monday(new Date()), cur = weeks[thisW], prevW = wk.filter(function(w){ return w<thisW; })[0];
+    var agTot = {}; wk.forEach(function(w){ Object.keys(weeks[w].byAgent).forEach(function(k){ agTot[k]=(agTot[k]||0)+weeks[w].byAgent[k]; }); });
+    var agKeys = Object.keys(agTot).sort(function(a,b){ return agTot[b]-agTot[a]; });
+    html += '<div class="grid g4">'+
+      stat('This week', money(cur?cur.total:0), (cur?cur.n:0)+' invoices · week of '+BB.date(thisW))+
+      stat('Last week', prevW? money(weeks[prevW].total) : '—', prevW? weeks[prevW].n+' invoices · week of '+BB.date(prevW) : 'no invoices')+
+      stat('Last 12 weeks', money(tot12), n12+' invoices', '', chron.map(function(w){ return weeks[w].total; }))+
+      stat('Average week', money(wk.length? tot12/wk.length : 0), 'over the weeks with sales')+
+    '</div>';
+    html += '<div class="split" style="margin-top:16px;">'+
+      card('The last 12 weeks', 'invoiced per week · week starts Monday · split by agent', '<div class="card-p"><div id="chWeeks"></div></div>')+
+      card('By agent', 'the same 12 weeks', '<div class="card-p"><div id="chWkAg"></div></div>')+
+    '</div>';
+    if(chron.length){
+      // stack the four biggest agents; everyone else together, so the bars stay readable
+      var topAg = agKeys.slice(0,4), rest = agKeys.slice(4);
+      var ser = topAg.map(function(k){ return { name:agentLabel(k==='none'?null:k), color:agentColour(k), values:chron.map(function(w){ return weeks[w].byAgent[k]||0; }) }; });
+      if(rest.length) ser.push({ name:'Everyone else', color:'#6b7a5e', values:chron.map(function(w){ return rest.reduce(function(t,k){ return t+(weeks[w].byAgent[k]||0); },0); }) });
+      chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:chron.map(function(w){ return BB.shortDate? BB.shortDate(w) : w.slice(5); }), money:true, stacked:true, height:250, table:true, series:ser }); });
+      chartJobs.push(function(){ BB.chart.hbar('#chWkAg',{ money:true, rows:agKeys.slice(0,8).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agTot[k], color:agentColour(k) }; }) }); });
+    }
+    var tb = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Week</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th>Split by agent</th></tr></thead><tbody>';
+    if(!wk.length) tb += '<tr><td colspan="5"><div class="empty">Nothing invoiced yet.</div></td></tr>';
     wk.forEach(function(w){
       var x = weeks[w];
       var parts = Object.keys(x.byAgent).sort(function(a,b){ return x.byAgent[b]-x.byAgent[a]; }).slice(0,3)
         .map(function(k){ return BB.esc(agentLabel(k==='none'?null:k))+' '+money(x.byAgent[k]); }).join(' · ');
-      html += '<tr><td class="wk"><b>'+BB.date(w)+'</b><div class="mini">week of</div></td>'+
-        '<td class="num"><b>'+money(x.total)+'</b><div class="bar" style="margin-top:5px;width:120px;"><i style="width:'+Math.round(x.total/max*100)+'%;background:var(--green-mid);"></i></div></td>'+
+      tb += '<tr><td class="wk"><b>'+BB.date(w)+'</b><div class="mini">week of</div></td>'+
+        '<td class="num"><b>'+money(x.total)+'</b></td>'+
+        '<td><div class="bar-cell"><div class="trk"><i style="width:'+Math.round(x.total/max*100)+'%;"></i></div></div></td>'+
         '<td class="num">'+x.n+'</td><td class="mini">'+(parts||'—')+'</td></tr>';
     });
-    html += '</tbody></table></div></div>';
+    tb += '</tbody>'+(wk.length?'<tfoot><tr><td>12 weeks</td><td class="num">'+money(tot12)+'</td><td></td><td class="num">'+n12+'</td><td></td></tr></tfoot>':'')+'</table></div>';
+    html += '<div style="margin-top:16px;">'+card('Week by week', wk.length+' weeks, newest first', tb)+'</div>';
   }
 
   // ---------------- by month vs budget ----------------
@@ -117,21 +158,42 @@ function render(){
     invoices.forEach(function(i){ var k=ym(i.date); if(!k) return; months[k]=(months[k]||0)+(i.amount||0); });
     var keys = Object.keys(months).sort().reverse().slice(0,14);
     var canEdit = BB.auth.can('finance') || u.roleKey==='director';
-    html += '<div class="sec"><h2>Month by month, against budget</h2><span class="ln"></span><span class="cnt">'+(canEdit?'type a budget to set it':'budget set by finance')+'</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Month</th><th class="num">Invoiced</th><th class="num">Budget</th><th class="num">Against budget</th><th>Progress</th></tr></thead><tbody>';
+    var chronM = keys.slice().reverse();
+    var budgets = pl.budgets||{};
+    var nowK = new Date().toISOString().slice(0,7);
+    var yr = nowK.slice(0,4);
+    var ytdA=0, ytdB=0; chronM.forEach(function(k){ if(k.slice(0,4)===yr && budgets[k]){ ytdA+=months[k]; ytdB+=budgets[k]; } });
+    var budN = chronM.filter(function(k){ return budgets[k]; }).length;
+    var ytdPct = ytdB? Math.round(ytdA/ytdB*100) : null;
+    html += '<div class="grid g4">'+
+      stat('This month', money(months[nowK]||0), 'invoiced so far', '', chronM.map(function(k){ return months[k]; }))+
+      stat('Budget this month', budgets[nowK]? money(budgets[nowK]) : '—', budgets[nowK]? Math.round((months[nowK]||0)/budgets[nowK]*100)+'% reached' : (canEdit?'type it in the table':'set by finance'))+
+      stat('This year against budget', ytdPct===null? '—' : ytdPct+'%', ytdB? money(ytdA)+' of '+money(ytdB)+', budgeted months' : 'no budget set this year', (ytdPct!==null && ytdPct<80)?'warn':'')+
+      stat('Months with a budget', budN+' <span style="font-size:.9rem;color:var(--faint);">of '+chronM.length+'</span>', 'in the months shown')+
+    '</div>';
+    html += '<div style="margin-top:16px;">'+card('Invoiced against budget', 'month by month', '<div class="card-p"><div id="chMonths"></div></div>')+'</div>';
+    if(chronM.length) chartJobs.push(function(){
+      var ser=[{name:'Invoiced',values:chronM.map(function(k){ return months[k]; }),color:'#3f6b28'}];
+      if(budN) ser.push({name:'Budget',values:chronM.map(function(k){ return budgets[k]||0; }),color:'#c77d17'});
+      BB.chart.bar('#chMonths',{ labels:chronM.map(function(k){ return monthLabel(k).replace(/ (\d\d)(\d\d)$/,' $2'); }), money:true, height:250, table:true, series:ser });
+    });
+    var tbm = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Month</th><th class="num">Invoiced</th><th class="num">Budget</th><th class="num">Against budget</th><th>Progress</th></tr></thead><tbody>';
+    var sumA=0, sumB=0;
     keys.forEach(function(k){
       var actual = months[k], budget = (pl.budgets||{})[k] || 0;
       var pct = budget? Math.round(actual/budget*100) : null;
       var diff = budget? actual-budget : null;
-      html += '<tr><td><b>'+monthLabel(k)+'</b></td>'+
+      sumA+=actual; if(budget) sumB+=budget;
+      tbm += '<tr><td><b>'+monthLabel(k)+'</b></td>'+
         '<td class="num"><b>'+money(actual)+'</b></td>'+
         '<td class="num">'+(canEdit
             ? '<input class="pick" style="width:130px;text-align:right;" inputmode="numeric" data-budget="'+k+'" value="'+(budget||'')+'" placeholder="set budget">'
             : (budget? money(budget) : '<span class="faint">—</span>'))+'</td>'+
         '<td class="num">'+(diff===null?'<span class="faint">—</span>':'<b style="color:'+(diff>=0?'var(--ok)':'var(--red)')+';">'+(diff>=0?'+':'')+money(diff)+'</b>')+'</td>'+
-        '<td>'+(pct===null?'<span class="faint">no budget set</span>':'<div class="bar" style="width:150px;"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of budget</div>')+'</td></tr>';
+        '<td>'+(pct===null?'<span class="faint">no budget set</span>':'<div class="trk-bar"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of budget</div>')+'</td></tr>';
     });
-    html += '</tbody></table></div></div>';
+    tbm += '</tbody>'+(keys.length?'<tfoot><tr><td>'+keys.length+' months</td><td class="num">'+money(sumA)+'</td><td class="num">'+(sumB?money(sumB):'—')+'</td><td></td><td></td></tr></tfoot>':'')+'</table></div>';
+    html += '<div style="margin-top:16px;">'+card('Month by month', canEdit?'type a budget to set it':'budget set by finance', tbm)+'</div>';
   }
 
   // ---------------- by agent ----------------
@@ -148,19 +210,40 @@ function render(){
     var ak = Object.keys(agents).sort(function(a,b){ return agents[b].total-agents[a].total; });
     var maxA = Math.max.apply(null, ak.map(function(k){ return agents[k].total; }).concat([1]));
     var comm = pl.commission||{};
-    html += '<div class="sec"><h2>By agent — last three months</h2><span class="ln"></span><span class="cnt">commission shown where a rate is set</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th class="num">Invoices</th><th class="num">Customers</th><th class="num">Commission</th><th></th></tr></thead><tbody>';
+    var totA = ak.reduce(function(t,k){ return t+agents[k].total; },0), totN = ak.reduce(function(t,k){ return t+agents[k].n; },0), totC = 0;
+    var none = agents.none;
+    var rateOf = function(k){ return k==='none' ? 0 : ((comm.byAgent&&comm.byAgent[k]!=null) ? comm.byAgent[k] : (comm.default||0)); };
+    ak.forEach(function(k){ totC += agents[k].total*rateOf(k)/100; });
+    html += '<div class="grid g4">'+
+      stat('Invoiced, three months', money(totA), totN+' invoices')+
+      stat('Agents selling', ak.filter(function(k){ return k!=='none'; }).length, 'with invoices in the period')+
+      stat('Commission', totC? money(totC) : '—', totC? 'at the rates set' : 'no rate set yet')+
+      stat('Not allocated', none? money(none.total) : 'R0', none? Object.keys(none.customers).length+' accounts carry no agent' : 'every account has an agent', none?'warn':'')+
+    '</div>';
+    var tba = '<div class="scroll"><table class="bb sr-table"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th class="num">Customers</th><th class="num">Commission</th><th></th></tr></thead><tbody>';
+    if(!ak.length) tba += '<tr><td colspan="7"><div class="empty">Nothing invoiced in the last three months.</div></td></tr>';
     ak.forEach(function(k){
       var x=agents[k];
-      var rate = k==='none' ? 0 : ((comm.byAgent&&comm.byAgent[k]!=null) ? comm.byAgent[k] : (comm.default||0));
-      html += '<tr><td><b>'+BB.esc(agentLabel(k==='none'?null:k))+'</b>'+(k==='none'?'<div class="mini">these accounts carry no agent</div>':'')+'</td>'+
-        '<td class="num"><b>'+money(x.total)+'</b><div class="bar" style="margin-top:5px;width:110px;"><i style="width:'+Math.round(x.total/maxA*100)+'%;background:var(--green-mid);"></i></div></td>'+
+      var rate = rateOf(k);
+      tba += '<tr><td><b>'+BB.esc(agentLabel(k==='none'?null:k))+'</b>'+(k==='none'?'<div class="mini">these accounts carry no agent</div>':'')+'</td>'+
+        '<td class="num"><b>'+money(x.total)+'</b></td>'+
+        '<td><div class="bar-cell"><div class="trk"><i style="width:'+Math.round(x.total/maxA*100)+'%;background:'+agentColour(k)+';"></i></div></div></td>'+
         '<td class="num">'+x.n+'</td><td class="num">'+Object.keys(x.customers).length+'</td>'+
         '<td class="num">'+(rate? money(x.total*rate/100)+'<div class="mini">at '+rate+'%</div>' : '<span class="faint">no rate set</span>')+'</td>'+
-        '<td class="num">'+(k==='none'?'<a class="btn ghost sm" href="sales-report.html?view=customer">Allocate ›</a>':'')+'</td></tr>';
+        '<td class="num">'+(k==='none'?'<a class="btn ghost sm" href="sales-report.html?view=customer">Allocate'+BB.icon('chevron')+'</a>':'')+'</td></tr>';
     });
-    html += '</tbody></table></div></div>';
-    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Commission is worked out on what was invoiced. Rates live under <a href="commission.html" style="color:var(--green-dark);">Commission</a>. Per-product rates switch on as soon as the line detail is pulled from your accounting system.</div>';
+    tba += '</tbody>'+(ak.length?'<tfoot><tr><td>All agents</td><td class="num">'+money(totA)+'</td><td></td><td class="num">'+totN+'</td><td></td><td class="num">'+(totC?money(totC):'—')+'</td><td></td></tr></tfoot>':'')+'</table></div>';
+    html += '<div class="split" style="margin-top:16px;">'+
+      card('By agent, last three months', 'commission shown where a rate is set', tba)+
+      card('Share of sales', 'invoiced, last three months', '<div class="card-p"><div id="chAgShare"></div></div>')+
+    '</div>';
+    if(ak.length) chartJobs.push(function(){
+      var rows = ak.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:agents[k].total, color:agentColour(k) }; });
+      var restV = ak.slice(5).reduce(function(t,k){ return t+agents[k].total; },0);
+      if(restV) rows.push({ label:'Everyone else', value:restV, color:'#6b7a5e' });
+      BB.chart.donut('#chAgShare',{ money:true, centreLabel:'3 months', rows:rows });
+    });
+    html += '<div class="sr-note faint">Commission is worked out on what was invoiced. Rates live under <a href="commission.html" style="color:var(--green-dark);">Commission</a>. Per-product rates switch on as soon as the line detail is pulled from your accounting system.</div>';
   }
 
   // ---------------- by customer (and agent allocation) ----------------
@@ -175,21 +258,51 @@ function render(){
     var agentOptions = [{k:'',t:'— not allocated —'}]
       .concat(d.allUnscoped('reps').map(function(r){ return {k:r.id,t:r.name}; }))
       .concat(reps.map(function(r){ return {k:'sage_rep_'+r.id, t:r.name+' (from your accounts)'}; }));
-    html += '<div class="sec"><h2>By customer — last 12 months</h2><span class="ln"></span><span class="cnt">'+rows.length+' customers with sales'+(canEdit2?' · set the agent here':'')+'</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Customer</th><th class="num">Invoiced</th><th class="num">Invoices</th><th>Agent</th></tr></thead><tbody>';
+    var totCu = rows.reduce(function(t,r){ return t+r.total; },0);
+    var top10 = rows.slice(0,10).reduce(function(t,r){ return t+r.total; },0);
+    var unalloc = rows.filter(function(r){ return !r.agent; });
+    var maxCu = rows.length? rows[0].total : 1;
+    html += '<div class="grid g4">'+
+      stat('Customers with sales', rows.length, 'last 12 months')+
+      stat('Invoiced', money(totCu), 'to these customers, last 12 months')+
+      stat('Top ten', totCu? Math.round(top10/totCu*100)+'%' : '—', 'of the year\'s sales')+
+      stat('Not allocated', unalloc.length, unalloc.length? money(unalloc.reduce(function(t,r){ return t+r.total; },0))+' with no agent' : 'every customer has an agent', unalloc.length?'warn':'')+
+    '</div>';
+    var tbc = '<div class="scroll tall"><table class="bb sr-table"><thead><tr><th>Customer</th><th class="num">Invoiced</th><th></th><th class="num">Invoices</th><th>Agent</th></tr></thead><tbody>';
+    if(!rows.length) tbc += '<tr><td colspan="5"><div class="empty">No customer has been invoiced in the last 12 months.</div></td></tr>';
     rows.slice(0,150).forEach(function(r){
-      html += '<tr><td><b>'+BB.esc(r.c.name)+'</b><div class="mini">'+BB.esc(r.c.town||'')+'</div></td>'+
-        '<td class="num"><b>'+money(r.total)+'</b></td><td class="num">'+r.n+'</td>'+
+      tbc += '<tr><td><b>'+BB.esc(r.c.name)+'</b><div class="mini">'+BB.esc(r.c.town||'')+'</div></td>'+
+        '<td class="num"><b>'+money(r.total)+'</b></td>'+
+        '<td><div class="bar-cell"><div class="trk"><i style="width:'+Math.round(r.total/maxCu*100)+'%;"></i></div></div></td>'+
+        '<td class="num">'+r.n+'</td>'+
         '<td>'+(canEdit2
           ? '<select class="pick" data-agent="sage_'+r.c.id+'">'+agentOptions.map(function(o){
               return '<option value="'+o.k+'"'+(r.agent===o.k?' selected':'')+'>'+BB.esc(o.t)+'</option>'; }).join('')+'</select>'
           : BB.esc(agentLabel(r.agent)))+'</td></tr>';
     });
-    html += '</tbody></table></div></div>';
-    if(rows.length>150) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Showing the 150 largest. The rest are in Farms &amp; farmers.</div>';
+    tbc += '</tbody></table></div>';
+    var byAg = {}; rows.forEach(function(r){ var k=r.agent||'none'; byAg[k]=(byAg[k]||0)+r.total; });
+    var agK = Object.keys(byAg).sort(function(a,b){ return byAg[b]-byAg[a]; });
+    html += '<div class="split" style="margin-top:16px;align-items:start;">'+
+      card('By customer, last 12 months', rows.length+' customers with sales'+(canEdit2?' · set the agent here':''), tbc)+
+      '<div class="grid" style="align-content:start;">'+
+        card('Biggest customers', 'invoiced, last 12 months', '<div class="card-p"><div id="chCu"></div></div>')+
+        card('By agent', 'the same sales, by who looks after the account', '<div class="card-p"><div id="chCuAg"></div></div>')+
+      '</div>'+
+    '</div>';
+    if(rows.length){
+      chartJobs.push(function(){ BB.chart.hbar('#chCu',{ money:true, rows:rows.slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.total, color:agentColour(r.agent||'none') }; }) }); });
+      chartJobs.push(function(){
+        var dr = agK.slice(0,5).map(function(k){ return { label:agentLabel(k==='none'?null:k), value:byAg[k], color:agentColour(k) }; });
+        var rv = agK.slice(5).reduce(function(t,k){ return t+byAg[k]; },0); if(rv) dr.push({ label:'Everyone else', value:rv, color:'#6b7a5e' });
+        BB.chart.donut('#chCuAg',{ money:true, centreLabel:'12 months', rows:dr });
+      });
+    }
+    if(rows.length>150) html += '<div class="sr-note faint">Showing the 150 largest. The rest are in Farms &amp; farmers.</div>';
   }
 
   host.innerHTML = html;
+  chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 
   // ---- saving: budget per month, agent per customer ----
   host.querySelectorAll('input[data-budget]').forEach(function(el){

@@ -7,9 +7,24 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Stock · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+  .take{border-left:3px solid var(--green-bright);}
+  .take-in{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:18px 20px;}
+  .take-ic{width:40px;height:40px;border-radius:10px;background:#eef4e4;color:var(--green-dark);display:flex;align-items:center;justify-content:center;flex:none;}
+  .take h3{font-family:var(--display);font-size:1.04rem;font-weight:600;color:var(--green-darkest);}
+  .take-act{display:flex;gap:8px;flex-wrap:wrap;align-self:center;}
+  .lvl .trk{position:relative;overflow:visible;height:7px;}
+  .lvl .trk i{border-radius:4px;}
+  .lvl .trk b{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--green-darkest);opacity:.45;}
+  table.bb tr.r-low td{background:#fffaf0;} table.bb tr.r-out td{background:#fdf2f0;}
+  table.bb tr.r-low td:first-child{box-shadow:inset 3px 0 0 var(--amber);} table.bb tr.r-out td:first-child{box-shadow:inset 3px 0 0 var(--red);}
+  .cnt-in{width:88px;padding:7px 9px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:8px;text-align:right;background:#fff;}
+  .cnt-in:focus{outline:none;border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}
+  @media(max-width:560px){ .lvl-col{display:none;} .take-act{width:100%;} .take-act .btn{flex:1 1 auto;} }
+</style>
 </head>
 <body>
 <script>
@@ -46,6 +61,15 @@ function statusOf(i){
   return 'In stock';
 }
 
+function shortName(n){ return String(n||'').replace(/^RenewAg\s+/,''); }
+function depotShort(id){ return String(d.depot(id).name||'').replace(/ Depot$/,''); }
+// stock level against reorder: the reorder level sits at the midpoint of the track
+function levelCell(qty, reorder){
+  var cap = Math.max(1, (reorder||0)*2), pct = Math.max(0, Math.min(100, qty/cap*100));
+  var col = qty<=0 ? 'var(--red)' : (qty<reorder ? 'var(--amber)' : 'var(--green-bright)');
+  return '<div class="bar-cell lvl"><div class="trk"><i style="width:'+pct+'%;background:'+col+'"></i><b title="reorder level"></b></div></div>';
+}
+
 function render(){
   var rows = invRows();
 
@@ -53,86 +77,133 @@ function render(){
   var all = scopedInventory();
   var totalValue = all.reduce(function(s,i){ return s + (i.qty||0)*(d.product(i.prod).price||0); }, 0);
   var lowCount = all.filter(function(i){ return i.qty<i.reorder; }).length;
+  var outCount = all.filter(function(i){ return i.qty<=0; }).length;
   var depotCount = scopeDepot ? 1 : d.all("depots").length;
+  var oneDepot = scopeDepot || (filter!=='all' ? filter : null);
 
   var html = '';
-  html += '<section class="page-head">'+
-    '<div class="eyebrow">Operations · Stock</div>'+
+  html += '<section class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">Operations · Stock</div>'+
     '<h1>'+(scopeDepot?('Stock at '+BB.esc(d.depot(scopeDepot).name)):'Stock across the depots')+'</h1>'+
     '<p>'+(scopeDepot
       ?'Every product line at your depot. Low and out-of-stock lines are flagged so you can reorder before a delivery is held. Count on the floor and save as you go — it works offline.'
-      :'Every product line in every depot. Low and out-of-stock lines are flagged so ops can reorder before a delivery is held. Count on the floor and save as you go — it works offline.')+'</p>'+
+      :'Every product line in every depot. Low and out-of-stock lines are flagged so ops can reorder before a delivery is held. Count on the floor and save as you go — it works offline.')+'</p></div>'+
+    ((BB.auth && BB.auth.canPage && BB.auth.canPage('suppliers.html')) ? '<div class="row"><a class="btn ghost" href="suppliers.html">'+BB.icon('link')+'Suppliers &amp; POs</a></div>' : '')+
   '</section>';
 
-  html += '<div class="grid g3">'+
+  html += '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Stock lines</div><div class="v">'+all.length+'</div><div class="s">'+(scopeDepot?('at '+d.depot(scopeDepot).name):('across '+depotCount+' depots'))+'</div></div>'+
     '<div class="stat'+(lowCount>0?' bad':'')+'"><div class="l">Below reorder</div><div class="v">'+lowCount+'</div><div class="s">need reordering</div></div>'+
+    '<div class="stat'+(outCount>0?' bad':'')+'"><div class="l">Out of stock</div><div class="v">'+outCount+'</div><div class="s">nothing on the shelf</div></div>'+
     '<div class="stat"><div class="l">On-hand value</div><div class="v">'+BB.money(totalValue)+'</div><div class="s">at list price</div></div>'+
   '</div>';
 
-  // filter chips — only for seats that see more than one depot
-  // ---- STOCK TAKE — one tap when nothing moved, voice when it did --------
-  var lastTake = null; try{ lastTake = JSON.parse(localStorage.getItem('bb_stocktake_'+(scopeDepot||filter))); }catch(e){}
-  html += '<div class="card card-p" id="takeCard" style="margin-top:14px;border-left:3px solid var(--green-bright);">'+
-    '<div class="row between" style="align-items:flex-start;gap:14px;">'+
-      '<div><div class="eyebrow">Stock take</div>'+
-        '<h2 style="font-family:var(--display);font-size:1.06rem;color:var(--green-dark);margin-top:2px;">'+(scopeDepot?BB.esc(d.depot(scopeDepot).name):(filter==='all'?'Choose a depot below':BB.esc(d.depot(filter).name)))+' · '+all.length+' lines</h2>'+
-        '<p class="muted" style="font-size:.84rem;margin-top:4px;max-width:520px;">Walk the shelves. If every count matches what is on the screen, one tap closes the take. If something moved, say it or type it in the table below.</p>'+
-        (lastTake?'<div class="faint" style="font-size:.76rem;margin-top:6px;">Last take: '+BB.esc(lastTake.when)+' by '+BB.esc(lastTake.by)+' · '+BB.esc(lastTake.note)+'</div>':'')+
-      '</div>'+
-      '<div class="row" style="gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end;">'+
-        (function(){ var mode=''; try{ mode=localStorage.getItem('bb_reorder_mode')||'notify'; }catch(e){} return '<span class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">Below reorder →</span><span class="chip tog'+(mode==='notify'?' on':'')+'" data-rmode="notify" style="cursor:pointer;">Notify Renzie</span><span class="chip tog'+(mode==='auto'?' on':'')+'" data-rmode="auto" style="cursor:pointer;">Auto-raise PO</span>'; })()+
-        '<button class="btn lime" id="takeVoice" title="Say the product and the count">🎙 Say a count</button>'+
-        '<button class="btn" id="takeSame" style="padding:13px 20px;">✓ Nothing has changed</button>'+
-      '</div>'+
-    '</div>'+
-    '<div id="takeVoiceOut" style="display:none;margin-top:12px;padding:12px 14px;border-radius:11px;background:#f7faf1;border:1px solid var(--line);font-size:.86rem;"></div>'+
+  // ---- the picture: on hand against reorder, beside where the value sits ----
+  html += '<div class="split" style="margin-top:16px;">'+
+    '<div class="card"><div class="card-h"><div><h3>'+(oneDepot?'On hand against reorder level':'Stock health by depot')+'</h3><div class="sub">'+
+      (oneDepot?BB.esc(d.depot(oneDepot).name)+' · every line':'lines in stock, low and out')+'</div></div></div><div class="card-p">'+
+      (all.length?'<div id="chStock"></div>':'<div class="empty">No stock lines yet.</div>')+'</div></div>'+
+    '<div class="card"><div class="card-h"><div><h3>On-hand value</h3><div class="sub">at list price, '+(oneDepot?'by product':'by depot')+'</div></div></div><div class="card-p">'+
+      (totalValue>0?'<div id="chValue"></div>':'<div class="empty">Nothing on hand.</div>')+'</div></div>'+
   '</div>';
 
+  // ---- STOCK TAKE — one tap when nothing moved, voice when it did --------
+  var lastTake = null; try{ lastTake = JSON.parse(localStorage.getItem('bb_stocktake_'+(scopeDepot||filter))); }catch(e){}
+  var rmode=''; try{ rmode=localStorage.getItem('bb_reorder_mode')||'notify'; }catch(e){}
+  html += '<div class="card take" id="takeCard" style="margin-top:16px;">'+
+    '<div class="take-in">'+
+      '<div class="take-ic">'+BB.icon('clipboard')+'</div>'+
+      '<div style="min-width:0;flex:1 1 320px;"><div class="eyebrow" style="margin-bottom:2px;">Stock take</div>'+
+        '<h3>'+(scopeDepot?BB.esc(d.depot(scopeDepot).name):(filter==='all'?'Choose a depot below':BB.esc(d.depot(filter).name)))+' · '+all.length+' lines</h3>'+
+        '<p class="muted" style="font-size:.84rem;margin-top:3px;max-width:560px;">Walk the shelves. If every count matches what is on the screen, one tap closes the take. If something moved, say it or type it in the table below.</p>'+
+        (lastTake?'<div class="faint" style="font-size:.76rem;margin-top:6px;">Last take: '+BB.esc(lastTake.when)+' by '+BB.esc(lastTake.by)+' · '+BB.esc(lastTake.note)+'</div>':'')+
+      '</div>'+
+      '<div class="take-act">'+
+        '<button class="btn lime" id="takeVoice" title="Say the product and the count">'+BB.icon('mic')+'Say a count</button>'+
+        '<button class="btn" id="takeSame">'+BB.icon('check')+'Nothing has changed</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card-f row" style="gap:8px;"><span class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Below reorder</span>'+
+      '<span class="seg"><button class="tog'+(rmode==='notify'?' on':'')+'" data-rmode="notify">Notify Renzie</button><button class="tog'+(rmode==='auto'?' on':'')+'" data-rmode="auto">Auto-raise PO</button></span></div>'+
+    '<div id="takeVoiceOut" style="display:none;margin:0 20px 16px;padding:12px 14px;border-radius:10px;background:#f7faf1;border:1px solid var(--line);font-size:.86rem;"></div>'+
+  '</div>';
+
+  // filter chips — only for seats that see more than one depot
+  var chips = '';
   if(!scopeDepot){
-    html += '<div class="row" style="margin:20px 0 4px;">';
+    chips = '<div class="row" style="gap:6px;">';
     DEPOT_CHIPS.forEach(function(c){
-      html += '<button class="chip'+(filter===c.id?' on':'')+'" data-depot="'+c.id+'">'+BB.esc(c.name)+'</button>';
+      chips += '<button class="chip'+(filter===c.id?' on':'')+'" data-depot="'+c.id+'">'+BB.esc(c.name)+'</button>';
     });
-    html += '</div>';
+    chips += '</div>';
   }
 
   // table
-  html += '<div class="card" style="margin-top:12px;"><div class="scroll"><table class="bb">'+
-    '<thead><tr><th>Product</th><th>Depot</th><th>On hand</th><th>Reorder at</th><th>Status</th><th class="right">Stock take</th></tr></thead><tbody>';
+  var lowInView = rows.filter(function(i){ return i.qty<i.reorder; }).length;
+  html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Stock lines</h3><div class="sub">'+rows.length+' line'+(rows.length===1?'':'s')+(lowInView?' · '+lowInView+' below reorder':'')+' · type a count to save it</div></div>'+chips+'</div>'+
+    '<div class="scroll"><table class="bb">'+
+    '<thead><tr><th>Product</th>'+(scopeDepot?'':'<th>Depot</th>')+'<th class="num">On hand</th><th class="num">Reorder at</th><th class="lvl-col" style="min-width:150px;">Level</th><th>Status</th><th class="num">Stock take</th></tr></thead><tbody>';
 
   if(!rows.length){
-    html += '<tr><td colspan="6"><div class="empty">No stock lines for this depot.</div></td></tr>';
+    html += '<tr><td colspan="'+(scopeDepot?6:7)+'"><div class="empty">No stock lines for this depot.</div></td></tr>';
   } else {
     rows.forEach(function(i, idx){
       var p = d.product(i.prod);
       var st = statusOf(i);
       var low = st!=='In stock';
-      var rowStyle = st==='Out of stock' ? 'background:var(--red-bg);' : (st==='Low stock' ? 'background:var(--amber-bg);' : '');
-      html += '<tr style="'+rowStyle+'">'+
+      var rowCls = st==='Out of stock' ? 'r-out' : (st==='Low stock' ? 'r-low' : '');
+      html += '<tr class="'+rowCls+'">'+
         '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
-        '<td class="muted">'+BB.esc(d.depot(i.depot).name)+'</td>'+
-        '<td><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
-        '<td class="muted">'+BB.num(i.reorder)+'</td>'+
+        (scopeDepot?'':'<td class="muted">'+BB.esc(d.depot(i.depot).name)+'</td>')+
+        '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
+        '<td class="num muted">'+BB.num(i.reorder)+'</td>'+
+        '<td class="lvl-col">'+levelCell(i.qty, i.reorder)+'</td>'+
         '<td>'+BB.statusBadge(st)+'</td>'+
-        '<td class="right"><div class="row" style="justify-content:flex-end;gap:8px;">'+
-          '<input type="number" min="0" value="'+i.qty+'" data-count="'+i.depot+'|'+i.prod+'" style="width:88px;padding:7px 9px;font-size:.85rem;border:1.5px solid var(--line);border-radius:9px;text-align:right;">'+
+        '<td class="num"><div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:nowrap;">'+
           (low ? '<button class="btn ghost sm" data-reorder="'+i.depot+'|'+i.prod+'">Reorder</button>' : '')+
+          '<input type="number" min="0" value="'+i.qty+'" data-count="'+i.depot+'|'+i.prod+'" class="cnt-in" aria-label="Count for '+BB.esc(p.name)+'">'+
         '</div></td>'+
       '</tr>';
     });
   }
-  html += '</tbody></table></div></div>';
-
-  html += '<p class="faint" style="font-size:.76rem;margin:14px 0 24px;">Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier.</p>';
+  html += '</tbody></table></div>'+
+    '<div class="card-f">Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier. The mark on each level bar is the reorder level.</div></div>';
+  html += '<div style="height:24px;"></div>';
 
   var main = document.querySelector('main.wrap');
   if(main){ main.innerHTML = html; } else { document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>'); }
   wire();
+  drawCharts(all, oneDepot);
+}
+
+function drawCharts(all, oneDepot){
+  try{
+    var val = function(i){ return (i.qty||0)*(d.product(i.prod).price||0); };
+    if(oneDepot){
+      var mine = all.filter(function(i){ return i.depot===oneDepot; });
+      if(mine.length) BB.chart.bar('#chStock', { labels:mine.map(function(i){ return shortName(d.product(i.prod).name); }), height:220, table:true,
+        series:[{name:'On hand', values:mine.map(function(i){ return i.qty; }), color:'#3f6b28'},{name:'Reorder at', values:mine.map(function(i){ return i.reorder; }), color:'#c77d17'}] });
+      var byP = mine.map(function(i){ return { label:shortName(d.product(i.prod).name), value:val(i) }; }).sort(function(a,b){ return b.value-a.value; });
+      if(byP.length>6){ var rest = byP.slice(5).reduce(function(t,x){ return t+x.value; },0); byP = byP.slice(0,5).concat([{label:'Everything else', value:rest, color:'#6b7a5e'}]); }
+      if(document.getElementById('chValue')) BB.chart.donut('#chValue', { money:true, centreLabel:'on hand', rows:byP });
+    } else {
+      var deps = d.all('depots');
+      // counts of lines: keep the axis on whole numbers
+      var perDep = deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id; }).length; });
+      var cMax = Math.max(4, Math.ceil(Math.max.apply(null, perDep.concat([0]))/4)*4);
+      if(all.length) BB.chart.bar('#chStock', { labels:deps.map(function(x){ return depotShort(x.id); }), stacked:true, height:220, table:true, max:cMax,
+        series:[
+          {name:'In stock', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty>=i.reorder; }).length; }), color:'#3f6b28'},
+          {name:'Low', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty>0 && i.qty<i.reorder; }).length; }), color:'#c77d17'},
+          {name:'Out', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty<=0; }).length; }), color:'#b8382a'}] });
+      if(document.getElementById('chValue')) BB.chart.donut('#chValue', { money:true, centreLabel:'on hand',
+        rows:deps.map(function(x,k){ return { label:depotShort(x.id), value:all.filter(function(i){ return i.depot===x.id; }).reduce(function(t,i){ return t+val(i); },0), color:['#3f6b28','#2f6f9e','#c77d17','#7d4f9a'][k%4] }; }) });
+    }
+  }catch(e){ console.warn('chart', e); }
 }
 
 function wire(){
-  Array.prototype.forEach.call(document.querySelectorAll('.chip.tog[data-rmode]'), function(c){ c.onclick=function(){ try{ localStorage.setItem('bb_reorder_mode', this.dataset.rmode); }catch(e){} BB.toast(this.dataset.rmode==='auto'?'Below reorder → purchase order raised automatically with the supplier':'Below reorder → Renzie is notified to reorder'); render(); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('.tog[data-rmode]'), function(c){ c.onclick=function(){ try{ localStorage.setItem('bb_reorder_mode', this.dataset.rmode); }catch(e){} BB.toast(this.dataset.rmode==='auto'?'Below reorder → purchase order raised automatically with the supplier':'Below reorder → Renzie is notified to reorder'); render(); }; });
   // one-tap stock take — everything matches
   var same=document.getElementById('takeSame');
   if(same) same.onclick=function(){

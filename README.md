@@ -1,5 +1,14 @@
 # BioBrix OS — Operating System
 
+> **This repo is the redesign** (started 7 Oct 2026). It began as a copy of the live portal at
+> https://claireboshoff.github.io/biobrix-portal/ and changes only how it looks: the FreedomHub category
+> rail on the left (same nav as our other client portals), a breadcrumb top bar, a tighter BioBrix-green
+> design system, and charts drawn by `BB.chart` in plain SVG so they work offline. Data, sign-in, access
+> rules and the Sage mirror are unchanged. Page rules: `CONVENTIONS.md`.
+>
+> Preview locally: `python3 -m http.server 8811`, then open `http://localhost:8811/index.html?seat=director`
+> (localhost runs the demo gate; seats: director, advisor, operations, finance, warehouse, u_farmer).
+
 A working demo of the **BioBrix operating system** — sales, operations and BioServices (RenewAg)
 in one place, built by **FreedomHub** for BioBrix (Pty) Ltd, Tzaneen. "The Biological Way."
 

@@ -7,9 +7,27 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioAnalyze — Soil · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+/* BioAnalyze — page-scoped */
+.detail{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin:2px 0 4px;}
+.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0;}
+.reading{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.reading .rl{font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;}
+.reading .rv{font-family:var(--display);font-size:1.15rem;font-weight:600;color:var(--green-dark);margin-top:2px;}
+.interp{margin-top:8px;padding:11px 13px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.86rem;}
+.interp.ok{background:var(--ok-bg);color:var(--ok);}
+.ctx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 0;}
+.ctx .chip .ico{width:14px;height:14px;transform:rotate(180deg);}
+.mini h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.6px;font-weight:700;color:var(--faint);margin-bottom:10px;}
+table.bb tr.open td{background:#f3f8ec;}
+table.bb tr.detail-row td{padding-top:0;background:#f3f8ec;}
+.empty .big .ico{width:30px;height:30px;color:var(--faint);}
+.card .empty{padding:26px 20px;}
+.fld:last-of-type{margin-bottom:12px;}
+</style>
 </head>
 <body>
 <script>
@@ -20,17 +38,6 @@ var isAdvisor = u.roleKey==='advisor';
 function esc(s){ return BB.esc(s); }
 
 var blockParam = new URLSearchParams(location.search).get('block');
-
-var css=''+
-'.detail{background:#f7faf1;border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:6px;}'+
-'.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0;}'+
-'.reading{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}'+
-'.reading .rl{font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;}'+
-'.reading .rv{font-family:var(--display);font-size:1.15rem;font-weight:600;color:var(--green-dark);margin-top:2px;}'+
-'.interp{margin-top:8px;padding:11px 13px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.86rem;}'+
-'.interp.ok{background:var(--ok-bg);color:var(--ok);}'+
-'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;}';
-document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 // advisor sees their own samples; a block filter narrows further
 function baseRows(){
@@ -54,13 +61,19 @@ var filter = 'All';
 var openId = null;
 var blockCtx = blockParam ? d.by('blocks', blockParam) : null;
 
+// readings arrive as text from the lab ("2.1%", "12 ppm", "3.1:1") — read the number, never guess one
+function numOf(v){ var n=parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)? n : null; }
+function microBadge(m){ if(!m) return '<span class="faint">—</span>'; var c=/low/i.test(m)?'b-warn':/high|good|excellent/i.test(m)?'b-ok':'b-lime'; return '<span class="badge '+c+'">'+esc(m)+'</span>'; }
+
 function statBar(rows){
   var awaiting = rows.filter(function(s){ return s.status==='New'||s.status==='Awaiting lab'; }).length;
   var interp = rows.filter(function(s){ return s.status==='Interpreted'; }).length;
-  var html='<div class="grid g3">';
+  var blocksN = rows.map(function(s){ return s.block; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; }).length;
+  var html='<div class="grid g4" style="margin-top:12px;">';
   html += '<div class="stat"><div class="l">Samples</div><div class="v">'+rows.length+'</div><div class="s">'+(blockCtx?'on this block':'in view')+'</div></div>';
   html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting interpretation</div><div class="v">'+awaiting+'</div><div class="s">new + at lab</div></div>';
   html += '<div class="stat"><div class="l">Interpreted</div><div class="v">'+interp+'</div><div class="s">this season</div></div>';
+  html += '<div class="stat"><div class="l">Blocks sampled</div><div class="v">'+blocksN+'</div><div class="s">'+(blockCtx?esc(blockCtx.crop||''):'with at least one sample')+'</div></div>';
   html += '</div>';
   return html;
 }
@@ -99,17 +112,15 @@ function logForm(){
     var f=d.farmer(b.farmer);
     return '<option value="'+esc(b.id)+'"'+(blockParam===b.id?' selected':'')+'>'+esc(f.name)+' — '+esc(b.name)+'</option>';
   }).join('');
-  var html='<div class="card card-p" style="margin-top:18px;">';
-  html += '<div class="sec" style="margin:0 0 12px;"><h2 style="font-size:1rem;">Log a soil sample</h2><span class="ln"></span></div>';
-  html += '<div class="grid g3">';
+  var html='<div class="card" id="logSample"><div class="card-h"><div><h3>Log a soil sample</h3><div class="sub">saves on this device and syncs when you have signal</div></div></div><div class="card-p">';
   html += '<div class="fld"><label>Block</label><select id="fBlock">'+opts+'</select></div>';
+  html += '<div class="grid g2" style="gap:12px;">';
   html += '<div class="fld"><label>Date sampled</label><input id="fDate" type="date" value="2026-07-28"></div>';
   html += '<div class="fld"><label>Status</label><select id="fStatus"><option>New</option><option>Awaiting lab</option></select></div>';
   html += '</div>';
   html += '<div class="fld"><label>Field note (optional)</label><input id="fNote" type="text" placeholder="e.g. Collected top 20cm, wet block"></div>';
-  html += '<button class="btn" id="fSave">Save sample</button>';
-  html += '<p class="faint" style="font-size:.74rem;margin-top:8px;">Saves on this device and syncs when you have signal.</p>';
-  html += '</div>';
+  html += '<button class="btn block" id="fSave">'+BB.icon('plus')+'Save sample</button>';
+  html += '</div></div>';
   return html;
 }
 
@@ -118,54 +129,110 @@ function render(){
   var shown = filter==='All' ? rows : rows.filter(function(s){ return s.status===filter; });
 
   var html='';
-  html += '<div class="page-head"><h1>BioAnalyze — Soil</h1><p>'+
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">BioServices · BioAnalyze</div><h1>BioAnalyze — Soil</h1><p>'+
     (blockCtx?'Soil results for '+esc(blockCtx.name)+'. ':'')+
-    'Soil read as a living system — pH, organic matter, Ca:Mg balance, microbial life and phosphorus.</p></div>';
+    'Soil read as a living system — pH, organic matter, Ca:Mg balance, microbial life and phosphorus.</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn ghost" href="bioanalyze-leaf.html'+(blockParam?'?block='+encodeURIComponent(blockParam):'')+'">'+BB.icon('leaf')+'Leaf results</a>'+
+    '<a class="btn" href="#logSample">'+BB.icon('plus')+'Log a sample</a></div></div>';
 
   if(blockCtx){
-    html += '<div class="chips"><a class="chip" href="bioanalyze-soil.html">‹ All blocks</a>'+
+    html += '<div class="ctx"><a class="chip" href="bioanalyze-soil.html">'+BB.icon('chevron')+'All blocks</a>'+
       '<span class="chip on">'+esc(d.farmer(blockCtx.farmer).name)+' — '+esc(blockCtx.name)+'</span></div>';
   }
 
   html += statBar(rows);
 
-  html += '<div class="chips" style="margin-top:12px;">';
+  // The picture: interpreted readings compared block by block, beside where the samples stand
+  var interp = rows.filter(function(s){ return s.status==='Interpreted'; });
+  var omRows = interp.filter(function(s){ return numOf(s.om)!=null; });
+  var pRows  = interp.filter(function(s){ return numOf(s.p)!=null; });
+  var cmp = interp.length>=2;
+  html += '<div class="split" style="margin-top:16px;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Readings by block</h3><div class="sub">interpreted samples in view · as reported by the lab</div></div></div>';
+  if(cmp){
+    var maxOm = Math.max.apply(null, omRows.map(function(s){ return numOf(s.om); }).concat([0.0001]));
+    var maxP  = Math.max.apply(null, pRows.map(function(s){ return numOf(s.p); }).concat([0.0001]));
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Block</th><th class="num">pH</th><th class="num">Organic matter</th><th class="num">Ca:Mg</th><th class="num">Phosphorus</th><th>Microbial</th></tr></thead><tbody>';
+    interp.forEach(function(s){
+      var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'};
+      var om=numOf(s.om), p=numOf(s.p);
+      html += '<tr><td style="min-width:170px;"><b>'+esc(b.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(f.name)+' · '+BB.shortDate(s.date)+'</div></td>'+
+        '<td class="num">'+(s.ph!=null?'<b>'+esc(s.ph)+'</b>':'<span class="faint">—</span>')+'</td>'+
+        '<td class="num">'+(om!=null?'<div class="bar-cell" style="justify-content:flex-end;"><span class="trk" style="max-width:70px;"><i style="width:'+Math.round(om/maxOm*100)+'%"></i></span><span>'+esc(s.om)+'</span></div>':'<span class="faint">—</span>')+'</td>'+
+        '<td class="num">'+esc(s.ca_mg||'—')+'</td>'+
+        '<td class="num">'+(p!=null?'<div class="bar-cell" style="justify-content:flex-end;"><span class="trk" style="max-width:70px;"><i style="width:'+Math.round(p/maxP*100)+'%;background:#2f6f9e;"></i></span><span>'+esc(s.p)+'</span></div>':'<span class="faint">—</span>')+'</td>'+
+        '<td>'+microBadge(s.microbial)+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  } else if(interp.length===1){
+    var s1=interp[0];
+    html += '<div class="card-p"><div class="readings" style="margin:0;">'+
+      '<div class="reading"><div class="rl">pH</div><div class="rv">'+esc(s1.ph)+'</div></div>'+
+      '<div class="reading"><div class="rl">Organic matter</div><div class="rv">'+esc(s1.om)+'</div></div>'+
+      '<div class="reading"><div class="rl">Ca:Mg</div><div class="rv">'+esc(s1.ca_mg)+'</div></div>'+
+      '<div class="reading"><div class="rl">Microbial</div><div class="rv">'+esc(s1.microbial)+'</div></div>'+
+      '<div class="reading"><div class="rl">Phosphorus</div><div class="rv">'+esc(s1.p)+'</div></div>'+
+    '</div><div class="faint" style="font-size:.78rem;margin-top:10px;">One interpreted sample in view — '+BB.date(s1.date)+'. Readings compare here once there are two.</div></div>';
+  } else {
+    html += '<div class="empty">No interpreted results in view yet. Readings appear here once the lab results are interpreted.</div>';
+  }
+  html += '</div>';
+  html += '<div class="card"><div class="card-h"><div><h3>Where the samples are</h3><div class="sub">'+rows.length+' in view</div></div></div><div class="card-p">'+
+    (rows.length?'<div id="chStatus"></div>':'<div class="empty" style="padding:16px;">No samples yet.</div>')+'</div></div>';
+  html += '</div>';
+
+  // The work: the sample queue beside the log form
+  html += '<div class="split" style="margin-top:16px;align-items:start;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Samples</h3><div class="sub">newest first · tap a row for the full result</div></div>'+
+    '<div class="row" style="gap:6px;">';
   ['All','New','Awaiting lab','Interpreted'].forEach(function(st){
     var n = st==='All'?rows.length:rows.filter(function(s){ return s.status===st; }).length;
     html += '<button class="chip'+(filter===st?' on':'')+'" data-f="'+esc(st)+'">'+esc(st)+' <span style="opacity:.7;">'+n+'</span></button>';
   });
-  html += '</div>';
+  html += '</div></div>';
 
-  html += '<div class="card" style="margin-top:6px;"><div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Date</th><th>Farmer / block</th><th>pH</th><th>Ca:Mg</th><th>Microbial</th><th>Status</th></tr></thead><tbody>';
+  html += '<div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Date</th><th>Farmer / block</th><th class="num">pH</th><th class="num">Ca:Mg</th><th>Microbial</th><th>Status</th></tr></thead><tbody>';
 
   if(!shown.length){
-    html += '<tr><td colspan="6"><div class="empty"><div class="big">🧪</div>No soil samples here yet.</div></td></tr>';
+    html += '<tr><td colspan="6"><div class="empty"><div class="big">'+BB.icon('flask')+'</div>No soil samples here yet.</div></td></tr>';
   }
 
   shown.forEach(function(s){
     var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'};
     var isInterp = s.status==='Interpreted';
-    html += '<tr class="click" data-id="'+esc(s.id)+'">'+
-      '<td>'+BB.date(s.date)+'</td>'+
-      '<td><b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div></td>'+
-      '<td>'+(isInterp?esc(s.ph):'<span class="faint">—</span>')+'</td>'+
-      '<td>'+(isInterp?esc(s.ca_mg):'<span class="faint">—</span>')+'</td>'+
-      '<td>'+(isInterp?esc(s.microbial):'<span class="faint">—</span>')+'</td>'+
+    html += '<tr class="click'+(openId===s.id?' open':'')+'" data-id="'+esc(s.id)+'">'+
+      '<td style="white-space:nowrap;">'+BB.date(s.date)+'</td>'+
+      '<td style="min-width:150px;"><b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div></td>'+
+      '<td class="num">'+(isInterp?esc(s.ph):'<span class="faint">—</span>')+'</td>'+
+      '<td class="num">'+(isInterp?esc(s.ca_mg):'<span class="faint">—</span>')+'</td>'+
+      '<td>'+(isInterp?microBadge(s.microbial):'<span class="faint">—</span>')+'</td>'+
       '<td>'+BB.statusBadge(s.status)+'</td>'+
     '</tr>';
     if(openId===s.id){
-      html += '<tr><td colspan="6" style="padding:0 12px 12px;">'+detailPanel(s)+'</td></tr>';
+      html += '<tr class="detail-row"><td colspan="6">'+detailPanel(s)+'</td></tr>';
     }
   });
 
   html += '</tbody></table></div></div>';
 
   html += logForm();
+  html += '</div>';
   html += '<div style="height:20px;"></div>';
 
   document.getElementById('soilMain').innerHTML=html;
   bind();
+
+  // status split — counted from the rows in view
+  try{
+    if(rows.length){
+      var ST=[['New','#7d4f9a'],['Awaiting lab','#c77d17'],['Interpreted','#3f6b28']];
+      var stRows = ST.map(function(x){ return { label:x[0], value:rows.filter(function(s){ return s.status===x[0]; }).length, color:x[1] }; });
+      var other = rows.filter(function(s){ return ST.every(function(x){ return x[0]!==s.status; }); }).length;
+      if(other) stRows.push({ label:'Other', value:other, color:'#6b7a5e' });
+      BB.chart.donut('#chStatus', { rows:stRows, centreLabel:'samples' });
+    }
+  }catch(e){ console.warn('chart', e); }
 }
 
 function bind(){

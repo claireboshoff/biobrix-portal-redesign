@@ -7,21 +7,55 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Finance · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+  .fin-row{margin-top:16px;}
+  .fin-rec{display:grid;gap:16px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start;}
+  @media(max-width:1100px){.fin-rec{grid-template-columns:minmax(0,1fr);}}
+  .sync{display:flex;gap:16px;align-items:flex-start;}
+  .sync .logo{width:46px;height:46px;border-radius:12px;background:#0b3d2e;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.74rem;letter-spacing:.6px;flex:none;}
+  .sync .what{font-size:.84rem;color:var(--muted);line-height:1.5;}
+  .sync-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin-top:14px;font-size:.82rem;}
+  .sync-facts dt{color:var(--faint);}
+  .sync-facts dd{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+  .sync-ledger{margin-top:14px;padding:10px 12px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line-soft);font-size:.8rem;color:var(--muted);line-height:1.5;}
+  .sync-ledger b{color:var(--green-darkest);}
+  .sync-err{margin-top:10px;display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--red);line-height:1.45;}
+  .sync-err .ico{width:15px;height:15px;margin-top:1px;}
+  .gap-pos{color:var(--amber);font-weight:700;}
+  .gap-zero{color:var(--ok);font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+  .gap-zero .ico{width:14px;height:14px;}
+  .rep-dot{display:inline-flex;align-items:center;gap:8px;font-weight:600;white-space:nowrap;}
+  .rep-dot i{width:9px;height:9px;border-radius:50%;flex:none;}
+  .inv-ref{font-weight:600;color:var(--green-darkest);}
+  .sub-line{font-size:.72rem;color:var(--faint);margin-top:1px;}
+  .od{font-size:.72rem;color:var(--red);font-weight:600;margin-top:1px;}
+  .kind-tag{display:inline-block;margin-left:6px;padding:0 7px;border-radius:999px;font-size:.64rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;background:var(--line-soft);color:var(--muted);vertical-align:middle;}
+  table.bb td.desc{max-width:280px;min-width:170px;color:var(--muted);}
+  .ob-list{display:flex;flex-direction:column;}
+  .draft{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:12px 20px;border-top:1px solid var(--line-soft);border-left:3px solid var(--amber);background:#fffdf7;}
+  .draft.sent{border-left-color:var(--ok);background:#fff;}
+  .draft .subj{font-weight:600;font-size:.88rem;line-height:1.4;margin-top:4px;}
+  .draft .meta{font-size:.74rem;color:var(--faint);margin-top:3px;}
+  .ob-note{padding:12px 20px;font-size:.8rem;color:var(--muted);background:var(--panel-2);}
+  .scroll.tall tfoot td{position:sticky;bottom:0;z-index:1;}
+  .chart-empty{padding:28px 10px;text-align:center;color:var(--faint);font-size:.84rem;}
+  @media(max-width:560px){
+    .sync{flex-direction:column;}
+    .draft{flex-direction:column;padding:12px 14px;}
+    .ob-note{padding:12px 14px;}
+  }
+</style>
 </head>
 <body>
 <script>
 BB.renderHeader({ active:'finance', back:'index.html' });
 var d = BB.data, u = BB.user;
-var css=''+
-'.sync{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}'+
-'.sync .logo{width:46px;height:46px;border-radius:12px;background:#0b3d2e;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.8rem;letter-spacing:.5px;}'+
-'.gap-pos{color:var(--amber);font-weight:700;} .gap-zero{color:var(--ok);font-weight:700;}'+
-'.draft{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:11px;padding:12px 14px;margin-bottom:10px;background:#fffdf7;}'+
-'.draft.sent{border-left-color:var(--ok);background:#fff;}';
-document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+// The last six calendar months, oldest first — the same window the home page charts.
+var MONTHS6 = (function(){ var out=[], t=new Date(); t.setDate(1); for(var k=5;k>=0;k--){ var x=new Date(t.getFullYear(), t.getMonth()-k, 1); out.push({ ym:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'), l:BB.monthName(x.getMonth()) }); } return out; })();
 
 function render(){
   var invs=d.all('invoices'), orders=d.all('orders'), outbox=d.all('outbox'), sync=d.all('syncLog')[0];
@@ -31,91 +65,192 @@ function render(){
   var billed=invs.reduce(function(s,i){return s+(i.amount||0);},0);
   var owing=invs.reduce(function(s,i){return s+open_(i);},0);
   var paid=billed-owing;
-  var overdue=invs.filter(function(i){return i.status==='Overdue';}).reduce(function(s,i){return s+open_(i);},0);
+  var overdueInvs=invs.filter(function(i){return i.status==='Overdue';});
+  var overdue=overdueInvs.reduce(function(s,i){return s+open_(i);},0);
+  var openCount=invs.filter(function(i){ return open_(i)>0.5; }).length;
   // The customers' own ledger balances — the figure finance sees in the accounting system.
   var ledger=null;
   if(BB.auth.live){ var fs=d.allUnscoped('farmers').filter(function(f){return f.sageBalance!=null;});
     if(fs.length) ledger=fs.reduce(function(s,f){return s+(f.sageBalance||0);},0); }
+
+  // Money received. Live: the payments read from the ledger. Demo: the paid date on each invoice.
+  var pays=d.all('payments')||[];
+  var paySrc = pays.length ? pays : invs.filter(function(i){ return i.paidDate; }).map(function(i){ return { date:i.paidDate, amount:i.amount||0 }; });
+  var sumMonth = function(list, key, ym){ return list.filter(function(x){ return String(x[key]||'').slice(0,7)===ym; }).reduce(function(t,x){ return t+(x.amount||0); },0); };
+  var invByM = MONTHS6.map(function(m){ return sumMonth(invs,'date',m.ym); });
+  var payByM = MONTHS6.map(function(m){ return sumMonth(paySrc,'date',m.ym); });
+  var thisYm = MONTHS6[5].ym;
+  var recvMonth = payByM[5], recvCount = paySrc.filter(function(x){ return String(x.date||'').slice(0,7)===thisYm; }).length;
+
+  // Ageing: open money by days past its due date.
+  var t0=new Date(new Date().toISOString().slice(0,10));
+  var daysOver=function(i){ return i.dueDate ? Math.round((t0-new Date(i.dueDate))/86400000) : 0; };
+  var ageB=[{label:'Current',value:0,color:'#3f6b28'},{label:'1–30 days',value:0,color:'#8fbf5a'},{label:'31–60 days',value:0,color:'#c77d17'},{label:'61–90 days',value:0,color:'#a3533f'},{label:'90+ days',value:0,color:'#b8382a'}];
+  invs.forEach(function(i){ var v=open_(i); if(v<=0.5) return; var dd=daysOver(i); ageB[dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4].value+=v; });
+
+  // Who is over their credit limit (the ledger balance when Sage is connected, open invoices otherwise).
+  var overL=d.all('farmers').filter(function(f){ return d.overLimit(f.id,0); });
+  var overAmt=overL.reduce(function(t,f){ return t+(d.accountBalance(f.id)-d.creditLimit(f.id)); },0);
+
+  // Top debtors: open money per customer, split into overdue and not yet due.
+  var byCust={};
+  invs.forEach(function(i){ var v=open_(i); if(v<=0.5) return; var k=i.farmer||'_none';
+    var r=byCust[k]||(byCust[k]={ id:i.farmer, od:0, nd:0, n:0 }); r.n++; if(i.status==='Overdue') r.od+=v; else r.nd+=v; });
+  var debtors=Object.keys(byCust).map(function(k){ return byCust[k]; }).sort(function(a,b){ return (b.od+b.nd)-(a.od+a.nd); });
+  var canFarm = BB.auth.canPage('farm-detail.html');
+
   var html='';
-  html+='<div class="page-head"><h1>Finance &amp; reconciliation</h1><p>What the reps report, what was actually invoiced, what has been paid — and the accounting system mirrored alongside, so nobody types a number twice.</p></div>';
-  html+='<div class="grid g4">'+
-    '<div class="stat"><div class="l">Invoiced this season</div><div class="v">'+BB.money(billed)+'</div><div class="s">'+invs.length+' invoices</div></div>'+
-    '<div class="stat"><div class="l">Paid</div><div class="v" style="color:var(--ok);">'+BB.money(paid)+'</div><div class="s">received</div></div>'+
-    '<div class="stat'+(owing?' warn':'')+'"><div class="l">Outstanding</div><div class="v">'+BB.money(owing)+'</div><div class="s">not yet paid</div></div>'+
-    '<div class="stat'+(overdue?' bad':'')+'"><div class="l">Overdue</div><div class="v">'+BB.money(overdue)+'</div><div class="s">deliveries on hold</div></div>'+
+  html+='<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Finance</div><h1>Finance &amp; reconciliation</h1>'+
+    '<p>What the reps report, what was actually invoiced, what has been paid — with the accounting system mirrored alongside, so nobody types a number twice.</p></div>'+
+    '<div class="row" style="gap:8px;">'+
+      '<a class="btn ghost" href="#outbox">'+BB.icon('message')+'Outbox'+(outbox.filter(function(x){return x.status==='Draft';}).length?' <span class="badge b-warn">'+outbox.filter(function(x){return x.status==='Draft';}).length+'</span>':'')+'</a>'+
+      '<button class="btn" id="syncNow">'+BB.icon('refresh')+'Sync now</button>'+
+    '</div></div>';
+  html+=BB.staleNote();
+
+  // ---- KPI strip ----
+  var tile=function(href, cls, label, value, sub, spark){
+    var inner='<div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+'</div>'+(spark?'<div class="spark">'+spark+'</div>':'');
+    if(href && BB.auth.canPage(href)) return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'">'+inner+'</a>';
+    return '<div class="stat'+(cls?' '+cls:'')+'">'+inner+'</div>';
+  };
+  html+='<div class="grid g4" style="margin-top:14px;">'+
+    tile('finance.html?show=open#invoices', '', 'Owed to you', BB.money(owing), openCount+' invoice'+(openCount===1?'':'s')+' open · '+BB.money(billed)+' invoiced')+
+    tile('finance.html?show=overdue#invoices', overdue?'bad':'', 'Overdue', BB.money(overdue), overdueInvs.length+' invoice'+(overdueInvs.length===1?'':'s')+' past due · deliveries on hold')+
+    tile('', '', 'Received this month', BB.money(recvMonth), recvCount+' receipt'+(recvCount===1?'':'s')+' · '+BB.money(paid)+' paid in all', BB.chart.spark(payByM,{color:'#68a53e'}))+
+    tile('farms.html?show=overlimit', overL.length?'warn':'', 'Over their limit', overL.length, overL.length? BB.money(overAmt)+' over in total' : 'every account inside its limit')+
   '</div>';
 
-  // ---- accounting mirror (Sage 200 Evolution) ----
-  html+=BB.staleNote();
-  html+='<div class="sec"><h2>Accounting system</h2><span class="ln"></span><span class="cnt">read-only mirror · you keep invoicing where you do today</span></div>';
-  html+='<div class="card card-p"><div class="sync">'+
-    '<div class="logo">SAGE</div>'+
-    '<div style="flex:1;min-width:220px;"><b style="font-family:var(--display);color:var(--green-dark);">'+BB.esc(sync?sync.system:'Sage 200 Evolution')+'</b> '+BB.statusBadge(sync?sync.status:'Design')+
-      '<div class="muted" style="font-size:.84rem;margin-top:3px;">Pulls <b>'+BB.esc(sync?sync.pulled:'')+'</b> into this portal three times a day. Nothing is written back into Sage — invoices are still raised there until you decide to move invoicing into the portal.</div>'+
-      '<div class="faint" style="font-size:.76rem;margin-top:4px;">Last sync '+BB.esc(sync?sync.last:'—')+' · next '+BB.esc(sync?sync.next:'—')+(sync&&sync.counts?' · '+sync.counts.customers+' customers · '+sync.counts.invoices+' invoices':'')+'</div>'+
-      (ledger!=null?'<div style="font-size:.82rem;margin-top:6px;"><b>Customer balances in Sage: '+BB.money(ledger)+'</b> <span class="faint">— what the accounts show right now. The Outstanding tile above is what is open on individual invoices; the difference is credits not yet allocated to an invoice.</span></div>':'')+
-      (sync&&sync.lastError?'<div style="font-size:.78rem;margin-top:4px;color:var(--bad,#b3261e);">Last attempt failed '+BB.esc((sync.lastError.at||'').slice(0,16).replace('T',' '))+' — the team has it; figures shown are from the last good sync.</div>':'')+'</div>'+
-    '<div class="row" style="gap:8px;"><button class="btn sm" id="syncNow">↻ Sync now</button>'+(BB.auth.live?'':'<a class="btn ghost sm" href="jobs.html">Which Evolution version? ›</a>')+'</div>'+
-  '</div></div>';
+  // ---- The picture: money in and out, and how old the open money is ----
+  html+='<div class="split fin-row">'+
+    '<div class="card"><div class="card-h"><div><h3>Invoiced vs received</h3><div class="sub">last six months'+(pays.length?' · invoices and payments from your accounting system':' · invoice date vs paid date')+'</div></div>'+BB.liveChip()+'</div><div class="card-p"><div id="chTrend"></div></div></div>'+
+    '<div class="card"><div class="card-h"><div><h3>What is owed, by age</h3><div class="sub">open invoices · days past due</div></div></div><div class="card-p"><div id="chAge"></div></div></div>'+
+  '</div>';
 
-  // ---- reported vs actual per rep ----
+  // ---- Top debtors beside the accounting system ----
+  html+='<div class="split fin-row">';
+  html+='<div class="card"><div class="card-h"><div><h3>Top debtors</h3><div class="sub">open money per customer · overdue first in each bar</div></div><span class="badge b-grey">'+debtors.length+' owing</span></div><div class="card-p"><div id="chDebtors"></div></div></div>';
+
+  html+='<div class="card"><div class="card-h"><div><h3>Accounting system</h3><div class="sub">read-only mirror · you keep invoicing where you do today</div></div>'+BB.statusBadge(sync?sync.status:'Design')+'</div>'+
+    '<div class="card-p"><div class="sync"><div class="logo">SAGE</div><div style="min-width:0;">'+
+      '<b style="font-family:var(--display);color:var(--green-darkest);">'+BB.esc(sync?sync.system:'Sage 200 Evolution')+'</b>'+
+      '<div class="what" style="margin-top:3px;">Pulls <b>'+BB.esc(sync?sync.pulled:'')+'</b> into this portal three times a day. Nothing is written back into Sage — invoices are still raised there until you decide to move invoicing into the portal.</div>'+
+    '</div></div>'+
+    '<dl class="sync-facts"><dt>Last sync</dt><dd>'+BB.esc(sync?sync.last:'—')+'</dd><dt>Next</dt><dd>'+BB.esc(sync?sync.next:'—')+'</dd>'+
+      (sync&&sync.counts?'<dt>Read</dt><dd>'+BB.esc(sync.counts.customers)+' customers · '+BB.esc(sync.counts.invoices)+' invoices</dd>':'')+'</dl>'+
+    (ledger!=null?'<div class="sync-ledger"><b>Customer balances in Sage: '+BB.money(ledger)+'</b> — what the accounts show right now. "Owed to you" above is what is open on individual invoices; the difference is credits not yet allocated to an invoice.</div>':'')+
+    (sync&&sync.lastError?'<div class="sync-err">'+BB.icon('alert')+'<span>Last attempt failed '+BB.esc((sync.lastError.at||'').slice(0,16).replace('T',' '))+' — the team has it; figures shown are from the last good sync.</span></div>':'')+
+    '</div>'+
+    (BB.auth.live?'':'<div class="card-f"><a href="jobs.html" style="color:var(--green-dark);font-weight:600;">Which Evolution version do you run? ›</a></div>')+
+  '</div>';
+  html+='</div>';
+
+  // ---- invoices ----
+  var show=(new URLSearchParams(location.search).get('show')||'all').toLowerCase();
+  var shown=invs.filter(function(i){ return show==='open'? i.status!=='Paid' : show==='overdue'? i.status==='Overdue' : true; });
+  var shownSorted=shown.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var listed=shownSorted.slice(0,300);
+  var totAmt=shown.reduce(function(t,i){ return t+(i.amount||0); },0), totOpen=shown.reduce(function(t,i){ return t+open_(i); },0);
+  html+='<div class="card fin-row" id="invoices"><div class="card-h"><div><h3>Invoices '+BB.liveChip()+'</h3><div class="sub">'+shown.length+' of '+invs.length+' · from your accounting system</div></div>'+
+    '<div class="seg" role="tablist" aria-label="Filter invoices">'+
+      ['all|All','open|Still open','overdue|Overdue'].map(function(o){ var k=o.split('|')[0], t=o.split('|')[1];
+        return '<a class="'+(show===k?'on':'')+'" href="finance.html?show='+k+'#invoices">'+t+'</a>'; }).join('')+
+    '</div></div>';
+  html+='<div class="scroll tall"><table class="bb"><thead><tr><th>Invoice</th><th>Customer</th><th>For</th><th>Due</th><th class="num">Amount</th><th class="num">Outstanding</th><th>Status</th><th></th></tr></thead><tbody>';
+  if(!listed.length) html+='<tr><td colspan="8"><div class="empty">No invoices '+(show==='overdue'?'overdue':show==='open'?'still open':'yet')+'.</div></td></tr>';
+  listed.forEach(function(i){
+    var f=d.farmer(i.farmer); var hasDraft=outbox.some(function(x){return x.invoice===i.id && x.status==='Draft';});
+    var op=open_(i), dd=daysOver(i);
+    html+='<tr><td><span class="inv-ref">'+BB.esc(i.label||i.ref)+'</span>'+(i.kind&&i.kind!=='invoice'?'<span class="kind-tag">'+(i.kind==='opening'?'brought forward':'journal')+'</span>':'')+'<div class="sub-line">'+BB.date(i.date)+'</div></td>'+
+      '<td>'+BB.esc(f.name)+(f.farm&&f.farm!==f.name?'<div class="sub-line">'+BB.esc(f.farm)+'</div>':'')+'</td>'+
+      '<td class="desc">'+BB.esc(i.description||'')+'</td>'+
+      '<td style="white-space:nowrap;">'+BB.date(i.dueDate)+(op>0.5&&dd>0?'<div class="od">'+dd+' day'+(dd===1?'':'s')+' over</div>':'')+'</td>'+
+      '<td class="num">'+BB.money(i.amount)+'</td>'+
+      '<td class="num">'+(op>0.5?'<b>'+BB.money(op)+'</b>':'<span class="faint">—</span>')+'</td>'+
+      '<td>'+BB.statusBadge(i.status)+'</td>'+
+      '<td class="right" style="white-space:nowrap;">'+(i.status==='Paid'?'':(hasDraft?'<span class="badge b-warn">Reminder drafted</span>':'<button class="btn ghost sm" data-remind="'+i.id+'">Draft reminder</button>'))+'</td></tr>';
+  });
+  html+='</tbody>';
+  if(listed.length) html+='<tfoot><tr><td colspan="4">Total · '+shown.length+' invoice'+(shown.length===1?'':'s')+'</td><td class="num">'+BB.money(totAmt)+'</td><td class="num">'+BB.money(totOpen)+'</td><td colspan="2"></td></tr></tfoot>';
+  html+='</table></div>';
+  if(shown.length>listed.length) html+='<div class="card-f">Showing the latest '+listed.length+' of '+shown.length+'. The totals count all '+shown.length+'.</div>';
+  html+='</div>';
+
+  // ---- reported vs actual per rep (beside the outbox) ----
   var reps=d.all('reps');
   // This reconciliation compares orders captured in the portal against invoices. BioBrix capture
   // their orders in Sage, so on a live client seat there is nothing on the portal side to compare
   // and the whole section stands down rather than showing an empty table under a sample warning.
   var liveSeat = !!(BB.auth && BB.auth.tenantLive && BB.auth.tenantLive() && !(BB.auth.isFreedomHub && BB.auth.isFreedomHub()));
   var repRowsAny = reps.some(function(r){ return orders.some(function(o){ return o.rep===r.id && (o.status==='Delivered'||o.status==='Confirmed'); }); });
-  if(!(liveSeat && !repRowsAny)){
-  html+='<div class="sec"><h2>Reported vs actual</h2><span class="ln"></span><span class="cnt">rep counts delivered as a sale · finance counts invoiced</span></div>';
-  if(BB.sageLive() && !liveSeat) html+=BB.sampleNote('what the reps reported')+'';
-  html+='<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Rep</th><th class="right">Reported (delivered + confirmed)</th><th class="right">Invoiced (actual)</th><th class="right">Gap</th><th></th></tr></thead><tbody>';
-  reps.forEach(function(r){
-    var ro=orders.filter(function(o){return o.rep===r.id && (o.status==='Delivered'||o.status==='Confirmed');});
-    var reported=ro.reduce(function(s,o){return s+d.quoteTotal(o);},0);
-    var actual=ro.filter(function(o){return d.orderInvoiced(o.id);}).reduce(function(s,o){return s+d.quoteTotal(o);},0);
-    var gap=reported-actual; var un=ro.filter(function(o){return !d.orderInvoiced(o.id);});
-    if(!ro.length) return;
-    html+='<tr><td><span class="chip" style="background:'+r.colour+'22;border-color:'+r.colour+';color:'+r.colour+';">'+BB.esc(r.name)+'</span></td><td class="right">'+BB.money(reported)+'</td><td class="right">'+BB.money(actual)+'</td><td class="right '+(gap?'gap-pos':'gap-zero')+'">'+(gap?BB.money(gap):'✓ reconciled')+'</td>'+
-      '<td class="right">'+(un.length?'<button class="btn sm" data-invall="'+r.id+'">Invoice '+un.length+' order'+(un.length>1?'s':'')+'</button>':'')+'</td></tr>';
-  });
-  html+='</tbody></table></div></div>';
-  html+='<div class="pline faint" style="font-size:.78rem;margin-top:8px;">A gap means a rep is counting product that went out but was never invoiced. Invoice it here and the actuals catch up — the forecast page updates the same second.</div>';
+  var showRec = !(liveSeat && !repRowsAny);
+  if(showRec && BB.sageLive() && !liveSeat) html+=BB.sampleNote('what the reps reported');
+  html+=showRec ? '<div class="fin-rec fin-row">' : '';
+  if(showRec){
+    var tRep=0, tAct=0;
+    html+='<div class="card"><div class="card-h"><div><h3>Reported vs actual</h3><div class="sub">rep counts delivered as a sale · finance counts invoiced</div></div></div>';
+    html+='<div class="scroll"><table class="bb"><thead><tr><th>Rep</th><th class="num">Reported</th><th class="num">Invoiced</th><th class="num">Gap</th><th></th></tr></thead><tbody>';
+    reps.forEach(function(r){
+      var ro=orders.filter(function(o){return o.rep===r.id && (o.status==='Delivered'||o.status==='Confirmed');});
+      var reported=ro.reduce(function(s,o){return s+d.quoteTotal(o);},0);
+      var actual=ro.filter(function(o){return d.orderInvoiced(o.id);}).reduce(function(s,o){return s+d.quoteTotal(o);},0);
+      var gap=reported-actual; var un=ro.filter(function(o){return !d.orderInvoiced(o.id);});
+      if(!ro.length) return;
+      tRep+=reported; tAct+=actual;
+      html+='<tr><td><span class="rep-dot"><i style="background:'+BB.esc(r.colour)+';"></i>'+BB.esc(r.name)+'</span></td><td class="num">'+BB.money(reported)+'</td><td class="num">'+BB.money(actual)+'</td>'+
+        '<td class="num">'+(gap?'<span class="gap-pos">'+BB.money(gap)+'</span>':'<span class="gap-zero">'+BB.icon('check')+'Reconciled</span>')+'</td>'+
+        '<td class="right">'+(un.length?'<button class="btn sm" data-invall="'+r.id+'">Invoice '+un.length+' order'+(un.length>1?'s':'')+'</button>':'')+'</td></tr>';
+    });
+    html+='</tbody><tfoot><tr><td>Total</td><td class="num">'+BB.money(tRep)+'</td><td class="num">'+BB.money(tAct)+'</td><td class="num">'+(tRep-tAct?'<span class="gap-pos">'+BB.money(tRep-tAct)+'</span>':'—')+'</td><td></td></tr></tfoot></table></div>';
+    html+='<div class="card-f">Reported is delivered + confirmed orders. A gap means a rep is counting product that went out but was never invoiced. Invoice it here and the actuals catch up — the forecast page updates the same second.</div></div>';
   }
 
-  // ---- invoices ----
-  var show=(new URLSearchParams(location.search).get('show')||'all').toLowerCase();
-  var shown=invs.filter(function(i){ return show==='open'? i.status!=='Paid' : show==='overdue'? i.status==='Overdue' : true; });
-  html+='<div class="sec" id="invoices"><h2>Invoices</h2><span class="ln"></span><span class="cnt">'+shown.length+' of '+invs.length+' · from your accounting system</span>'+BB.liveChip()+'</div>';
-  html+='<div class="row" style="gap:8px;margin:0 0 10px;">'+
-    ['all|All','open|Still open','overdue|Overdue'].map(function(o){ var k=o.split('|')[0], t=o.split('|')[1];
-      return '<a class="btn sm'+(show===k?'':' ghost')+'" href="finance.html?show='+k+'#invoices">'+t+'</a>'; }).join('')+'</div>';
-  html+='<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Invoice</th><th>Farmer</th><th>For</th><th>Due</th><th class="right">Amount</th><th>Status</th><th></th></tr></thead><tbody>';
-  shown.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).slice(0,300).forEach(function(i){
-    var f=d.farmer(i.farmer); var hasDraft=outbox.some(function(x){return x.invoice===i.id && x.status==='Draft';});
-    html+='<tr><td><b>'+BB.esc(i.label||i.ref)+'</b>'+(i.kind&&i.kind!=='invoice'?'<span class="chip-sample" style="border-style:solid;background:var(--line-soft);border-color:var(--line);color:var(--muted);">'+(i.kind==='opening'?'brought forward':'journal')+'</span>':'')+'<div class="faint" style="font-size:.72rem;">'+BB.date(i.date)+'</div></td><td>'+BB.esc(f.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(f.farm)+'</div></td><td style="max-width:260px;">'+BB.esc(i.description||'')+'</td><td>'+BB.date(i.dueDate)+'</td><td class="right">'+BB.money(i.amount)+'</td><td>'+BB.statusBadge(i.status)+'</td>'+
-      '<td class="right">'+(i.status==='Paid'?'':(hasDraft?'<span class="badge b-warn">Reminder drafted</span>':'<button class="btn ghost sm" data-remind="'+i.id+'">Draft reminder</button>'))+'</td></tr>';
-  });
-  html+='</tbody></table></div></div>';
-
   // ---- outbox: drafts first, automation later ----
-  html+='<div class="sec"><h2>Outbox</h2><span class="ln"></span><span class="cnt">invoices &amp; reminders wake up as drafts — you check, then send</span></div>';
-  html+='<div class="card card-p">';
-  html+='<div class="row between" style="margin-bottom:12px;"><div class="muted" style="font-size:.84rem;">Automation is <b>off</b> — every message lands here first. Once you trust it, switch it on and the reminders go by themselves.</div><span class="chip">Auto-send: off</span></div>';
+  var drafts=outbox.filter(function(x){return x.status==='Draft';}).length;
+  html+='<div class="card'+(showRec?'':' fin-row')+'" id="outbox"><div class="card-h"><div><h3>Outbox</h3><div class="sub">invoices &amp; reminders wake up as drafts — you check, then send</div></div><span class="chip">Auto-send: off</span></div>';
+  html+='<div class="ob-note">Automation is <b>off</b> — every message lands here first. Once you trust it, switch it on and the reminders go by themselves.'+(drafts?' <b>'+drafts+'</b> waiting for you.':'')+'</div>';
   if(!outbox.length) html+='<div class="empty">Nothing waiting.</div>';
+  html+='<div class="ob-list">';
   outbox.slice().sort(function(a,b){return (b.created||'').localeCompare(a.created||'');}).forEach(function(x){
     var f=d.farmer(x.to); var iv=d.by('invoices',x.invoice)||{};
-    html+='<div class="draft'+(x.status==='Sent'?' sent':'')+'"><div class="row between" style="align-items:flex-start;gap:12px;">'+
-      '<div><div class="row" style="gap:8px;"><span class="badge '+(x.kind==='Invoice'?'b-blue':'b-warn')+'">'+BB.esc(x.kind)+'</span><b>'+BB.esc(x.subject)+'</b></div>'+
-      '<div class="faint" style="font-size:.76rem;margin-top:3px;">To '+BB.esc(f.name)+' · '+BB.esc(x.channel)+' · '+BB.date(x.created)+(iv.status?' · invoice '+BB.esc(iv.status).toLowerCase():'')+'</div></div>'+
-      '<div class="row" style="gap:8px;flex:none;">'+BB.statusBadge(x.status)+(x.status==='Draft'?'<button class="btn sm" data-send="'+x.id+'">Check &amp; send</button>':'')+'</div></div></div>';
+    html+='<div class="draft'+(x.status==='Sent'?' sent':'')+'">'+
+      '<div style="min-width:0;"><div class="row" style="gap:6px;"><span class="badge '+(x.kind==='Invoice'?'b-blue':'b-warn')+'">'+BB.esc(x.kind)+'</span>'+BB.statusBadge(x.status)+'</div>'+
+      '<div class="subj">'+BB.esc(x.subject)+'</div>'+
+      '<div class="meta">To '+BB.esc(f.name)+' · '+BB.esc(x.channel)+' · '+BB.date(x.created)+(iv.status?' · invoice '+BB.esc(iv.status).toLowerCase():'')+'</div></div>'+
+      (x.status==='Draft'?'<div style="flex:none;"><button class="btn sm" data-send="'+x.id+'">'+BB.icon('check')+'Check &amp; send</button></div>':'')+
+    '</div>';
   });
-  html+='</div><div style="height:24px;"></div>';
-  var main=document.querySelector('main.wrap'); main.innerHTML=html; wire();
+  html+='</div></div>';
+  html+=showRec ? '</div>' : '';
+  html+='<div style="height:24px;"></div>';
+
+  var main=document.querySelector('main.wrap'); main.innerHTML=html;
+
+  // charts — mounted after the HTML is in the page; a missing figure never stops the page
+  try{
+    if(invByM.some(function(v){return v>0;}) || payByM.some(function(v){return v>0;}))
+      BB.chart.bar('#chTrend',{ labels:MONTHS6.map(function(m){return m.l;}), money:true, height:240, table:true,
+        series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}] });
+    else document.getElementById('chTrend').innerHTML='<div class="chart-empty">Nothing invoiced or received in the last six months.</div>';
+  }catch(e){ console.warn('chart', e); }
+  try{
+    if(ageB.some(function(b){return b.value>0;})) BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed' });
+    else document.getElementById('chAge').innerHTML='<div class="chart-empty">Nothing open. Every invoice is paid.</div>';
+  }catch(e){ console.warn('chart', e); }
+  try{
+    if(debtors.length) BB.chart.hbar('#chDebtors',{ money:true, rows:debtors.slice(0,8).map(function(r){
+        var f=d.farmer(r.id);
+        return { label:f.name||'—', sub:(f.farm&&f.farm!==f.name?f.farm:(r.n+' open')), href:(canFarm&&r.id?'farm-detail.html?farmer='+r.id:null),
+          parts:[{name:'Overdue',value:r.od,color:'#b8382a'},{name:'Not yet overdue',value:r.nd,color:'#3f6b28'}] }; }),
+        legend:[{name:'Overdue',color:'#b8382a'},{name:'Not yet overdue',color:'#3f6b28'}] });
+    else document.getElementById('chDebtors').innerHTML='<div class="chart-empty">Nobody owes anything right now.</div>';
+  }catch(e){ console.warn('chart', e); }
+  wire();
 }
 function nextMonth25(){ var n=new Date(); var y=n.getFullYear(), m=n.getMonth()+1; if(m>11){m=0;y++;} return y+'-'+String(m+1).padStart(2,'0')+'-25'; }
 function wire(){
   var sn=document.getElementById('syncNow'); if(sn) sn.onclick=function(){
-    if(BB.auth.live){ sn.disabled=true; sn.textContent='↻ Fetching…'; d.refreshSage().then(function(ok){ sn.disabled=false; sn.textContent='↻ Sync now'; BB.toast(ok?'Latest Sage figures loaded':'No newer figures yet — Sage is read at 06:00, 12:00 and 17:00'); render(); }); return; }
+    if(BB.auth.live){ sn.disabled=true; sn.innerHTML=BB.icon('refresh')+'Fetching…'; d.refreshSage().then(function(ok){ sn.disabled=false; sn.innerHTML=BB.icon('refresh')+'Sync now'; BB.toast(ok?'Latest Sage figures loaded':'No newer figures yet — Sage is read at 06:00, 12:00 and 17:00'); render(); }); return; }
     var sl=d.all('syncLog')[0]; var now=new Date(); var stamp=now.toISOString().slice(0,10)+' '+now.toTimeString().slice(0,5); if(sl){ d.update('syncLog', sl.id, { last:stamp, status:'Live' }); } BB.toast('Synced · customers, invoices, payments, stock'); render(); };
   document.querySelectorAll('button[data-invall]').forEach(function(b){ b.onclick=function(){
     var rid=this.dataset.invall; var n=0;

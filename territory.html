@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Territory potential · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -30,7 +30,11 @@ var css=''+
 '.map-tools .lbl{font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);margin-right:2px;}'+
 '.map-tools .sp{flex:1;}'+
 '.chip.tog{cursor:pointer;user-select:none;}'+
-'#vmap{height:460px;width:100%;background:#eef2e7;position:relative;z-index:0;}'+
+'#vmap{height:520px;width:100%;background:#eef2e7;position:relative;z-index:0;}'+
+'.t-col{display:grid;gap:16px;align-content:start;}'+
+'.rep{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:.84rem;} .rep i{width:8px;height:8px;border-radius:50%;flex:none;}'+
+'.crop-chip{display:inline-block;font-size:.72rem;padding:2px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);margin:2px 4px 2px 0;white-space:nowrap;color:var(--muted);}'+
+'.map-fallback .ico{width:30px;height:30px;color:var(--green-mid);}'+
 '@media(max-width:700px){#vmap{height:340px;} .map-tools .sp{display:none;}}'+
 '.map-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:11px 14px;font-size:.74rem;color:var(--muted);border-top:1px solid var(--line-soft);}'+
 '.map-legend .k{display:inline-flex;align-items:center;gap:6px;}'+
@@ -38,7 +42,7 @@ var css=''+
 '.map-legend .sq{width:10px;height:10px;border-radius:3px;background:var(--green-darkest);display:inline-block;}'+
 '.map-legend .ring{width:14px;height:14px;border-radius:50%;border:2px solid var(--green-mid);background:rgba(104,165,62,.35);display:inline-block;}'+
 '.map-fallback{padding:34px 20px;text-align:center;color:var(--muted);font-size:.9rem;}'+
-'.map-fallback .big{font-size:2rem;margin-bottom:6px;}'+
+'.map-fallback .big{margin-bottom:6px;}'+
 '.rep-pin{width:34px;height:34px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 3px 10px rgba(20,41,12,.35);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.72rem;color:#fff;letter-spacing:.3px;}'+
 '.rep-pin-wrap{background:none;border:none;}'+
 '.depot-pin{width:22px;height:22px;border-radius:6px;background:var(--green-darkest);border:2px solid #fff;box-shadow:0 2px 8px rgba(20,41,12,.35);display:flex;align-items:center;justify-content:center;color:var(--lime);font-size:.62rem;font-weight:800;}'+
@@ -69,19 +73,20 @@ var totHa = territory.reduce(function(s,t){ return s+(t.ha||0); },0);
 var avgPen = territory.length ? Math.round(territory.reduce(function(s,t){ return s+(t.penetration||0); },0)/territory.length) : 0;
 
 var html='';
-html += '<div class="page-head"><h1>Territory potential</h1><p>The whole country in one view — where the next farmer is, who covers it, and how much is still open.</p></div>';
+html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Territory potential</h1><p>The whole country in one view: where the next farmer is, who covers it, and how much is still open.</p></div>'+
+  '<div class="row" style="gap:8px;"><a class="btn" href="#funnel" id="toFunnel">'+BB.icon('plus')+'Funnel a new farmer</a></div></div>';
 
 // stat tiles
-html += '<div class="grid g4">';
+html += '<div class="grid g4" style="margin-top:16px;">';
 html += '<div class="stat"><div class="l">Total potential</div><div class="v">'+BB.money(totPotential)+'</div><div class="s">addressable, all regions</div></div>';
 html += '<div class="stat"><div class="l">Addressable farms</div><div class="v">'+BB.num(totFarms)+'</div><div class="s">across '+regions.length+' regions</div></div>';
 html += '<div class="stat"><div class="l">Hectares in reach</div><div class="v">'+BB.num(totHa)+'</div><div class="s">total farmed area</div></div>';
 html += '<div class="stat'+(avgPen<25?' warn':'')+'"><div class="l">Avg penetration</div><div class="v">'+avgPen+'%</div><div class="s">room to grow</div></div>';
 html += '</div>';
 
-// ---- vision map (who's where, live) ----
-html += '<div class="sec"><h2>Vision map</h2><span class="ln"></span><span class="cnt">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</span></div>';
-html += '<div class="card map-card">';
+// ---- vision map (who's where, live) beside the region and rep breakdowns ----
+html += '<div class="split" style="margin-top:16px;">';
+html += '<div class="card map-card"><div class="card-h"><div><h3>Vision map</h3><div class="sub">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</div></div></div>';
 html += '<div class="map-tools">'+
   '<div class="grp"><span class="lbl">Show</span>'+
     '<span class="chip tog on" data-layer="territory">Territories</span>'+
@@ -96,47 +101,37 @@ html += '<div class="map-tools">'+
 html += '<div id="vmap"></div>';
 html += '<div class="map-legend">'+
   d.all('reps').map(function(r){ return '<span class="k"><span class="dot" style="background:'+r.colour+';"></span>'+BB.esc(r.name.split(' ')[0])+' · '+BB.esc(r.region)+'</span>'; }).join('')+
-  '<span class="k"><span class="ring"></span>territory — size = potential, fill = penetration</span>'+
+  '<span class="k"><span class="ring"></span>territory: size = potential, fill = penetration</span>'+
   '<span class="k"><span class="sq"></span>depot</span>'+
   '</div>';
 html += '</div>';
+html += '<div class="t-col">'+
+  '<div class="card"><div class="card-h"><div><h3>Potential by region</h3><div class="sub">the dark part is already won, at today\'s penetration</div></div></div><div class="card-p"><div id="chRegion"></div></div></div>'+
+  '<div class="card"><div class="card-h"><div><h3>Who covers it</h3><div class="sub">potential by rep</div></div></div><div class="card-p"><div id="chRep"></div></div></div>'+
+'</div>';
+html += '</div>';
 
-// table by region/town
-html += '<div class="sec"><h2>By region &amp; town</h2><span class="ln"></span><span class="cnt">'+territory.length+' areas</span></div>';
-html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
-  '<th>Region · Town</th><th class="right">Farms</th><th class="right">Hectares</th><th class="right">Potential</th><th>Penetration</th><th>Rep</th></tr></thead><tbody>';
-territory.slice().sort(function(a,b){ return b.potential-a.potential; }).forEach(function(t){
+// table by region/town beside the funnel
+var tRows = territory.slice().sort(function(a,b){ return b.potential-a.potential; });
+html += '<div class="split" style="margin-top:16px;align-items:start;">';
+html += '<div class="card"><div class="card-h"><div><h3>By region &amp; town</h3><div class="sub">'+territory.length+' areas · tap a row to find it on the map</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Region · Town</th><th class="num">Farms</th><th class="num">Hectares</th><th class="num">Potential</th><th>Penetration</th><th>Rep</th></tr></thead><tbody>';
+tRows.forEach(function(t){
   var r=d.rep(t.rep);
   html += '<tr class="click" id="row-'+t.id+'" data-tid="'+t.id+'" title="Show on map">'+
     '<td><b>'+BB.esc(t.town)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(t.region)+' · '+BB.esc(t.crop)+'</div></td>'+
-    '<td class="right">'+t.farms+'</td>'+
-    '<td class="right">'+BB.num(t.ha)+'</td>'+
-    '<td class="right">'+BB.money(t.potential)+'</td>'+
-    '<td><div class="row" style="gap:8px;flex-wrap:nowrap;"><div class="pbar"><i style="width:'+Math.min(100,t.penetration)+'%;"></i></div><span class="faint" style="font-size:.76rem;">'+t.penetration+'%</span></div></td>'+
-    '<td><span class="chip" style="background:'+r.colour+'22;border-color:'+r.colour+';color:'+r.colour+';"><span style="width:8px;height:8px;border-radius:50%;background:'+r.colour+';display:inline-block;"></span>'+BB.esc(r.name)+'</span></td>'+
+    '<td class="num">'+t.farms+'</td>'+
+    '<td class="num">'+BB.num(t.ha)+'</td>'+
+    '<td class="num"><b>'+BB.money(t.potential)+'</b></td>'+
+    '<td><div class="bar-cell" style="min-width:110px;"><div class="trk"><i style="width:'+Math.min(100,t.penetration)+'%;"></i></div><span class="faint" style="font-size:.76rem;">'+t.penetration+'%</span></div></td>'+
+    '<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>'+
   '</tr>';
 });
-html += '</tbody></table></div></div>';
-
-// crop intelligence — hectares by crop & area + the right questions (data-set style prep)
-var cropRows={};
-territory.forEach(function(t){ String(t.crop||'').split('/').forEach(function(c){ c=c.trim(); if(!c) return; var k=c==='Avo'?'Avocado':c==='Mac'?'Macadamia':c==='Cane'?'Sugarcane':c==='Veg'?'Vegetables':c==='Pome'?'Apple':c; cropRows[k]=cropRows[k]||{crop:k, regions:{}, ha:0, potential:0, farms:0}; var share=1/String(t.crop).split('/').length; cropRows[k].ha+=Math.round((t.ha||0)*share); cropRows[k].potential+=Math.round((t.potential||0)*share); cropRows[k].farms+=Math.round((t.farms||0)*share); cropRows[k].regions[t.region]=(cropRows[k].regions[t.region]||0)+Math.round((t.ha||0)*share); }); });
-var cropList=Object.keys(cropRows).map(function(k){return cropRows[k];}).sort(function(a,b){return b.potential-a.potential;});
-html += '<div class="sec"><h2>Crop intelligence</h2><span class="ln"></span><span class="cnt">hectares by crop &amp; area · what to ask before the visit</span></div>';
-html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Crop</th><th>Where</th><th class="right">Hectares in reach</th><th class="right">Farms</th><th class="right">Potential</th><th>Prep</th></tr></thead><tbody>';
-cropList.forEach(function(c){
-  var prep=d.cropPrep(c.crop);
-  html += '<tr><td><b>'+BB.esc(c.crop)+'</b></td><td>'+Object.keys(c.regions).map(function(r){return '<span class="chip" style="margin:2px 2px 2px 0;">'+BB.esc(r)+' · '+BB.num(c.regions[r])+' ha</span>';}).join('')+'</td><td class="right">'+BB.num(c.ha)+'</td><td class="right">'+c.farms+'</td><td class="right">'+BB.money(c.potential)+'</td>'+
-    '<td>'+(prep?'<details><summary style="cursor:pointer;color:var(--green-mid);font-weight:600;font-size:.8rem;">Ask the right questions</summary><div style="font-size:.78rem;margin-top:6px;max-width:420px;"><b>Watch for:</b> '+BB.esc(prep.problems.join(' · '))+'<ol style="margin:6px 0 4px 18px;">'+prep.questions.map(function(q){return '<li>'+BB.esc(q)+'</li>';}).join('')+'</ol><b>BioBrix answer:</b> '+prep.products.map(function(pid){return BB.esc(d.product(pid).name);}).join(', ')+'</div></details>':'<span class="faint" style="font-size:.76rem;">data set to load</span>')+'</td></tr>';
-});
-html += '</tbody></table></div></div>';
-html += '<p class="faint" style="font-size:.76rem;margin-top:8px;">Point us at your data sources (industry hectares, problem maps per area) and this table reads from them instead of the seeded figures.</p>';
+html += '</tbody><tfoot><tr><td>All areas</td><td class="num">'+BB.num(totFarms)+'</td><td class="num">'+BB.num(totHa)+'</td><td class="num">'+BB.money(totPotential)+'</td><td>'+avgPen+'% average</td><td></td></tr></tfoot></table></div></div>';
 
 // funnel a new farmer
-html += '<div class="sec"><h2>Funnel a new farmer</h2><span class="ln"></span></div>';
-html += '<div class="card card-p">';
-html += '<p class="muted" style="font-size:.86rem;margin-bottom:14px;">Enter a lead and see if it is viable and who should service it — before you drive out there.</p>';
-html += '<div class="grid g2">';
+html += '<div class="card" id="funnel"><div class="card-h"><div><h3>Funnel a new farmer</h3><div class="sub">is the lead viable, and who should service it, before you drive out</div></div></div><div class="card-p">';
+html += '<div class="grid g2" style="gap:0 12px;">';
 html += '<div class="fld"><label>Farm / business name</label><input id="pFarm" placeholder="e.g. Bergsig Boerdery"></div>';
 html += '<div class="fld"><label>Farmer name</label><input id="pName" placeholder="e.g. Andre Kruger"></div>';
 html += '<div class="fld"><label>Region</label><select id="pRegion"><option value="">Select region…</option>'+
@@ -145,13 +140,44 @@ html += '<div class="fld"><label>Town</label><input id="pTown" placeholder="e.g.
 html += '<div class="fld"><label>Main crop</label><input id="pCrop" placeholder="e.g. Macadamia"></div>';
 html += '<div class="fld"><label>Hectares</label><input id="pHa" type="number" min="0" placeholder="e.g. 220"></div>';
 html += '</div>';
-html += '<button class="btn" id="check">Check viability</button>';
+html += '<button class="btn" id="check">'+BB.icon('check')+'Check viability</button>';
 html += '<div id="readout"></div>';
+html += '</div></div>';
 html += '</div>';
 
-html += '<div style="height:20px;"></div>';
+// crop intelligence — hectares by crop & area + the right questions (data-set style prep)
+var cropRows={};
+territory.forEach(function(t){ String(t.crop||'').split('/').forEach(function(c){ c=c.trim(); if(!c) return; var k=c==='Avo'?'Avocado':c==='Mac'?'Macadamia':c==='Cane'?'Sugarcane':c==='Veg'?'Vegetables':c==='Pome'?'Apple':c; cropRows[k]=cropRows[k]||{crop:k, regions:{}, ha:0, potential:0, farms:0}; var share=1/String(t.crop).split('/').length; cropRows[k].ha+=Math.round((t.ha||0)*share); cropRows[k].potential+=Math.round((t.potential||0)*share); cropRows[k].farms+=Math.round((t.farms||0)*share); cropRows[k].regions[t.region]=(cropRows[k].regions[t.region]||0)+Math.round((t.ha||0)*share); }); });
+var cropList=Object.keys(cropRows).map(function(k){return cropRows[k];}).sort(function(a,b){return b.potential-a.potential;});
+var maxCropHa = Math.max.apply(null, cropList.map(function(c){ return c.ha; }).concat([1]));
+html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Crop intelligence</h3><div class="sub">hectares by crop &amp; area · what to ask before the visit</div></div><span class="badge b-grey">'+cropList.length+' crops</span></div>';
+html += '<div class="scroll"><table class="bb"><thead><tr><th>Crop</th><th>Where</th><th class="num">Hectares in reach</th><th></th><th class="num">Farms</th><th class="num">Potential</th><th>Prep</th></tr></thead><tbody>';
+cropList.forEach(function(c){
+  var prep=d.cropPrep(c.crop);
+  html += '<tr><td><b>'+BB.esc(c.crop)+'</b></td><td>'+Object.keys(c.regions).map(function(r){return '<span class="crop-chip">'+BB.esc(r)+' · '+BB.num(c.regions[r])+' ha</span>';}).join('')+'</td>'+
+    '<td class="num">'+BB.num(c.ha)+'</td><td><div class="bar-cell" style="min-width:90px;"><div class="trk"><i style="width:'+Math.round(c.ha/maxCropHa*100)+'%;"></i></div></div></td>'+
+    '<td class="num">'+c.farms+'</td><td class="num">'+BB.money(c.potential)+'</td>'+
+    '<td>'+(prep?'<details><summary style="cursor:pointer;color:var(--green-mid);font-weight:600;font-size:.8rem;white-space:nowrap;">Ask the right questions</summary><div style="font-size:.78rem;margin-top:6px;max-width:420px;"><b>Watch for:</b> '+BB.esc(prep.problems.join(' · '))+'<ol style="margin:6px 0 4px 18px;">'+prep.questions.map(function(q){return '<li>'+BB.esc(q)+'</li>';}).join('')+'</ol><b>BioBrix answer:</b> '+prep.products.map(function(pid){return BB.esc(d.product(pid).name);}).join(', ')+'</div></details>':'<span class="faint" style="font-size:.76rem;">data set to load</span>')+'</td></tr>';
+});
+html += '</tbody></table></div>';
+html += '<div class="card-f">Point us at your data sources (industry hectares, problem maps per area) and this table reads from them instead of the seeded figures.</div></div>';
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+
+// ---- breakdown charts: potential by region (won vs open) and by rep ----
+try{
+  var regAgg = regions.map(function(rg){
+    var ts = territory.filter(function(t){ return t.region===rg; });
+    var pot = ts.reduce(function(s2,t){ return s2+(t.potential||0); },0);
+    var won = ts.reduce(function(s2,t){ return s2+(t.potential||0)*Math.min(100,t.penetration||0)/100; },0);
+    return { label:rg, sub:ts.length+' area'+(ts.length===1?'':'s'), value:pot, total:pot, parts:[{name:'Won',value:won,color:'#22431a'},{name:'Still open',value:pot-won,color:'#8fbf5a'}] };
+  }).sort(function(a,b){ return b.value-a.value; });
+  if(regAgg.length) BB.chart.hbar('#chRegion',{ money:true, rows:regAgg, legend:[{name:'Won',color:'#22431a'},{name:'Still open',color:'#8fbf5a'}] });
+  var repAgg = d.all('reps').map(function(r){ return { label:r.name, value:territory.filter(function(t){ return t.rep===r.id; }).reduce(function(s2,t){ return s2+(t.potential||0); },0), color:r.colour }; }).filter(function(x){ return x.value>0; });
+  if(repAgg.length) BB.chart.donut('#chRep',{ money:true, centreLabel:'potential', size:132, rows:repAgg });
+}catch(e){ console.warn('chart', e); }
+var toF = document.getElementById('toFunnel');
+if(toF) toF.onclick=function(e){ e.preventDefault(); var c=document.getElementById('funnel'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(function(){ var f=document.getElementById('pFarm'); if(f) f.focus(); },500); };
 
 // ---- vision map logic ----
 var TOWN = {
@@ -177,7 +203,7 @@ function penBar(p){ return '<div class="row" style="gap:8px;flex-wrap:nowrap;mar
 function buildMap(){
   var el=document.getElementById('vmap'); if(!el) return;
   if(typeof L==='undefined'){
-    el.innerHTML='<div class="map-fallback"><div class="big">🗺</div><b>The map needs signal.</b><br>Every territory, farmer and depot is still listed below — nothing else is affected.</div>';
+    el.innerHTML='<div class="map-fallback"><div class="big">'+BB.icon('map')+'</div><b>The map needs signal.</b><br>Every territory, farmer and depot is still listed below — nothing else is affected.</div>';
     el.style.height='auto'; return;
   }
   var SA=L.latLngBounds([-35.6,15.5],[-21.6,33.6]);
@@ -211,7 +237,7 @@ function buildMap(){
       '<div class="kv"><span>Potential</span><b>'+BB.money(t.potential)+'</b><span>Farms</span><b>'+t.farms+'</b><span>Hectares</span><b>'+BB.num(t.ha)+'</b><span>Covered by</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
       penBar(t.penetration||0)+
       (t.note?'<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(t.note)+'</div>':'')+
-      '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here ›</button></div></div>', {maxWidth:280});
+      '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here</button></div></div>', {maxWidth:280});
     m.on('popupopen', function(){ highlightRow(t.id); });
     m.on('popupclose', function(){ highlightRow(null); });
     layers.territory.addLayer(m); tMarkers[t.id]=m;
@@ -229,7 +255,7 @@ function buildMap(){
     m.bindPopup('<div class="pp"><h4>'+BB.esc(dp.name)+'</h4><div class="sub">'+BB.esc(dp.region)+'</div>'+
       '<div class="kv"><span>Status</span><b>'+BB.esc(dp.status)+'</b><span>Manager</span><b>'+BB.esc(dp.manager)+'</b></div>'+
       '<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(dp.address||'')+'</div>'+
-      '<div class="act"><a href="depots.html">Open depot ›</a><a href="stock.html">Stock ›</a></div></div>');
+      '<div class="act"><a href="depots.html">Open depot</a><a href="stock.html">Stock</a></div></div>');
     layers.depots.addLayer(m);
   });
 
@@ -242,7 +268,7 @@ function buildMap(){
     var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'rep-pin-wrap',html:'<div class="rep-pin" style="background:'+r.colour+';" title="'+BB.esc(r.name)+'">'+initials(r.name)+'</div>',iconSize:[34,34],iconAnchor:[52,52]}) });
     m.bindPopup('<div class="pp"><h4>'+BB.esc(r.name)+'</h4><div class="sub">'+BB.esc(r.role)+' · based '+BB.esc(r.base)+'</div>'+
       '<div class="kv"><span>Covers</span><b>'+BB.esc(r.region)+'</b><span>Areas</span><b>'+mine.length+'</b><span>Farmers</span><b>'+farmers+'</b><span>Potential</span><b>'+BB.money(pot)+'</b><span>Cell</span><b>'+BB.esc(r.cell)+'</b></div>'+
-      '<div class="act"><a href="farms.html">Farms ›</a><a href="forecast.html">Forecast ›</a></div></div>');
+      '<div class="act"><a href="farms.html">Farms</a><a href="forecast.html">Forecast</a></div></div>');
     layers.reps.addLayer(m);
   });
 
@@ -289,7 +315,7 @@ function addFarmerMarker(f){
   var m=L.circleMarker([la,ln],{ pane:'farm', radius:6, color:'#fff', weight:2, fillColor:prospect?'#9aa88f':r.colour, fillOpacity:1, dashArray:prospect?'2,2':null });
   m.bindPopup('<div class="pp"><h4>'+BB.esc(f.farm||f.name)+'</h4><div class="sub">'+BB.esc(f.name)+' · '+BB.esc(f.town||f.region)+'</div>'+
     '<div class="kv"><span>Status</span><b>'+BB.esc(f.status||'')+'</b><span>Crops</span><b>'+BB.esc((f.crops||[]).join(', ')||'—')+'</b><span>Hectares</span><b>'+BB.num(f.ha||0)+'</b><span>Rep</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
-    '<div class="act"><a href="farm-detail.html?farmer='+encodeURIComponent(f.id)+'">Farm file ›</a><a href="voice-order.html">Capture order ›</a></div></div>');
+    '<div class="act"><a href="farm-detail.html?farmer='+encodeURIComponent(f.id)+'">Farm file</a><a href="voice-order.html">Capture order</a></div></div>');
   layers.farmers.addLayer(m);
   return m;
 }
@@ -374,7 +400,7 @@ function addProspect(){
   BB.toast('Prospect added — assigned to '+p.rep.name);
   try{ var nm=addFarmerMarker(rec); if(nm){ MAP.flyTo(nm.getLatLng(), 8, {duration:0.9}); setTimeout(function(){ nm.openPopup(); }, 950); } }catch(e){}
   document.getElementById('readout').innerHTML='<div class="readout"><b>'+BB.esc(rec.name)+'</b> is now a prospect, assigned to <b>'+BB.esc(p.rep.name)+'</b> ('+BB.esc(p.region)+'). '+
-    'They will see it on their farms list. <a href="voice-order.html" style="color:var(--green-mid);font-weight:600;">Capture their first order ›</a></div>';
+    'They will see it on their farms list. <a href="voice-order.html" style="color:var(--green-mid);font-weight:600;">Capture their first order</a></div>';
   lastProspect=null;
 }
 

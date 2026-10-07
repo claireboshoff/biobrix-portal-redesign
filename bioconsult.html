@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioConsult · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -21,10 +21,19 @@ var preFarmer = params.get('farmer') || '';
 var preBlock = params.get('block') || '';
 
 var css=''+
-'.prog{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--green-bright);border-radius:16px;padding:22px;box-shadow:var(--shadow);}'+
-'.line-row{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;}'+
-'@media(max-width:640px){.line-row{grid-template-columns:1fr 1fr;}}'+
-'@media print{.bb-head,.bb-nav,.noprint{display:none!important;}body{padding:0;}}';
+'.prog{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}'+
+'.prog .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:18px 22px;border-bottom:1px solid var(--line-soft);background:var(--panel-2);}'+
+'.prog .pb{padding:18px 22px 6px;}'+
+'.prog .pf{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 22px;border-top:1px solid var(--line-soft);font-size:.76rem;color:var(--faint);}'+
+'.goal{padding:14px 16px;border-left:3px solid var(--green-bright);background:#f7faf1;border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-bottom:6px;}'+
+'.klabel{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}'+
+'.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;}'+
+'.facts .v{font-family:var(--display);font-weight:600;font-size:1.02rem;color:var(--green-darkest);margin-top:2px;}'+
+'.line-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;padding:12px 0;border-top:1px solid var(--line-soft);}'+
+'.line-row:first-child{border-top:0;padding-top:0;}'+
+'@media(max-width:640px){.line-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}.line-row .fld:first-child{grid-column:1/-1;}}'+
+'.tot{font-family:var(--display);font-size:1.7rem;font-weight:600;color:var(--green-darkest);letter-spacing:-.4px;}'+
+'@media print{#bbNav,.bb-top,.bb-nav,.bb-scope,.noprint{display:none!important;}body{padding:0!important;}.split{display:block!important;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 function inMyScope(p){
@@ -34,6 +43,13 @@ function inMyScope(p){
 function progValue(p){ return (p.lines||[]).reduce(function(s,l){ return s+(l.cost||0); },0); }
 
 var state={ view:'list', open:null };
+var chartJobs=[];
+var LEVER_COL={ Biology:'#3f6b28', Chemistry:'#2f6f9e', Physics:'#c77d17' };
+function leverSplit(list){
+  var t={};
+  list.forEach(function(p){ (p.lines||[]).forEach(function(l){ var lv=d.product(l.prod).lever||'Other'; t[lv]=(t[lv]||0)+(l.cost||0); }); });
+  return Object.keys(t).map(function(k){ return { label:k, value:t[k], color:LEVER_COL[k]||'#6b7a5e' }; }).sort(function(a,b){ return b.value-a.value; });
+}
 
 function programmes(){
   return d.all('programs').filter(inMyScope).sort(function(a,b){
@@ -46,42 +62,73 @@ function statRow(){
   var active=list.filter(function(p){ return p.status==='Active'; }).length;
   var drafts=list.filter(function(p){ return p.status==='Draft'; }).length;
   var tot=list.reduce(function(s,p){ return s+progValue(p); },0);
-  return '<div class="grid g3">'+
+  var seen={}, ha=0;
+  list.forEach(function(p){ if(seen[p.block]) return; seen[p.block]=1; var b=d.by('blocks',p.block); ha+=(b&&b.ha)||0; });
+  return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Active programmes</div><div class="v">'+active+'</div><div class="s">running this season</div></div>'+
-    '<div class="stat"><div class="l">Drafts</div><div class="v">'+drafts+'</div><div class="s">awaiting sign-off</div></div>'+
+    '<div class="stat'+(drafts?' warn':'')+'"><div class="l">Drafts</div><div class="v">'+drafts+'</div><div class="s">awaiting sign-off</div></div>'+
     '<div class="stat"><div class="l">Programme value</div><div class="v">'+BB.money(tot)+'</div><div class="s">across all programmes</div></div>'+
+    '<div class="stat"><div class="l">Hectares on a programme</div><div class="v">'+BB.num(ha)+'</div><div class="s">'+Object.keys(seen).length+' block'+(Object.keys(seen).length===1?'':'s')+'</div></div>'+
   '</div>';
 }
 
 function renderList(){
   var list=programmes();
   var html='';
-  html += '<div class="page-head"><h1>BioConsult — recommendations</h1>'+
-    '<p>The interpretation layer. Soil and leaf data become a regenerative programme for the block: the right products, rates and timing, costed for the farmer.</p></div>';
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioServices · BioConsult</div><h1>Programmes &amp; recommendations</h1>'+
+    '<p>Soil and leaf data become a regenerative programme for the block: the right products, rates and timing, costed for the farmer.</p></div>'+
+    '<div class="row"><button class="btn" id="newBtn">'+BB.icon('plus')+'Build a recommendation</button></div></div>';
   html += statRow();
 
-  html += '<div class="row between" style="margin:24px 0 14px;"><div class="sec" style="margin:0;flex:1;"><h2>Programmes</h2><span class="ln"></span><span class="cnt">'+list.length+'</span></div>'+
-    '<button class="btn sm" id="newBtn" style="margin-left:12px;">＋ Build a recommendation</button></div>';
+  var maxV = Math.max.apply(null, list.map(progValue).concat([1]));
+  var totV = list.reduce(function(s,p){ return s+progValue(p); },0);
 
-  html += '<div class="card">';
+  html += '<div class="split" style="margin-top:16px;align-items:start;">';
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Programmes</h3><div class="sub">active first · tap one for the full programme</div></div><span class="badge b-grey">'+list.length+'</span></div>';
   if(!list.length){
-    html += '<div class="empty"><div class="big">📑</div>No programmes yet. Build the first recommendation.</div>';
+    html += '<div class="empty">No programmes yet. Build the first recommendation.</div>';
   } else {
-    html += '<div class="scroll"><table class="bb"><thead><tr><th>Farm · block</th><th>Crop</th><th>Season</th><th>Goal</th><th>Status</th><th class="right">Value</th></tr></thead><tbody>';
+    html += '<div class="scroll'+(list.length>12?' tall':'')+'"><table class="bb"><thead><tr><th>Farm · block</th><th>Crop · season</th><th>Goal</th><th>Status</th><th class="num">Lines</th><th class="num">Value</th></tr></thead><tbody>';
     list.forEach(function(p){
       var f=d.farmer(p.farmer); var b=d.by('blocks',p.block)||{name:'—'};
+      var v=progValue(p);
       html += '<tr class="click" data-open="'+p.id+'">'+
         '<td><b style="color:var(--green-dark);">'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(b.name)+'</div></td>'+
-        '<td class="muted">'+BB.esc(p.crop||'—')+'</td>'+
-        '<td class="muted">'+BB.esc(p.season||'—')+'</td>'+
-        '<td class="faint" style="font-size:.78rem;max-width:220px;">'+BB.esc(p.goal||'—')+'</td>'+
+        '<td class="muted">'+BB.esc(p.crop||'—')+'<div class="faint" style="font-size:.74rem;">'+BB.esc(p.season||'—')+'</div></td>'+
+        '<td style="font-size:.82rem;max-width:240px;">'+BB.esc(p.goal||'—')+'</td>'+
         '<td>'+BB.statusBadge(p.status)+'</td>'+
-        '<td class="right"><b>'+BB.money(progValue(p))+'</b></td>'+
+        '<td class="num muted">'+(p.lines||[]).length+'</td>'+
+        '<td class="num"><div class="bar-cell" style="min-width:150px;"><span class="trk"><i style="width:'+Math.round(v/maxV*100)+'%;'+(p.status==='Active'?'':'background:#b9c4ad;')+'"></i></span><b>'+BB.money(v)+'</b></div></td>'+
       '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody><tfoot><tr><td colspan="5">Total</td><td class="num">'+BB.money(totV)+'</td></tr></tfoot></table></div>';
   }
-  html += '</div><div style="height:24px;"></div>';
+  html += '</div>';
+
+  // which products the programmes lean on, by value
+  var byProd={};
+  list.forEach(function(p){ (p.lines||[]).forEach(function(l){ byProd[l.prod]=(byProd[l.prod]||0)+(l.cost||0); }); });
+  var prodRows=Object.keys(byProd).map(function(k){ var pr=d.product(k); return { label:pr.name, sub:pr.lever||'', value:byProd[k], color:LEVER_COL[pr.lever]||'#3f6b28' }; })
+    .sort(function(a,b){ return b.value-a.value; }).slice(0,8);
+  if(prodRows.length){
+    html += '<div class="card"><div class="card-h"><div><h3>Products recommended</h3><div class="sub">programme value per product</div></div></div><div class="card-p"><div id="chProd"></div></div></div>';
+    chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:prodRows, money:true, legend:[{name:'Biology',color:LEVER_COL.Biology},{name:'Chemistry',color:LEVER_COL.Chemistry},{name:'Physics',color:LEVER_COL.Physics}] }); });
+  }
+  html += '</div>';
+
+  // right: status mix and the three levers
+  var st={}; list.forEach(function(p){ st[p.status]=(st[p.status]||0)+1; });
+  var ST_COL={ Active:'#3f6b28', Draft:'#c77d17' };
+  var stRows=Object.keys(st).map(function(k){ return { label:k, value:st[k], color:ST_COL[k] }; });
+  var lv=leverSplit(list);
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Programme status</h3><div class="sub">number of programmes</div></div></div><div class="card-p">'+(list.length?'<div id="chStatus"></div>':'<div class="empty" style="padding:20px;">Nothing yet.</div>')+'</div></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>The three levers</h3><div class="sub">programme value by lever</div></div></div><div class="card-p">'+(lv.length?'<div id="chLever"></div>':'<div class="empty" style="padding:20px;">Nothing yet.</div>')+'</div></div>';
+  html += '</div></div>';
+  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chStatus',{ rows:stRows, centreLabel:'total', size:136 }); });
+  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lv, money:true, centreLabel:'value', size:136 }); });
   return html;
 }
 
@@ -91,38 +138,50 @@ function renderDetail(id){
   var adv=d.rep(p.advisor);
 
   var html='';
-  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm noprint" id="backList">‹ All programmes</button></div>';
+  html += '<div class="page-head row between noprint" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioConsult · programme</div><h1>'+BB.esc(f.farm)+'</h1>'+
+    '<p>'+BB.esc(b.name)+' · '+BB.esc(p.crop||'')+' · '+BB.esc(p.season||'')+'</p></div>'+
+    '<div class="row"><button class="btn ghost" id="backList">All programmes</button><button class="btn" id="printProg">'+BB.icon('file')+'Print / share with farmer</button></div></div>';
+
+  html += '<div class="split" style="margin-top:14px;align-items:start;">';
   html += '<div class="prog" id="progCard">';
-  html += '<div class="row between" style="align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;">'+
+  html += '<div class="ph">'+
     '<div><div class="eyebrow">BioConsult programme</div>'+
-      '<h1 style="font-family:var(--display);font-size:1.35rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(f.farm)+'</h1>'+
+      '<div style="font-family:var(--display);font-size:1.3rem;font-weight:600;color:var(--green-darkest);">'+BB.esc(f.farm)+'</div>'+
       '<div class="muted" style="font-size:.85rem;">'+BB.esc(f.name)+' · '+BB.esc(b.name)+' · '+BB.esc(p.crop||'')+' · '+BB.esc(p.season||'')+'</div></div>'+
-    '<div style="text-align:right;">'+BB.statusBadge(p.status)+'</div>'+
+    '<div>'+BB.statusBadge(p.status)+'</div>'+
   '</div>';
+  html += '<div class="pb"><div class="goal"><div class="klabel">Programme goal</div><div style="font-size:.98rem;margin-top:3px;">'+BB.esc(p.goal||'—')+'</div></div></div>';
 
-  html += '<div class="card-p" style="background:#f7faf1;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:16px;">'+
-    '<div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);">Programme goal</div>'+
-    '<div style="font-size:.98rem;margin-top:3px;">'+BB.esc(p.goal||'—')+'</div></div>';
-
-  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Rate</th><th>Timing</th><th class="right">Line cost</th></tr></thead><tbody>';
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Rate</th><th>Timing</th><th class="num">Line cost</th></tr></thead><tbody>';
   (p.lines||[]).forEach(function(l){
     var pr=d.product(l.prod);
     html += '<tr>'+
-      '<td><b style="color:var(--green-dark);">'+BB.esc(pr.name)+'</b></td>'+
+      '<td><b style="color:var(--green-dark);">'+BB.esc(pr.name)+'</b>'+(pr.lever?'<div class="faint" style="font-size:.72rem;">'+BB.esc(pr.lever)+'</div>':'')+'</td>'+
       '<td class="muted">'+BB.esc(pr.code)+'</td>'+
       '<td class="muted">'+BB.esc(l.rate||'—')+'</td>'+
       '<td class="muted">'+BB.esc(l.timing||'—')+'</td>'+
-      '<td class="right">'+BB.money(l.cost||0)+'</td>'+
+      '<td class="num">'+BB.money(l.cost||0)+'</td>'+
     '</tr>';
   });
-  html += '</tbody><tfoot><tr><td colspan="4" class="right"><b>Total programme value</b></td><td class="right"><b style="color:var(--green-dark);font-size:1rem;">'+BB.money(progValue(p))+'</b></td></tr></tfoot></table></div>';
+  html += '</tbody><tfoot><tr><td colspan="4">Total programme value</td><td class="num" style="color:var(--green-dark);">'+BB.money(progValue(p))+'</td></tr></tfoot></table></div>';
 
-  html += '<div class="divider"></div><div class="row between"><div class="faint" style="font-size:.76rem;">Prepared by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</div>'+
-    '<div class="faint" style="font-size:.76rem;">BioBrix · The Biological Way</div></div>';
+  html += '<div class="pf"><span>Prepared by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</span><span>BioBrix · The Biological Way</span></div>';
   html += '</div>';
 
-  html += '<div class="row noprint" style="margin-top:14px;"><button class="btn" id="printProg">Print / share with farmer</button></div>';
-  html += '<div style="height:24px;"></div>';
+  // right: the block it is for, and where the money goes
+  var lv=leverSplit([p]);
+  var ha=(b&&b.ha)||0;
+  html += '<div style="display:grid;gap:16px;min-width:0;" class="noprint">';
+  html += '<div class="card"><div class="card-h"><div><h3>The block</h3><div class="sub">'+BB.esc(b.name)+'</div></div></div><div class="card-p"><div class="facts">'+
+    '<div><div class="klabel">Crop</div><div class="v">'+BB.esc(b.crop||p.crop||'—')+'</div></div>'+
+    '<div><div class="klabel">Area</div><div class="v">'+(ha?BB.num(ha)+' ha':'—')+'</div></div>'+
+    '<div><div class="klabel">Planted</div><div class="v">'+BB.esc(b.planted||'—')+'</div></div>'+
+    '<div><div class="klabel">Per hectare</div><div class="v">'+(ha?BB.money(Math.round(progValue(p)/ha)):'—')+'</div></div>'+
+  '</div></div><div class="card-f"><a href="biowatch.html?block='+encodeURIComponent(p.block)+'" style="color:var(--green-dark);font-weight:600;">BioWatch visits on this block ›</a></div></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>Where the money goes</h3><div class="sub">by lever</div></div></div><div class="card-p">'+(lv.length?'<div id="chPLever"></div>':'<div class="empty" style="padding:20px;">No product lines.</div>')+'</div></div>';
+  html += '</div></div>';
+  if(lv.length) chartJobs.push(function(){ BB.chart.donut('#chPLever',{ rows:lv, money:true, centreLabel:'total', size:136 }); });
   return html;
 }
 
@@ -135,9 +194,12 @@ function renderForm(){
   if(!draftLines.length) draftLines=[{prod:products[0].id, rate:'', timing:'', cost:0}];
 
   var html='';
-  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm" id="backList2">‹ All programmes</button></div>';
-  html += '<div class="page-head" style="padding-top:6px;"><h1>Build a recommendation</h1><p>Frame the regenerative programme for a block — the products, rates and timing, costed as you build it.</p></div>';
-  html += '<div class="card card-p">';
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioConsult · new programme</div><h1>Build a recommendation</h1><p>Frame the regenerative programme for a block: the products, rates and timing, costed as you build it.</p></div>'+
+    '<div class="row"><button class="btn ghost" id="backList2">All programmes</button></div></div>';
+  html += '<div class="split" style="margin-top:14px;align-items:start;">';
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Farm and block</h3><div class="sub">who the programme is for</div></div></div><div class="card-p">';
   html += '<div class="grid g2">';
   html += '<div class="fld"><label>Farmer</label><select id="fFarmer">'+
     farmers.map(function(f){ return '<option value="'+f.id+'"'+(f.id===preFarmer?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(f.name)+'</option>'; }).join('')+'</select></div>';
@@ -145,16 +207,21 @@ function renderForm(){
   html += '<div class="fld"><label>Crop</label><input id="fCrop" placeholder="e.g. Macadamia"></div>';
   html += '<div class="fld"><label>Season</label><input id="fSeason" value="2026/27"></div>';
   html += '</div>';
-  html += '<div class="fld"><label>Programme goal</label><textarea id="fGoal" rows="2" placeholder="e.g. Rebuild biology + correct pH"></textarea></div>';
+  html += '<div class="fld" style="margin-bottom:0;"><label>Programme goal</label><textarea id="fGoal" rows="2" placeholder="e.g. Rebuild biology + correct pH"></textarea></div>';
+  html += '</div></div>';
 
-  html += '<div class="sec" style="margin:8px 0 12px;"><h2 style="font-size:.95rem;">Product lines</h2><span class="ln"></span></div>';
-  html += '<p class="faint noprint" style="font-size:.76rem;margin-bottom:10px;">Line cost estimates at the block area × product price. Adjust the rate and timing in your own words.</p>';
+  html += '<div class="card"><div class="card-h"><div><h3>Product lines</h3><div class="sub">line cost estimates at the block area × product price</div></div>'+
+    '<button class="btn ghost sm" id="addLine">'+BB.icon('plus')+'Add product</button></div><div class="card-p">';
   html += '<div id="lines"></div>';
-  html += '<button class="btn ghost sm" id="addLine" style="margin-top:6px;">＋ Add product</button>';
-  html += '<div class="divider"></div>';
-  html += '<div class="row between"><div class="muted" style="font-size:.86rem;">Estimated programme value</div><div id="lineTotal" style="font-family:var(--display);font-size:1.3rem;font-weight:600;color:var(--green-dark);">R0</div></div>';
-  html += '<button class="btn block" id="saveProg" style="margin-top:14px;">Save programme (draft)</button>';
-  html += '</div><div style="height:24px;"></div>';
+  html += '</div></div>';
+  html += '</div>';
+
+  html += '<div class="card" style="position:sticky;top:calc(var(--top) + 16px);"><div class="card-h"><div><h3>Estimated value</h3><div class="sub">updates as you build</div></div></div><div class="card-p">'+
+    '<div id="lineTotal" class="tot">R0</div>'+
+    '<p class="faint" style="font-size:.78rem;margin-top:6px;">Adjust the rate and timing in your own words. It saves as a draft for sign-off.</p>'+
+    '<button class="btn block" id="saveProg" style="margin-top:14px;">'+BB.icon('check')+'Save programme (draft)</button>'+
+  '</div></div>';
+  html += '</div>';
   return html;
 }
 
@@ -188,7 +255,7 @@ function renderLines(){
       '</select></div>'+
       '<div class="fld" style="margin:0;"><label>Rate</label><input class="lRate" value="'+BB.esc(l.rate)+'" placeholder="5 L/ha"></div>'+
       '<div class="fld" style="margin:0;"><label>Timing</label><input class="lTiming" value="'+BB.esc(l.timing)+'" placeholder="Planting rain"></div>'+
-      '<div class="fld" style="margin:0;"><label>&nbsp;</label><button type="button" class="btn ghost sm lDel" title="Remove">✕</button></div>'+
+      '<div class="fld" style="margin:0;"><button type="button" class="btn ghost lDel" title="Remove this line" aria-label="Remove this line">Remove</button></div>'+
     '</div>';
   }).join('');
   wireLines();
@@ -215,10 +282,12 @@ function recost(){
 
 function paint(){
   var html;
+  chartJobs=[];
   if(state.view==='detail') html=renderDetail(state.open);
   else if(state.view==='form') html=renderForm();
   else html=renderList();
   document.querySelector('main.wrap').innerHTML=html;
+  chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
   wire();
 }
 

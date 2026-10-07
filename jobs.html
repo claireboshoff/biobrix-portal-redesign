@@ -7,76 +7,96 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Jobs to FreedomHub · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
 BB.renderHeader({ active:'jobs', back:'index.html' });
 var d = BB.data, u = BB.user;
 var css=''+
-'.band{margin-top:18px;} .band h3{font-size:.66rem;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--faint);margin-bottom:8px;}'+
-'.job{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;margin-bottom:8px;transition:.15s;}'+
-'.job:hover{border-color:var(--green-bright);box-shadow:var(--shadow);} .job.on{border-color:var(--green-dark);box-shadow:var(--shadow-lg);}'+
-'.job .t{font-weight:600;color:var(--green-dark);} .job .m{font-size:.76rem;color:var(--faint);margin-top:2px;}'+
-'.thread{display:flex;flex-direction:column;gap:10px;padding:16px;}'+
+'.jobs-grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);margin-top:16px;align-items:start;}'+
+'@media(min-width:1000px){.jobs-grid{grid-template-columns:380px minmax(0,1fr);}}'+
+'.band-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;background:var(--panel-2);border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}'+
+'.band-h:first-child{border-top:0;}'+
+'.band-h b{font-size:.68rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);}'+
+'.band-h span{font-size:.72rem;color:var(--faint);}'+
+'.job{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:12px 20px;border-top:1px solid var(--line-soft);cursor:pointer;transition:background .12s;border-left:3px solid transparent;}'+
+'.band-h + .job{border-top:0;}'+
+'.job:hover{background:#fafcf7;} .job.on{background:#f3f8ec;border-left-color:var(--green-bright);}'+
+'.job .t{font-weight:600;color:var(--green-darkest);font-size:.9rem;line-height:1.35;} .job .m{font-size:.74rem;color:var(--faint);margin-top:3px;}'+
+'.band-none{padding:10px 20px;font-size:.8rem;color:var(--faint);}'+
+'.thread{display:flex;flex-direction:column;gap:10px;padding:18px 20px;background:var(--panel-2);}'+
 '.bub{max-width:78%;padding:10px 13px;border-radius:14px;font-size:.9rem;line-height:1.5;position:relative;}'+
 '.bub.me{align-self:flex-end;background:var(--green-dark);color:#eaf4d8;border-bottom-right-radius:4px;}'+
-'.bub.fh{align-self:flex-start;background:#f3f6ee;border:1px solid var(--line);border-bottom-left-radius:4px;}'+
-'.bub .who{font-size:.68rem;font-weight:700;letter-spacing:.3px;opacity:.75;margin-bottom:3px;display:flex;gap:6px;align-items:center;}'+
+'.bub.fh{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;}'+
+'.bub .who{font-size:.68rem;font-weight:700;letter-spacing:.3px;opacity:.75;margin-bottom:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}'+
 '.bub .av{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;color:#fff;}'+
-'.sys{align-self:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.68rem;color:var(--faint);padding:2px 10px;border-radius:20px;background:#eef2e7;}'+
-'.result{align-self:stretch;border:1.5px solid var(--green-bright);background:#f7fbf0;border-radius:12px;padding:12px 14px;}'+
-'.result .eyebrow{margin-bottom:3px;}'+
-'.composer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);position:sticky;bottom:76px;background:var(--panel);}'+
-'.composer textarea{flex:1;min-height:44px;padding:10px 12px;border:1.5px solid var(--line);border-radius:11px;font-family:inherit;font-size:.9rem;resize:vertical;}'+
-'@media(min-width:960px){.split{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start;}}';
+'.sys{align-self:center;font-size:.7rem;color:var(--faint);padding:2px 10px;border-radius:20px;background:#eef2e7;}'+
+'.result{align-self:stretch;border:1px solid var(--green-bright);background:#f7fbf0;border-radius:12px;padding:12px 14px;}'+
+'.result .eyebrow{margin-bottom:3px;display:flex;align-items:center;gap:6px;} .result .eyebrow .ico{width:14px;height:14px;}'+
+'.composer{display:flex;gap:8px;padding:12px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--panel);border-radius:0 0 var(--radius) var(--radius);align-items:flex-end;}'+
+'@media(max-width:900px){.composer{bottom:76px;}}'+
+'.composer textarea{flex:1;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:.9rem;resize:vertical;outline:none;}'+
+'.composer textarea:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}'+
+'.pane-empty{padding:56px 20px;text-align:center;color:var(--faint);font-size:.88rem;}'+
+'.pane-empty .ico{width:30px;height:30px;margin-bottom:10px;color:var(--green-mid);}'+
+'@media(max-width:560px){.job,.band-h,.band-none{padding-left:14px;padding-right:14px;} .thread{padding:14px;} .composer{padding:10px 14px;} .bub{max-width:90%;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var openId = null, composing=false;
 function av(id){ var p=d.person(id); return '<span class="av" style="background:'+p.colour+';">'+String(p.name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase()+'</span>'+BB.esc(p.name); }
 function render(){
   var jobs=d.all('jobs').slice().sort(function(a,b){ return (b.created||'').localeCompare(a.created||''); });
-  var bands=[ {k:'needs', t:'Needs you', hint:'a question from the team is waiting on your answer'}, {k:'flight', t:'In flight', hint:'being built now'}, {k:'shipped', t:'Shipped', hint:'done and live'} ];
+  var bands=[ {k:'needs', t:'Needs you', hint:'waiting on your answer'}, {k:'flight', t:'In flight', hint:'being built now'}, {k:'shipped', t:'Shipped', hint:'done and live'} ];
+  var cnt=function(k){ return jobs.filter(function(j){return j.band===k;}).length; };
   var html='';
-  html+='<div class="page-head"><h1>Jobs to FreedomHub</h1><p>Anything you want changed, fixed or added — a button, a report, a whole new section — write it here. The team builds it, keeps you posted in the thread, and it ships into this portal. Ask at 2am on Christmas Eve if you like.</p></div>';
-  html+='<div class="row between" style="margin-bottom:6px;"><span class="faint" style="font-size:.78rem;">'+jobs.filter(function(j){return j.band==='needs';}).length+' waiting on you · '+jobs.filter(function(j){return j.band==='flight';}).length+' in flight · '+jobs.filter(function(j){return j.band==='shipped';}).length+' shipped</span><button class="btn" id="newJob">＋ New job</button></div>';
-  html+='<div class="split"><div>';
+  html+='<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Requests &amp; changes</div><h1>Jobs to FreedomHub</h1><p>Anything you want changed, fixed or added — a button, a report, a whole new section — write it here. The team builds it, keeps you posted in the thread, and it ships into this portal.</p></div>'+
+    '<div class="row"><button class="btn" id="newJob">'+BB.icon('plus')+'New job</button></div></div>';
+  html+='<div class="grid g3" style="margin-top:14px;">'+
+    '<div class="stat'+(cnt('needs')?' warn':'')+'"><div class="l">Needs you</div><div class="v">'+cnt('needs')+'</div><div class="s">a question from the team</div></div>'+
+    '<div class="stat"><div class="l">In flight</div><div class="v">'+cnt('flight')+'</div><div class="s">being built now</div></div>'+
+    '<div class="stat"><div class="l">Shipped</div><div class="v">'+cnt('shipped')+'</div><div class="s">done and live</div></div>'+
+  '</div>';
+  html+='<div class="jobs-grid"><div class="card"><div class="card-h"><div><h3>Requests</h3><div class="sub">tap one to open its thread</div></div><span class="badge b-grey">'+jobs.length+'</span></div>';
   bands.forEach(function(b){
     var list=jobs.filter(function(j){return j.band===b.k;});
-    html+='<div class="band"><h3>'+b.t+' <span style="font-weight:500;letter-spacing:0;text-transform:none;">· '+b.hint+'</span></h3>';
-    if(!list.length) html+='<div class="faint" style="font-size:.8rem;padding:6px 2px 2px;">Nothing here.</div>';
-    list.forEach(function(j){ html+='<div class="job'+(openId===j.id?' on':'')+'" data-job="'+j.id+'"><div><div class="t">'+BB.esc(j.title)+'</div><div class="m">'+BB.esc(d.person(j.by).name)+' · '+BB.date(j.created)+' · '+j.msgs.length+' message'+(j.msgs.length===1?'':'s')+'</div></div>'+BB.statusBadge(j.status)+'</div>'; });
-    html+='</div>';
+    html+='<div class="band-h"><b>'+b.t+' · '+list.length+'</b><span>'+b.hint+'</span></div>';
+    if(!list.length) html+='<div class="band-none">Nothing here.</div>';
+    list.forEach(function(j){ html+='<div class="job'+(openId===j.id?' on':'')+'" data-job="'+j.id+'" role="button" tabindex="0"><div style="min-width:0;"><div class="t">'+BB.esc(j.title)+'</div><div class="m">'+BB.esc(d.person(j.by).name)+' · '+BB.date(j.created)+' · '+j.msgs.length+' message'+(j.msgs.length===1?'':'s')+'</div></div>'+BB.statusBadge(j.status)+'</div>'; });
   });
-  html+='</div><div>';
+  html+='</div><div id="pane">';
   if(composing){
-    html+='<div class="card card-p"><div class="eyebrow">New job</div><div class="fld" style="margin-top:8px;"><label>What do you need?</label><input id="jTitle" placeholder="e.g. Add a column for delivery cost on the orders page"></div>'+
-      '<div class="fld"><label>Tell us a bit more</label><textarea id="jBrief" rows="4" style="width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem;" placeholder="What should it do, who uses it, what does it need to show…"></textarea></div>'+
-      '<div class="row" style="gap:8px;"><button class="btn" id="sendJob">Send to FreedomHub</button><button class="btn ghost" id="cancelJob">Cancel</button><span class="faint" style="font-size:.76rem;">You’ll get a reply in the thread; we only ping you when we need an answer.</span></div></div>';
+    html+='<div class="card"><div class="card-h"><div><h3>New job</h3><div class="sub">one job is one conversation with the team</div></div></div><div class="card-p">'+
+      '<div class="fld"><label for="jTitle">What do you need?</label><input id="jTitle" placeholder="e.g. Add a column for delivery cost on the orders page"></div>'+
+      '<div class="fld"><label for="jBrief">Tell us a bit more</label><textarea id="jBrief" rows="5" placeholder="What should it do, who uses it, what does it need to show…"></textarea></div>'+
+      '<div class="row" style="gap:8px;"><button class="btn" id="sendJob">'+BB.icon('check')+'Send to FreedomHub</button><button class="btn ghost" id="cancelJob">Cancel</button></div>'+
+      '<div class="faint" style="font-size:.76rem;margin-top:10px;">You’ll get a reply in the thread; we only ping you when we need an answer.</div></div></div>';
   } else if(openId){
     var j=d.by('jobs', openId);
     if(j){
-      html+='<div class="card"><div style="padding:14px 16px;border-bottom:1px solid var(--line);"><div class="row between"><div><div style="font-family:var(--display);font-weight:600;color:var(--green-dark);font-size:1.05rem;">'+BB.esc(j.title)+'</div><div class="faint" style="font-size:.76rem;">'+BB.esc(j.brief)+'</div></div>'+BB.statusBadge(j.status)+'</div></div>';
+      html+='<div class="card"><div class="card-h" style="align-items:flex-start;"><div style="min-width:0;flex:1;"><h3 style="font-size:1.05rem;">'+BB.esc(j.title)+'</h3><div class="sub" style="font-size:.8rem;margin-top:3px;">'+BB.esc(j.brief)+'</div></div>'+BB.statusBadge(j.status)+'</div>';
       html+='<div class="thread">';
       html+='<div class="sys">job opened · '+BB.date(j.created)+'</div>';
       j.msgs.forEach(function(m){ var mine=m.from!=='fh'; html+='<div class="bub '+(mine?'me':'fh')+'"><div class="who">'+av(m.from)+' · '+BB.esc(m.at)+'</div>'+BB.esc(m.text)+'</div>'; });
-      if(j.result) html+='<div class="result"><div class="eyebrow">What you got</div><div style="font-size:.9rem;">'+BB.esc(j.result)+'</div></div>';
+      if(j.result) html+='<div class="result"><div class="eyebrow">'+BB.icon('check')+'What you got</div><div style="font-size:.9rem;">'+BB.esc(j.result)+'</div></div>';
       if(j.band==='shipped') html+='<div class="sys">shipped · reply to reopen this job</div>';
       html+='</div>';
-      html+='<div class="composer"><textarea id="reply" placeholder="'+(j.band==='needs'?'Answer the team…':'Add to this job…')+'"></textarea><button class="btn" id="sendReply">Send</button></div></div>';
+      html+='<div class="composer"><textarea id="reply" aria-label="Reply" placeholder="'+(j.band==='needs'?'Answer the team…':'Add to this job…')+'"></textarea><button class="btn" id="sendReply">Send</button></div></div>';
     }
   } else {
-    html+='<div class="card card-p"><div class="empty"><div class="big">✉</div>Pick a job on the left, or start a new one.</div></div>';
+    html+='<div class="card"><div class="pane-empty">'+BB.icon('message')+'<div>Pick a job on the left, or start a new one.</div></div></div>';
   }
   html+='</div></div><div style="height:24px;"></div>';
   document.querySelector('main.wrap').innerHTML=html; wire();
 }
+// On a phone the pane sits below the list — bring it into view when it changes.
+function toPane(){ try{ if(window.matchMedia('(max-width:999px)').matches){ var p=document.getElementById('pane'); if(p) p.scrollIntoView({behavior:'smooth',block:'start'}); } }catch(e){} }
 function stamp(){ var n=new Date(); return n.toISOString().slice(0,10)+' '+n.toTimeString().slice(0,5); }
 function wire(){
-  document.querySelectorAll('.job[data-job]').forEach(function(el){ el.onclick=function(){ openId=this.dataset.job; composing=false; render(); }; });
-  var nb=document.getElementById('newJob'); if(nb) nb.onclick=function(){ composing=true; openId=null; render(); setTimeout(function(){ var t=document.getElementById('jTitle'); if(t) t.focus(); },50); };
+  document.querySelectorAll('.job[data-job]').forEach(function(el){ el.onclick=function(){ openId=this.dataset.job; composing=false; render(); toPane(); }; el.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); this.click(); } }; });
+  var nb=document.getElementById('newJob'); if(nb) nb.onclick=function(){ composing=true; openId=null; render(); toPane(); setTimeout(function(){ var t=document.getElementById('jTitle'); if(t) t.focus(); },50); };
   var cj=document.getElementById('cancelJob'); if(cj) cj.onclick=function(){ composing=false; render(); };
   var sj=document.getElementById('sendJob'); if(sj) sj.onclick=function(){
     var t=document.getElementById('jTitle').value.trim(), b=document.getElementById('jBrief').value.trim(); if(!t){ BB.toast('Give the job a title'); return; }

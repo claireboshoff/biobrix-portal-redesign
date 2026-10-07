@@ -6,19 +6,26 @@
 <title>Forecast &amp; actual · BioBrix OS</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <style>
-  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
-  td.num,th.num{text-align:right;white-space:nowrap;}
-  .qty{width:96px;padding:7px 9px;text-align:right;font-size:.88rem;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;}
-  .qty:focus{border-color:var(--green-bright);outline:none;}
+  .qty{width:96px;padding:7px 9px;text-align:right;font-size:.88rem;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;background:#fff;}
+  .qty:focus{border-color:var(--green-bright);outline:none;box-shadow:0 0 0 3px rgba(104,165,62,.15);}
   .qty.proposed{border-style:dashed;border-color:var(--green-bright);background:#f6fbef;}
   .mini{font-size:.72rem;color:var(--faint);}
   .pick{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;max-width:100%;}
-  .bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;} .bar > i{display:block;height:100%;}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px;}
+  .seg a{display:inline-flex;align-items:center;white-space:nowrap;}
+  .toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:none;}
+  .season{font-size:.8rem;color:var(--muted);font-weight:600;white-space:nowrap;}
+  .ico.flip{transform:rotate(180deg);}
+  .fp-table td:first-child,.fp-table th:first-child{position:sticky;left:0;z-index:2;background:#fff;min-width:190px;}
+  .fp-table th:first-child{background:var(--panel-2);z-index:3;} .fp-table tfoot td:first-child{background:var(--panel-2);}
+  .fp-table td{vertical-align:top;}
+  .trk-bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;width:150px;} .trk-bar > i{display:block;height:100%;}
+  .fp-note{font-size:.78rem;margin-top:10px;}
+  .fp-val td:first-child{white-space:nowrap;}
+  @media(max-width:560px){ .fp-table td:first-child,.fp-table th:first-child{min-width:140px;} }
 </style>
 </head>
 <body>
@@ -53,19 +60,22 @@ function render(){
   var view = (q.get('view')||'product').toLowerCase();
   var fc = pl.forecasts || {};
 
-  var html = '<div class="page-head"><h1>Forecast &amp; actual</h1>'+
-    '<p>Plan the year in litres and kilograms, product by product, and watch it against what is actually invoiced — in one place, updated as the year goes. Add a new customer or a new product in August and it simply joins the plan.</p></div>';
+  var prevFrom = seasonMonths(startYm)[0].replace(/^(\d{4})-(\d{2})$/,function(_,y,m){var mm=parseInt(m,10)-1,yy=+y;if(mm<1){mm=12;yy--;}return yy+'-'+String(mm).padStart(2,'0');});
+  var html = '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Forecast &amp; actual</h1>'+
+    '<p>Plan the year in litres and kilograms, product by product, and watch it against what is actually invoiced. A new customer or product simply joins the plan.</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+prevFrom+'">'+BB.icon('chevron','flip')+'Earlier</a>'+
+    '<span class="season">'+monthLabel(months[0])+' – '+monthLabel(months[11])+'</span>'+
+    '<a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+months[1]+'">Later'+BB.icon('chevron')+'</a></div></div>';
 
   html += BB.staleNote();
-  html += '<div class="tabs">'+
+  html += '<div class="toolbar"><div class="seg">'+
     ['product|By product','customer|By customer','value|Value vs invoiced'].map(function(o){
       var k=o.split('|')[0],t=o.split('|')[1];
-      return '<a class="btn sm'+(view===k?'':' ghost')+'" href="forecast-plan.html?view='+k+'&from='+startYm+'">'+t+'</a>';
-    }).join('')+
-    '<span style="flex:1"></span>'+
-    '<a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+seasonMonths(startYm)[0].replace(/^(\d{4})-(\d{2})$/,function(_,y,m){var mm=parseInt(m,10)-1,yy=+y;if(mm<1){mm=12;yy--;}return yy+'-'+String(mm).padStart(2,'0');})+'">‹ earlier</a>'+
-    '<a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+months[1]+'">later ›</a>'+
-  '</div>';
+      return '<a class="'+(view===k?'on':'')+'" href="forecast-plan.html?view='+k+'&from='+startYm+'">'+t+'</a>';
+    }).join('')+'</div></div>';
+  var chartJobs = [];
+  function emptyChart(sel, msg){ chartJobs.push(function(){ var el=document.querySelector(sel); if(el) el.innerHTML='<div class="empty">'+msg+'</div>'; }); }
+  function stat(l, v, sub, cls){ return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></div>'; }
 
   // ---------- actuals from the ledger ----------
   var actualByMonth = {}, actualByCustomerMonth = {};
@@ -80,11 +90,41 @@ function render(){
   // ---------- by product: quantity plan ----------
   if(view==='product'){
     var real = products.length && products[0].real;
-    html += '<div class="sec"><h2>The year in litres and kilograms</h2><span class="ln"></span><span class="cnt">'+
-      (real? products.length+(products.length===1?' product':' products')+' you actually sell · last year in grey under each box' : 'type a number — it saves for everyone')+'</span>'+(real?BB.liveChip():'')+'</div>';
+    // what the page already holds, added up: the plan per month and the same month last year
+    var planM = months.map(function(){ return 0; }), lyM = months.map(function(){ return 0; }), setCells = 0, perProd = [];
+    products.forEach(function(p){
+      var pt=0, lt=0;
+      months.forEach(function(m, mi){
+        var v = Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0); if(v){ planM[mi]+=v; pt+=v; setCells++; }
+        if(p.months){ var ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4); if(p.months[ly]){ var q=Number(p.months[ly].qty)||0; lyM[mi]+=q; lt+=q; } }
+      });
+      perProd.push({ label:p.name, sub:p.pack||'', value:pt, ly:lt });
+    });
+    var planTot = planM.reduce(function(a,b){return a+b;},0), lyTot = lyM.reduce(function(a,b){return a+b;},0);
+    // with nothing planned yet, rank by the same months last year so the panel still says something true
+    var rankByLy = !planTot && lyTot;
+    html += '<div class="grid g4">'+
+      stat('Products in the plan', products.length, real? 'the lines you actually sell' : 'sample products')+
+      stat('Planned this season', BB.num(Math.round(planTot)), 'units across '+months.length+' months')+
+      stat('Same months last year', lyTot? BB.num(Math.round(lyTot)) : '—', lyTot? 'units invoiced' : 'needs your accounting system')+
+      stat('Months set', setCells+' <span style="font-size:.9rem;color:var(--faint);">of '+(products.length*months.length)+'</span>', 'product-months with a figure', (products.length && !setCells)?'warn':'')+
+    '</div>';
+    // nothing planned and no history: two empty panels would only push the table down
+    if(planTot || lyTot) html += '<div class="split" style="margin-top:16px;">'+
+      '<div class="card"><div class="card-h"><div><h3>Plan against last year</h3><div class="sub">units per month, all products</div></div>'+(real?BB.liveChip():'')+'</div><div class="card-p"><div id="chPlan"></div></div></div>'+
+      '<div class="card"><div class="card-h"><div><h3>Biggest lines '+(rankByLy?'last year':'in the plan')+'</h3><div class="sub">'+(rankByLy?'units invoiced in these months last year':'planned units this season')+'</div></div></div><div class="card-p"><div id="chProd"></div></div></div>'+
+    '</div>';
+    if(planTot || lyTot) chartJobs.push(function(){ BB.chart.bar('#chPlan',{ labels:months.map(monthLabel), height:230, table:true,
+      series:[{name:'Plan',values:planM,color:'#3f6b28'},{name:'Last year',values:lyM,color:'#c77d17'}] }); });
+    else emptyChart('#chPlan','Nothing planned yet. Type a figure in the table below and it shows here.');
+    var topP = perProd.map(function(x){ return { label:x.label, sub:x.sub, value:rankByLy? x.ly : x.value }; })
+      .filter(function(x){ return x.value>0; }).sort(function(a,b){ return b.value-a.value; }).slice(0,8);
+    if(topP.length) chartJobs.push(function(){ BB.chart.hbar('#chProd',{ rows:topP }); });
+    else emptyChart('#chProd','No product has a planned figure yet.');
+
+    // Counting what we could propose lets the button say something true rather than "fill".
+    var canFill=0, wouldChange=0;
     if(real){
-      // Counting what we could propose lets the button say something true rather than "fill".
-      var canFill=0, wouldChange=0;
       products.forEach(function(p2){
         months.forEach(function(m){
           var ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4);
@@ -94,12 +134,12 @@ function render(){
           }
         });
       });
-      html += '<div class="row between" style="gap:12px;margin:0 0 12px;align-items:flex-start;">'+
-        '<div class="faint" style="font-size:.78rem;max-width:62ch;">Ranked by what you sold. The grey figure under each box is that month last year, from your accounting system — type over it, or take the lot as a starting plan and adjust from there.</div>'+
-        (canEdit && wouldChange? '<button class="btn" id="fillYear" style="flex:none;">Start from last year ('+wouldChange+' months)</button>' : '')+
-      '</div>';
     }
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Product</th><th class="mini">Unit</th>'+
+    html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>The year in litres and kilograms</h3><div class="sub">'+
+      (real? products.length+(products.length===1?' product':' products')+' you actually sell, ranked by what you sold · last year in grey under each box' : 'type a number and it saves for everyone')+'</div></div>'+
+      '<div class="row" style="gap:8px;">'+(real?BB.liveChip():'')+
+      (canEdit && wouldChange? '<button class="btn sm" id="fillYear">'+BB.icon('refresh')+'Start from last year ('+wouldChange+' months)</button>' : '')+'</div></div>';
+    html += '<div class="scroll"><table class="bb fp-table"><thead><tr><th>Product</th><th>Unit</th>'+
       months.map(function(m){ return '<th class="num">'+monthLabel(m)+'</th>'; }).join('')+'<th class="num">Year</th></tr></thead><tbody>';
     products.forEach(function(p){
       var rowTotal=0;
@@ -117,11 +157,12 @@ function render(){
           (lastYear? '<div class="mini">was '+BB.num(lastYear)+'</div>' : '')+'</td>';
       }).join('');
       html += '<tr><td><b>'+BB.esc(p.name)+'</b><div class="mini">'+BB.esc(p.code||'')+(p.sold? ' · '+BB.num(p.sold)+' sold to date':'')+'</div></td>'+
-        '<td class="mini">'+BB.esc(p.pack||'L')+'</td>'+cells+
+        '<td class="mini" style="white-space:nowrap;">'+BB.esc(p.pack||'L')+'</td>'+cells+
         '<td class="num"><b>'+(rowTotal? BB.num(rowTotal) : '—')+'</b></td></tr>';
     });
-    html += '</tbody></table></div></div>';
-    if(!real) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Showing sample products until the next read of your accounting system.</div>';
+    html += '</tbody><tfoot><tr><td>All products</td><td></td>'+planM.map(function(v){ return '<td class="num">'+(v?BB.num(Math.round(v)):'—')+'</td>'; }).join('')+
+      '<td class="num">'+(planTot?BB.num(Math.round(planTot)):'—')+'</td></tr></tfoot></table></div></div>';
+    if(!real) html += '<div class="fp-note faint">Showing sample products until the next read of your accounting system.</div>';
   }
 
   // ---------- by customer ----------
@@ -132,9 +173,33 @@ function render(){
       var last12=0; (sg.invoices||[]).forEach(function(i){ if(i.customer===c.id && i.kind!=='opening') last12+=(i.amount||0); });
       return {c:c, last12:last12};
     }).sort(function(a,b){ return b.last12-a.last12; }).slice(0,40);
-    html += '<div class="sec"><h2>By customer</h2><span class="ln"></span><span class="cnt">your 40 biggest · last year invoiced shown as the starting point</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Customer</th><th class="num">Invoiced to date</th>'+
+    // the plan typed against these customers for the six months shown
+    var planCust = 0;
+    top.forEach(function(r){ months.slice(0,6).forEach(function(m){ planCust += Number(((fc[d.fKey(m, null, 'sage_'+r.c.id)]||{}).value)||0); }); });
+    var invTop = top.reduce(function(t,r){ return t+r.last12; },0);
+    // the twelve months before the season, invoiced — the evidence the plan starts from
+    var prevMonths = (function(){ var out=[], p=startYm.split('-'), y=parseInt(p[0],10), m=parseInt(p[1],10); for(var i=0;i<12;i++){ m--; if(m<1){m=12;y--;} out.unshift(y+'-'+String(m).padStart(2,'0')); } return out; })();
+    var prevVals = prevMonths.map(function(m){ return actualByMonth[m]||0; });
+    html += '<div class="grid g4">'+
+      stat('Customers shown', top.length, top.length? 'your biggest, by invoiced to date' : 'from your accounting system')+
+      stat('Invoiced to date', money(invTop), 'these customers, all time')+
+      stat('Planned, next six months', planCust? money(planCust) : '—', planCust? 'typed against these customers' : 'type it in the table below')+
+      stat('Last 12 months', money(prevVals.reduce(function(a,b){return a+b;},0)), 'invoiced, every customer')+
+    '</div>';
+    html += '<div class="split" style="margin-top:16px;">'+
+      '<div class="card"><div class="card-h"><div><h3>Invoiced, the 12 months before</h3><div class="sub">what the plan starts from</div></div>'+BB.liveChip()+'</div><div class="card-p"><div id="chBack"></div></div></div>'+
+      '<div class="card"><div class="card-h"><div><h3>Biggest customers</h3><div class="sub">invoiced to date</div></div></div><div class="card-p"><div id="chCust"></div></div></div>'+
+    '</div>';
+    if(prevVals.some(function(v){ return v>0; })) chartJobs.push(function(){ BB.chart.bar('#chBack',{ labels:prevMonths.map(monthLabel), money:true, height:290, table:true, series:[{name:'Invoiced',values:prevVals,color:'#3f6b28'}] }); });
+    else emptyChart('#chBack','This fills in from your accounting system.');
+    var topRows = top.filter(function(r){ return r.last12>0; }).slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.last12 }; });
+    if(topRows.length) chartJobs.push(function(){ BB.chart.hbar('#chCust',{ money:true, rows:topRows }); });
+    else emptyChart('#chCust','No customer figures yet.');
+
+    html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>By customer</h3><div class="sub">your 40 biggest · last year invoiced shown as the starting point · amounts in rands</div></div>'+BB.liveChip()+'</div>';
+    html += '<div class="scroll"><table class="bb fp-table"><thead><tr><th>Customer</th><th class="num">Invoiced to date</th>'+
       months.slice(0,6).map(function(m){ return '<th class="num">'+monthLabel(m)+'</th>'; }).join('')+'</tr></thead><tbody>';
+    if(!top.length) html += '<tr><td colspan="8"><div class="empty">Your customers come from your accounting system. They appear here once it has been read.</div></td></tr>';
     top.forEach(function(r){
       var cells = months.slice(0,6).map(function(m){
         var key = d.fKey(m, null, 'sage_'+r.c.id);
@@ -145,39 +210,69 @@ function render(){
         '<td class="num">'+money(r.last12)+'</td>'+cells+'</tr>';
     });
     html += '</tbody></table></div></div>';
-    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Amounts in rands. A customer who only starts in August simply gets a figure from August — nothing has to be rebuilt.</div>';
+    html += '<div class="fp-note faint">A customer who only starts in August simply gets a figure from August. Nothing has to be rebuilt.</div>';
   }
 
   // ---------- value vs invoiced ----------
   if(view==='value'){
-    html += '<div class="sec"><h2>Forecast against what was invoiced</h2><span class="ln"></span><span class="cnt">actuals straight from your accounting system</span>'+BB.liveChip()+'</div>';
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Month</th><th class="num">Forecast</th><th class="num">Invoiced</th><th class="num">Difference</th><th>How it is tracking</th></tr></thead><tbody>';
-    var fTot=0, aTot=0;
-    months.forEach(function(m){
+    var rowsV = months.map(function(m){
       // a month's forecast = the month total typed here, else the sum of the per-customer figures
       var mk = d.fKey(m, null, null);
       var typed = (fc[mk]&&fc[mk].value)||0;
       var fromCustomers = Object.keys(fc).filter(function(k){ return k.indexOf(m+'|all|')===0 && k!==mk; })
         .reduce(function(t,k){ return t+(Number(fc[k].value)||0); },0);
-      var f = typed || fromCustomers;
-      var a = actualByMonth[m]||0;
-      fTot+=f; aTot+=a;
-      var pct = f? Math.round(a/f*100) : null;
-      html += '<tr><td><b>'+monthLabel(m)+'</b></td>'+
-        '<td class="num">'+(canEdit? '<input class="qty" style="width:120px;" inputmode="decimal" data-fv="'+mk+'" value="'+(typed||'')+'" placeholder="'+(fromCustomers? Math.round(fromCustomers):'set')+'">' : (f? money(f):'<span class="faint">—</span>'))+'</td>'+
+      return { m:m, mk:mk, typed:typed, fromCustomers:fromCustomers, f:(typed || fromCustomers), a:(actualByMonth[m]||0) };
+    });
+    var fTot=0, aTot=0;
+    rowsV.forEach(function(r){ fTot+=Number(r.f)||0; aTot+=r.a; });
+    // tracking is only fair over the months that have both a forecast and something invoiced
+    var fSoFar=0, aSoFar=0; rowsV.forEach(function(r){ if(r.f && r.a){ fSoFar+=Number(r.f)||0; aSoFar+=r.a; } });
+    var trk = fSoFar? Math.round(aSoFar/fSoFar*100) : null;
+    html += '<div class="grid g4">'+
+      stat('Forecast for the year', fTot? money(fTot) : '—', fTot? 'typed or added up from customers' : 'set a month below')+
+      stat('Invoiced so far', money(aTot), 'this season, opening balances left out')+
+      stat('Left to reach forecast', (fTot? money(Math.max(0,fTot-aTot)) : '—'), fTot? (aTot>=fTot?'forecast reached, '+money(aTot-fTot)+' over':'for the whole year') : 'set a forecast first')+
+      stat('Tracking', trk===null? '—' : trk+'%', trk===null? 'needs a forecast and an invoiced month' : 'of forecast, in months with both', (trk!==null && trk<80)?'warn':'')+
+    '</div>';
+    html += '<div class="split" style="margin-top:16px;">'+
+      '<div class="card"><div class="card-h"><div><h3>Forecast against invoiced</h3><div class="sub">by month</div></div>'+BB.liveChip()+'</div><div class="card-p"><div id="chVal"></div></div></div>'+
+      '<div class="card"><div class="card-h"><div><h3>Running total</h3><div class="sub">the year so far, added up</div></div></div><div class="card-p"><div id="chCum"></div></div></div>'+
+    '</div>';
+    if(fTot || aTot){
+      var fv = rowsV.map(function(r){ return Number(r.f)||0; }), av = rowsV.map(function(r){ return r.a; });
+      // the invoiced line stops at this month: the months ahead have not happened yet
+      var nowYm = new Date().toISOString().slice(0,7);
+      var cf=0, ca=0, cfv=fv.map(function(v){ cf+=v; return cf; }), cav=av.map(function(v,i){ ca+=v; return months[i]>nowYm? null : ca; });
+      var cumSeries = [{name:'Invoiced',values:cav,color:'#22431a',area:true}];
+      if(fTot) cumSeries.unshift({name:'Forecast',values:cfv,color:'#68a53e',dash:true});
+      chartJobs.push(function(){ BB.chart.bar('#chVal',{ labels:months.map(monthLabel), money:true, height:230, table:true,
+        series:[{name:'Forecast',values:fv,color:'#8fbf5a'},{name:'Invoiced',values:av,color:'#22431a'}] }); });
+      var cumPts = cav.filter(function(v){ return v!=null; }).length;
+      if(!fTot && cumPts<3) emptyChart('#chCum','Fills in as the year goes: '+money(aTot)+' invoiced so far.');
+      else chartJobs.push(function(){ BB.chart.line('#chCum',{ labels:months.map(monthLabel), money:true, height:230, table:true,
+        series:cumSeries }); });
+    } else { emptyChart('#chVal','No forecast set and nothing invoiced in these months yet.'); emptyChart('#chCum','Fills in as the year goes.'); }
+
+    html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Forecast against what was invoiced</h3><div class="sub">actuals straight from your accounting system · type a month\'s forecast to set it</div></div>'+BB.liveChip()+'</div>';
+    html += '<div class="scroll"><table class="bb fp-val"><thead><tr><th>Month</th><th class="num">Forecast</th><th class="num">Invoiced</th><th class="num">Difference</th><th>How it is tracking</th></tr></thead><tbody>';
+    rowsV.forEach(function(r){
+      var f=r.f, a=r.a, pct = f? Math.round(a/f*100) : null;
+      html += '<tr><td><b>'+monthLabel(r.m)+'</b></td>'+
+        '<td class="num">'+(canEdit? '<input class="qty" style="width:120px;" inputmode="decimal" data-fv="'+r.mk+'" value="'+(r.typed||'')+'" placeholder="'+(r.fromCustomers? Math.round(r.fromCustomers):'set')+'">' : (f? money(f):'<span class="faint">—</span>'))+'</td>'+
         '<td class="num"><b>'+(a? money(a) : '<span class="faint">—</span>')+'</b></td>'+
         '<td class="num">'+(f&&a? '<b style="color:'+(a>=f?'var(--ok)':'var(--red)')+';">'+(a>=f?'+':'')+money(a-f)+'</b>' : '<span class="faint">—</span>')+'</td>'+
         '<td>'+(pct===null? '<span class="faint">no forecast set</span>'
-          : '<div class="bar" style="width:150px;"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of forecast</div>')+'</td></tr>';
+          : '<div class="trk-bar"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of forecast</div>')+'</td></tr>';
     });
-    html += '</tbody><tfoot><tr><td><b>The year</b></td><td class="num"><b>'+(fTot?money(fTot):'—')+'</b></td><td class="num"><b>'+money(aTot)+'</b></td>'+
-      '<td class="num">'+(fTot? '<b style="color:'+(aTot>=fTot?'var(--ok)':'var(--red)')+';">'+(aTot>=fTot?'+':'')+money(aTot-fTot)+'</b>':'—')+'</td><td></td></tr></tfoot></table></div></div>';
-    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Leave a month blank and it adds up the per-customer figures for you. Opening balances carried over from the previous system are left out of the invoiced column — they are not sales.</div>';
+    html += '</tbody><tfoot><tr><td>The year</td><td class="num">'+(fTot?money(fTot):'—')+'</td><td class="num">'+money(aTot)+'</td>'+
+      '<td class="num">'+(fTot? '<span style="color:'+(aTot>=fTot?'var(--ok)':'var(--red)')+';">'+(aTot>=fTot?'+':'')+money(aTot-fTot)+'</span>':'—')+'</td><td></td></tr></tfoot></table></div></div>';
+    html += '<div class="fp-note faint">Leave a month blank and it adds up the per-customer figures for you. Opening balances carried over from the previous system are left out of the invoiced column; they are not sales.</div>';
   }
 
-  if(pl.updatedAt) html += '<div class="pline faint" style="font-size:.76rem;margin-top:14px;">Last change to the plan: '+BB.esc(String(pl.updatedAt).slice(0,16).replace('T',' '))+(pl.updatedBy? ' by '+BB.esc(pl.updatedBy):'')+'.</div>';
+  if(pl.updatedAt) html += '<div class="fp-note faint" style="font-size:.76rem;margin-top:14px;">Last change to the plan: '+BB.esc(String(pl.updatedAt).slice(0,16).replace('T',' '))+(pl.updatedBy? ' by '+BB.esc(pl.updatedBy):'')+'.</div>';
 
   host.innerHTML = html;
+  chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 
   function put(key, field, val){
     var cur = (d.plan().forecasts||{})[key] || {};

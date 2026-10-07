@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Orders · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -28,7 +28,15 @@ var css=''+
 '.src-portal{background:var(--blue-bg);color:var(--blue);}'+
 '.advsel{padding:6px 8px;font-size:.78rem;border:1.5px solid var(--line);border-radius:8px;background:#fff;}'+
 '.qp{margin-top:12px;padding:12px 14px;border-radius:11px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--green-bright);}'+
-'.qp .row.between{gap:12px;} .qp .btn{white-space:nowrap;}';
+'.qp .row.between{gap:12px;} .qp .btn{white-space:nowrap;}'+
+'.card-h .chips{margin:0;gap:6px;}'+
+'.rep{display:inline-flex;align-items:center;gap:7px;font-size:.84rem;white-space:nowrap;} .rep i{width:8px;height:8px;border-radius:50%;flex:none;}'+
+'tr.click .caret .ico{width:14px;height:14px;color:var(--faint);transition:transform .15s;} tr.click.open .caret .ico{transform:rotate(90deg);color:var(--green-dark);}'+
+'tr.click.open td{background:#f3f8ec;}'+
+'.exp > td{padding:6px 20px 16px 38px;}'+
+'table.bb.lines{background:#fff;border:1px solid var(--line);border-radius:10px;}'+
+'table.bb.lines th{background:var(--panel-2);} table.bb.lines{max-width:760px;}'+
+'@media(max-width:700px){#ordMain table.bb tbody td{white-space:nowrap;} #ordMain .exp > td{white-space:normal;padding:6px 14px 14px;} #ordMain .exp .qp{max-width:340px;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var STATUSES = ['Forecast','Pending','Confirmed','Awaiting stock','Delivered'];
@@ -58,7 +66,7 @@ function quotePanel(o){
     h+='</div>';
   } else if(q==='Awaiting approval'){
     h+='<div style="font-size:.86rem;margin-top:3px;">Quoted by <b>'+BB.esc(r.name)+'</b> · list <b>'+BB.money(list)+'</b> · preset margin '+pct+'% → <b>'+BB.money(tot)+'</b> to the farmer.</div></div>';
-    if(isDirector) h+='<div class="row" style="gap:8px;"><button class="btn sm" data-q="approve" data-oid="'+o.id+'">✓ Approve quote</button><button class="btn ghost sm" data-q="decline" data-oid="'+o.id+'">Decline</button></div>';
+    if(isDirector) h+='<div class="row" style="gap:8px;"><button class="btn sm" data-q="approve" data-oid="'+o.id+'">'+BB.icon('check')+'Approve quote</button><button class="btn ghost sm" data-q="decline" data-oid="'+o.id+'">Decline</button></div>';
     else h+='<span class="badge b-warn">Waiting for Rudie</span>';
     h+='</div>';
   } else if(q==='Approved'){
@@ -68,16 +76,16 @@ function quotePanel(o){
       '<div style="font-size:.84rem;"><div class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">Farmer pays</div><b data-tot="'+o.id+'" style="font-family:var(--display);font-size:1.1rem;color:var(--green-dark);">'+BB.money(tot)+'</b></div>'+
       '<div style="font-size:.84rem;"><div class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">My margin</div><b data-margin="'+o.id+'" style="color:var(--green-mid);">'+BB.money(margin)+'</b></div>'+
       '<span style="flex:1;"></span>'+
-      '<button class="btn sm" data-q="send" data-oid="'+o.id+'">Send quote to farmer ›</button></div>';
+      '<button class="btn sm" data-q="send" data-oid="'+o.id+'">Send quote to farmer'+BB.icon('chevron')+'</button></div>';
     return h+'</div>';
   } else if(q==='Sent to farmer'){
     h+='<div style="font-size:.86rem;margin-top:3px;">Quote of <b>'+BB.money(tot)+'</b> is in <b>'+BB.esc(String(f.name).split(' ')[0])+'\u2019s portal</b> for approval (your margin '+BB.money(margin)+', '+pct+'%).</div></div>';
-    h+='<div class="row" style="gap:8px;"><a class="btn ghost sm" target="_blank" rel="noopener" href="'+farmerWA(o,'your BioBrix quote for '+BB.money(tot)+' is ready in your portal — tap Approve and we get it moving.')+'">WhatsApp '+BB.esc(String(f.name).split(' ')[0])+'</a>'+
-       '<button class="btn sm" data-q="farmerok" data-oid="'+o.id+'" title="Farmer said yes on WhatsApp / phone">Farmer approved ✓</button></div>';
+    h+='<div class="row" style="gap:8px;"><a class="btn ghost sm" target="_blank" rel="noopener" href="'+farmerWA(o,'your BioBrix quote for '+BB.money(tot)+' is ready in your portal — tap Approve and we get it moving.')+'">'+BB.icon('message')+'WhatsApp '+BB.esc(String(f.name).split(' ')[0])+'</a>'+
+       '<button class="btn sm" data-q="farmerok" data-oid="'+o.id+'" title="Farmer said yes on WhatsApp / phone">'+BB.icon('check')+'Farmer approved</button></div>';
     h+='</div>';
   } else if(q==='Farmer approved'){
     h+='<div style="font-size:.86rem;margin-top:3px;"><b>'+BB.esc(f.name)+' approved</b> '+BB.money(tot)+(o.quote.farmerApprovedAt?' on '+BB.date(o.quote.farmerApprovedAt):'')+'. Invoice it and it becomes actual revenue; your margin '+BB.money(margin)+' is in the invoice.</div></div>';
-    h+='<button class="btn sm" data-inv="'+o.id+'">Generate invoice</button>';
+    h+='<button class="btn sm" data-inv="'+o.id+'">'+BB.icon('receipt')+'Generate invoice</button>';
     h+='</div>';
   } else if(q==='Declined'){
     h+='<div style="font-size:.86rem;margin-top:3px;">Quote declined by '+BB.esc(o.quote.declinedBy||'Rudie')+'. Adjust and re-quote.</div></div>';
@@ -123,10 +131,14 @@ function statBar(orders){
   var open = orders.filter(function(o){ return o.status==='Forecast'||o.status==='Pending'; }).reduce(function(s,o){ return s+d.orderValue(o); },0);
   var conf = orders.filter(function(o){ return o.status==='Confirmed'||o.status==='Delivered'; }).reduce(function(s,o){ return s+d.orderValue(o); },0);
   var awaiting = orders.filter(function(o){ return o.status==='Awaiting stock'; }).length;
-  var html='<div class="grid g3">';
+  var uninv = orders.filter(function(o){ return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id); });
+  var quotes = orders.filter(function(o){ return d.quoteStatus(o)==='Awaiting approval'; }).length;
+  var html='<div class="grid g5" style="margin-top:16px;">';
   html += '<div class="stat"><div class="l">Open pipeline</div><div class="v">'+BB.money(open)+'</div><div class="s">forecast + pending</div></div>';
   html += '<div class="stat"><div class="l">Confirmed value</div><div class="v">'+BB.money(conf)+'</div><div class="s">confirmed + delivered</div></div>';
   html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting stock</div><div class="v">'+awaiting+'</div><div class="s">order'+(awaiting===1?'':'s')+' held on stock</div></div>';
+  html += '<div class="stat'+(uninv.length?' warn':'')+'"><div class="l">Uninvoiced</div><div class="v">'+uninv.length+'</div><div class="s">counted as sales, not yet billed</div></div>';
+  html += '<div class="stat'+(quotes?' warn':'')+'"><div class="l">Quotes to approve</div><div class="v">'+quotes+'</div><div class="s">'+(isDirector?'waiting for you':'waiting for Rudie')+'</div></div>';
   html += '</div>';
   return html;
 }
@@ -136,55 +148,66 @@ function srcBadge(s){
   return '<span class="src '+cls+'">'+BB.esc(s)+'</span>';
 }
 
+var STATUS_COL = { 'Forecast':'#68a53e', 'Pending':'#c77d17', 'Confirmed':'#3f6b28', 'Awaiting stock':'#a3533f', 'Delivered':'#2f6f9e' };
+
 function render(){
   var orders = allOrders();
   var shown = filter==='All' ? orders : orders.filter(function(o){ return o.status===filter; });
   shown = shown.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var cols = isAdvisor?6:7;
 
   var html='';
-  html += '<div class="page-head"><h1>Orders</h1><p>'+
-    (isAdvisor?'Your full order pipeline — every order you have captured, live.'
-              :'The full pipeline across every rep. Tap a row for the products; advance status as it moves.')+'</p></div>';
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Orders</h1><p>'+
+    (isAdvisor?'Every order you have captured, and where each one is.'
+              :'The full pipeline across every rep. Open a row for the products; advance the status as it moves.')+'</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn" href="voice-order.html">'+BB.icon('mic')+'Capture an order</a><a class="btn ghost" href="forecast.html">'+BB.icon('chart')+'Forecast</a></div></div>';
 
   html += statBar(orders);
 
-  // filter chips
-  html += '<div class="chips">';
+  // the picture: the book by delivery month beside the status mix
+  html += '<div class="split" style="margin-top:16px;">'+
+    '<div class="card"><div class="card-h"><div><h3>Order book by delivery month</h3><div class="sub">'+(isAdvisor?'your orders':'all reps')+' · confirmed and still in the pipeline</div></div></div><div class="card-p"><div id="chBook"></div></div></div>'+
+    '<div class="card"><div class="card-h"><div><h3>Where the value sits</h3><div class="sub">order value by status</div></div></div><div class="card-p"><div id="chStatus"></div></div></div>'+
+  '</div>';
+
+  // the work: every order, filterable by status
+  html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>'+(isAdvisor?'Your orders':'All orders')+'</h3><div class="sub">newest first · open a row for the products, quote and invoice</div></div>'+
+    '<div class="chips">';
   ['All'].concat(STATUSES).forEach(function(s){
     var n = s==='All'?orders.length:orders.filter(function(o){ return o.status===s; }).length;
     html += '<button class="chip'+(filter===s?' on':'')+'" data-f="'+s+'">'+s+' <span style="opacity:.7;">'+n+'</span></button>';
   });
-  html += '</div>';
+  html += '</div></div>';
 
-  // table
-  html += '<div class="card" style="margin-top:6px;"><div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Ref</th><th>Farmer</th>'+(isAdvisor?'':'<th>Rep</th>')+'<th>Delivery</th><th>Source</th><th class="right">Value</th><th>Status</th></tr></thead><tbody>';
+  html += '<div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Ref</th><th>Farmer</th>'+(isAdvisor?'':'<th>Rep</th>')+'<th>Delivery</th><th>Source</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>';
 
   if(!shown.length){
-    html += '<tr><td colspan="'+(isAdvisor?6:7)+'"><div class="empty"><div class="big">▲</div>No orders here yet.</div></td></tr>';
+    html += '<tr><td colspan="'+cols+'"><div class="empty">No orders here yet.</div></td></tr>';
   }
 
+  var shownTot = 0;
   shown.forEach(function(o){
     var f=d.farmer(o.farmer), r=d.rep(o.rep);
-    html += '<tr class="click" data-id="'+o.id+'">'+
-      '<td><b>'+BB.esc(o.ref)+'</b></td>'+
+    var val = d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o); shownTot += val;
+    html += '<tr class="click'+(expanded[o.id]?' open':'')+'" data-id="'+o.id+'">'+
+      '<td><div class="row" style="gap:6px;flex-wrap:nowrap;"><span class="caret">'+BB.icon('chevron')+'</span><b>'+BB.esc(o.ref)+'</b></div></td>'+
       '<td>'+BB.esc(f.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(f.farm)+'</div></td>'+
-      (isAdvisor?'':'<td><span class="chip" style="background:'+r.colour+'22;border-color:'+r.colour+';color:'+r.colour+';"><span style="width:7px;height:7px;border-radius:50%;background:'+r.colour+';display:inline-block;"></span>'+BB.esc(r.name)+'</span></td>')+
-      '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">✓ delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'✓ delivered ':'🚚 '+BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
+      (isAdvisor?'':'<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>')+
+      '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'delivered ':BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
       '<td>'+srcBadge(o.source)+'</td>'+
-      '<td class="right">'+BB.money(d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o))+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
+      '<td class="num"><b>'+BB.money(val)+'</b>'+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;font-weight:400;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
       '<td><div class="row" style="gap:5px;">'+BB.statusBadge(o.status)+quoteChip(o)+invoiceBadge(o)+holdBadge(o)+'</div></td>'+
     '</tr>';
     // expanded row
     if(expanded[o.id]){
-      var cols = isAdvisor?6:7;
       html += '<tr class="exp"><td colspan="'+cols+'"><div class="inner">';
-      html += '<div class="scroll"><table class="bb" style="background:transparent;"><thead><tr><th>Product</th><th>Pack</th><th class="right">Qty</th><th class="right">Line value</th></tr></thead><tbody>';
+      html += '<div class="scroll"><table class="bb lines"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Line value</th></tr></thead><tbody>';
       (o.lines||[]).forEach(function(l){
         var p=d.product(l.prod);
-        html += '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="right">'+BB.num(l.qty)+'</td><td class="right">'+BB.money((p.price||0)*l.qty)+'</td></tr>';
+        html += '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>';
       });
-      html += '</tbody></table></div>';
+      html += '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>';
       html += '<div class="row between" style="margin-top:10px;">'+
         '<div class="faint" style="font-size:.78rem;">Captured '+BB.date(o.date)+' · depot '+BB.esc(d.depot(o.depot).name)+'</div>';
       if(canAdvance){
@@ -202,19 +225,39 @@ function render(){
             '<span class="faint" style="font-size:.76rem;">This order counts as actual revenue.</span></div>';
         } else if(o.status==='Delivered' || o.status==='Confirmed'){
           html += '<div class="row between" style="margin-top:8px;">'+
-            '<span class="faint" style="font-size:.76rem;">Counted as a sale but not yet invoiced — invoice it to count as actual revenue.</span>'+
-            '<button class="btn sm" data-inv="'+o.id+'">Generate invoice</button></div>';
+            '<span class="faint" style="font-size:.76rem;">Counted as a sale but not yet invoiced. Invoice it to count as actual revenue.</span>'+
+            '<button class="btn sm" data-inv="'+o.id+'">'+BB.icon('receipt')+'Generate invoice</button></div>';
         }
       }
       html += '</div></td></tr>';
     }
   });
 
-  html += '</tbody></table></div></div>';
-  html += '<div class="divider"></div><div class="row" style="padding-bottom:18px;"><a class="btn" href="voice-order.html">Capture an order</a><a class="btn ghost" href="forecast.html">Forecast</a></div>';
+  html += '</tbody>';
+  if(shown.length) html += '<tfoot><tr><td colspan="'+(cols-2)+'">'+shown.length+' order'+(shown.length===1?'':'s')+(filter==='All'?'':' · '+BB.esc(filter))+'</td><td class="num">'+BB.money(shownTot)+'</td><td></td></tr></tfoot>';
+  html += '</table></div></div>';
 
   document.getElementById('ordMain').innerHTML=html;
+  drawCharts(orders);
   bind();
+}
+
+function drawCharts(orders){
+  try{
+    var used = orders.map(function(o){ return o.deliverMonth; }).filter(function(m){ return m!=null && m>=0 && m<12; });
+    var lo = used.length?Math.min.apply(null,used):new Date().getMonth(), hi = used.length?Math.max.apply(null,used):lo+5;
+    if(hi-lo<5) hi=Math.min(11, lo+5);
+    if(hi-lo<5) lo=Math.max(0, hi-5);
+    var span=[]; for(var mi=lo; mi<=hi; mi++) span.push(mi);
+    var won = function(o){ return o.status==='Confirmed'||o.status==='Delivered'; };
+    var sumWhere = function(test){ return span.map(function(mi){ return orders.filter(function(o){ return o.deliverMonth===mi && test(o); }).reduce(function(t,o){ return t+d.orderValue(o); },0); }); };
+    BB.chart.bar('#chBook',{ labels:span.map(BB.monthName), money:true, stacked:true, height:230, table:true,
+      series:[{name:'Confirmed',values:sumWhere(won),color:'#22431a'},{name:'Pipeline',values:sumWhere(function(o){ return !won(o); }),color:'#68a53e'}] });
+    var st={}; orders.forEach(function(o){ st[o.status]=(st[o.status]||0)+d.orderValue(o); });
+    var rows = STATUSES.filter(function(k){ return st[k]; }).map(function(k){ return {label:k, value:st[k], color:STATUS_COL[k]}; });
+    if(rows.length) BB.chart.donut('#chStatus',{ money:true, centreLabel:'order value', rows:rows });
+    else document.getElementById('chStatus').innerHTML='<div class="empty">No orders yet.</div>';
+  }catch(e){ console.warn('chart', e); }
 }
 
 function bind(){

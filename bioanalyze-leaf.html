@@ -7,9 +7,31 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioAnalyze — Leaf · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+/* BioAnalyze — page-scoped */
+.detail{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin:2px 0 4px;}
+.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0;}
+.reading{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.reading .rl{font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;}
+.reading .rv{font-family:var(--display);font-size:1.15rem;font-weight:600;color:var(--green-dark);margin-top:2px;}
+.interp{margin-top:8px;padding:11px 13px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.86rem;}
+.interp.ok{background:var(--ok-bg);color:var(--ok);}
+.ctx{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 0;}
+.ctx .chip .ico{width:14px;height:14px;transform:rotate(180deg);}
+.flagl{display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);}
+.flagl .f{display:flex;gap:8px;align-items:flex-start;font-size:.8rem;color:var(--amber);}
+.flagl .f.ok{color:var(--ok);}
+.flagl .f::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;margin-top:6px;}
+.flagl .f b{color:var(--ink);font-weight:600;}
+table.bb tr.open td{background:#f3f8ec;}
+table.bb tr.detail-row td{padding-top:0;background:#f3f8ec;}
+.empty .big .ico{width:30px;height:30px;color:var(--faint);}
+.card .empty{padding:26px 20px;}
+.fld:last-of-type{margin-bottom:12px;}
+</style>
 </head>
 <body>
 <script>
@@ -20,17 +42,6 @@ var isAdvisor = u.roleKey==='advisor';
 function esc(s){ return BB.esc(s); }
 
 var blockParam = new URLSearchParams(location.search).get('block');
-
-var css=''+
-'.detail{background:#f7faf1;border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:6px;}'+
-'.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0;}'+
-'.reading{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}'+
-'.reading .rl{font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;}'+
-'.reading .rv{font-family:var(--display);font-size:1.15rem;font-weight:600;color:var(--green-dark);margin-top:2px;}'+
-'.interp{margin-top:8px;padding:11px 13px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.86rem;}'+
-'.interp.ok{background:var(--ok-bg);color:var(--ok);}'+
-'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;}';
-document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 function baseRows(){
   var rows = d.all('leaf');
@@ -52,13 +63,19 @@ var filter = 'All';
 var openId = null;
 var blockCtx = blockParam ? d.by('blocks', blockParam) : null;
 
+// readings arrive as text from the lab ("2.1%") — read the number, never guess one
+function numOf(v){ var n=parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n)? n : null; }
+function shortBlock(b){ var n=String(b.name||'—'); var parts=n.split(' — '); return parts.length>1? parts[1] : n; }
+
 function statBar(rows){
   var awaiting = rows.filter(function(l){ return l.status!=='Interpreted'; }).length;
   var interp = rows.filter(function(l){ return l.status==='Interpreted'; }).length;
-  var html='<div class="grid g3">';
+  var crops = rows.map(function(l){ return l.crop; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
+  var html='<div class="grid g4" style="margin-top:12px;">';
   html += '<div class="stat"><div class="l">Samples</div><div class="v">'+rows.length+'</div><div class="s">'+(blockCtx?'on this block':'in view')+'</div></div>';
   html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting interpretation</div><div class="v">'+awaiting+'</div><div class="s">new + at lab</div></div>';
   html += '<div class="stat"><div class="l">Interpreted</div><div class="v">'+interp+'</div><div class="s">this season</div></div>';
+  html += '<div class="stat"><div class="l">Crops</div><div class="v">'+crops.length+'</div><div class="s">'+(crops.length? esc(crops.join(' · ')) : 'none sampled yet')+'</div></div>';
   html += '</div>';
   return html;
 }
@@ -95,17 +112,15 @@ function logForm(){
     var f=d.farmer(b.farmer);
     return '<option value="'+esc(b.id)+'" data-crop="'+esc(b.crop)+'"'+(blockParam===b.id?' selected':'')+'>'+esc(f.name)+' — '+esc(b.name)+'</option>';
   }).join('');
-  var html='<div class="card card-p" style="margin-top:18px;">';
-  html += '<div class="sec" style="margin:0 0 12px;"><h2 style="font-size:1rem;">Log a leaf-sap sample</h2><span class="ln"></span></div>';
-  html += '<div class="grid g3">';
+  var html='<div class="card" id="logSample"><div class="card-h"><div><h3>Log a leaf-sap sample</h3><div class="sub">saves on this device and syncs when you have signal</div></div></div><div class="card-p">';
   html += '<div class="fld"><label>Block</label><select id="fBlock">'+opts+'</select></div>';
+  html += '<div class="grid g2" style="gap:12px;">';
   html += '<div class="fld"><label>Date sampled</label><input id="fDate" type="date" value="2026-07-28"></div>';
   html += '<div class="fld"><label>Status</label><select id="fStatus"><option>New</option><option>Awaiting lab</option></select></div>';
   html += '</div>';
   html += '<div class="fld"><label>Field note (optional)</label><input id="fNote" type="text" placeholder="e.g. Youngest fully-expanded leaves, pre nut-fill"></div>';
-  html += '<button class="btn" id="fSave">Save sample</button>';
-  html += '<p class="faint" style="font-size:.74rem;margin-top:8px;">Saves on this device and syncs when you have signal.</p>';
-  html += '</div>';
+  html += '<button class="btn block" id="fSave">'+BB.icon('plus')+'Save sample</button>';
+  html += '</div></div>';
   return html;
 }
 
@@ -114,55 +129,108 @@ function render(){
   var shown = filter==='All' ? rows : rows.filter(function(l){ return l.status===filter; });
 
   var html='';
-  html += '<div class="page-head"><h1>BioAnalyze — Leaf</h1><p>'+
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">BioServices · BioAnalyze</div><h1>BioAnalyze — Leaf</h1><p>'+
     (blockCtx?'Leaf-sap results for '+esc(blockCtx.name)+'. ':'')+
-    'Leaf-sap analysis for in-season correction — what the plant is actually taking up, block by block.</p></div>';
+    'Leaf-sap analysis for in-season correction — what the plant is actually taking up, block by block.</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn ghost" href="bioanalyze-soil.html'+(blockParam?'?block='+encodeURIComponent(blockParam):'')+'">'+BB.icon('flask')+'Soil results</a>'+
+    '<a class="btn" href="#logSample">'+BB.icon('plus')+'Log a sample</a></div></div>';
 
   if(blockCtx){
-    html += '<div class="chips"><a class="chip" href="bioanalyze-leaf.html">‹ All blocks</a>'+
+    html += '<div class="ctx"><a class="chip" href="bioanalyze-leaf.html">'+BB.icon('chevron')+'All blocks</a>'+
       '<span class="chip on">'+esc(d.farmer(blockCtx.farmer).name)+' — '+esc(blockCtx.name)+'</span></div>';
   }
 
   html += statBar(rows);
 
-  html += '<div class="chips" style="margin-top:12px;">';
+  // The picture: N, K and Ca as reported, block by block, beside where the samples stand
+  var interp = rows.filter(function(l){ return l.status==='Interpreted' && (numOf(l.n)!=null || numOf(l.k)!=null || numOf(l.ca)!=null); });
+  html += '<div class="split" style="margin-top:16px;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Nutrient readings by block</h3><div class="sub">interpreted samples in view · % as reported by the lab</div></div></div><div class="card-p">';
+  if(interp.length>=2){
+    html += '<div id="chNut"></div>';
+    html += '<div class="flagl">'+interp.map(function(l){
+      var b=d.by('blocks',l.block)||{name:'—'}, ok=/balanced|hold|good/i.test(l.flag||'');
+      return '<div class="f'+(ok?' ok':'')+'"><span><b>'+esc(shortBlock(b))+'</b> · '+esc(l.crop)+' — '+esc(l.flag)+'</span></div>';
+    }).join('')+'</div>';
+  } else if(interp.length===1){
+    var l1=interp[0], b1=d.by('blocks',l1.block)||{name:'—'};
+    html += '<div class="readings" style="margin:0;">'+
+      '<div class="reading"><div class="rl">Nitrogen</div><div class="rv">'+esc(l1.n)+'</div></div>'+
+      '<div class="reading"><div class="rl">Potassium</div><div class="rv">'+esc(l1.k)+'</div></div>'+
+      '<div class="reading"><div class="rl">Calcium</div><div class="rv">'+esc(l1.ca)+'</div></div>'+
+    '</div><div class="faint" style="font-size:.78rem;margin-top:10px;">One interpreted sample in view — '+esc(b1.name)+', '+BB.date(l1.date)+'. Readings compare here once there are two.</div>';
+  } else {
+    html += '<div class="empty" style="padding:20px;">No interpreted results in view yet. Readings appear here once the sap results are interpreted.</div>';
+  }
+  html += '</div></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>Where the samples are</h3><div class="sub">'+rows.length+' in view</div></div></div><div class="card-p">'+
+    (rows.length?'<div id="chStatus"></div>':'<div class="empty" style="padding:16px;">No samples yet.</div>')+'</div></div>';
+  html += '</div>';
+
+  // The work: the sample queue beside the log form
+  html += '<div class="split" style="margin-top:16px;align-items:start;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Samples</h3><div class="sub">newest first · tap a row for the full result</div></div>'+
+    '<div class="row" style="gap:6px;">';
   ['All','New','Awaiting lab','Interpreted'].forEach(function(st){
     var n = st==='All'?rows.length:rows.filter(function(l){ return l.status===st; }).length;
     html += '<button class="chip'+(filter===st?' on':'')+'" data-f="'+esc(st)+'">'+esc(st)+' <span style="opacity:.7;">'+n+'</span></button>';
   });
-  html += '</div>';
+  html += '</div></div>';
 
-  html += '<div class="card" style="margin-top:6px;"><div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Date</th><th>Farmer / block</th><th>Crop</th><th>N</th><th>K</th><th>Ca</th><th>Status</th></tr></thead><tbody>';
+  html += '<div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Date</th><th>Farmer / block</th><th>Crop</th><th class="num">N</th><th class="num">K</th><th class="num">Ca</th><th>Status</th></tr></thead><tbody>';
 
   if(!shown.length){
-    html += '<tr><td colspan="7"><div class="empty"><div class="big">🍃</div>No leaf-sap samples here yet.</div></td></tr>';
+    html += '<tr><td colspan="7"><div class="empty"><div class="big">'+BB.icon('leaf')+'</div>No leaf-sap samples here yet.</div></td></tr>';
   }
 
   shown.forEach(function(l){
     var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'};
     var isInterp = l.status==='Interpreted';
-    html += '<tr class="click" data-id="'+esc(l.id)+'">'+
-      '<td>'+BB.date(l.date)+'</td>'+
-      '<td><b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div></td>'+
+    html += '<tr class="click'+(openId===l.id?' open':'')+'" data-id="'+esc(l.id)+'">'+
+      '<td style="white-space:nowrap;">'+BB.date(l.date)+'</td>'+
+      '<td style="min-width:150px;"><b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div></td>'+
       '<td>'+esc(l.crop)+'</td>'+
-      '<td>'+(isInterp?esc(l.n):'<span class="faint">—</span>')+'</td>'+
-      '<td>'+(isInterp?esc(l.k):'<span class="faint">—</span>')+'</td>'+
-      '<td>'+(isInterp?esc(l.ca):'<span class="faint">—</span>')+'</td>'+
+      '<td class="num">'+(isInterp?esc(l.n):'<span class="faint">—</span>')+'</td>'+
+      '<td class="num">'+(isInterp?esc(l.k):'<span class="faint">—</span>')+'</td>'+
+      '<td class="num">'+(isInterp?esc(l.ca):'<span class="faint">—</span>')+'</td>'+
       '<td>'+BB.statusBadge(l.status)+'</td>'+
     '</tr>';
     if(openId===l.id){
-      html += '<tr><td colspan="7" style="padding:0 12px 12px;">'+detailPanel(l)+'</td></tr>';
+      html += '<tr class="detail-row"><td colspan="7">'+detailPanel(l)+'</td></tr>';
     }
   });
 
   html += '</tbody></table></div></div>';
 
   html += logForm();
+  html += '</div>';
   html += '<div style="height:20px;"></div>';
 
   document.getElementById('leafMain').innerHTML=html;
   bind();
+
+  // charts — only the lab's own figures and counts of the rows in view
+  try{
+    if(interp.length>=2){
+      BB.chart.bar('#chNut', { height:220, table:true, fmt:function(v){ return (Math.round(v*100)/100)+'%'; }, axisFmt:function(v){ return (Math.round(v*100)/100)+'%'; },
+        labels: interp.map(function(l){ return shortBlock(d.by('blocks',l.block)||{name:'—'}); }),
+        series:[
+          { name:'Nitrogen (N)',  values: interp.map(function(l){ return numOf(l.n)||0; }),  color:'#3f6b28' },
+          { name:'Potassium (K)', values: interp.map(function(l){ return numOf(l.k)||0; }),  color:'#c77d17' },
+          { name:'Calcium (Ca)',  values: interp.map(function(l){ return numOf(l.ca)||0; }), color:'#2f6f9e' }
+        ] });
+    }
+  }catch(e){ console.warn('chart', e); }
+  try{
+    if(rows.length){
+      var ST=[['New','#7d4f9a'],['Awaiting lab','#c77d17'],['Interpreted','#3f6b28']];
+      var stRows = ST.map(function(x){ return { label:x[0], value:rows.filter(function(l){ return l.status===x[0]; }).length, color:x[1] }; });
+      var other = rows.filter(function(l){ return ST.every(function(x){ return x[0]!==l.status; }); }).length;
+      if(other) stRows.push({ label:'Other', value:other, color:'#6b7a5e' });
+      BB.chart.donut('#chStatus', { rows:stRows, centreLabel:'samples' });
+    }
+  }catch(e){ console.warn('chart', e); }
 }
 
 function bind(){

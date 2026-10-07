@@ -7,9 +7,25 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Operations board · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+  .ops-kpi{margin-top:14px;}
+  .ops-row{margin-top:16px;}
+  .ops-row > .card{display:flex;flex-direction:column;}
+  .ops-row > .card > .card-f{margin-top:auto;}
+  .sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none;}
+  .lvl .trk{position:relative;overflow:visible;height:7px;}
+  .lvl .trk i{border-radius:4px;}
+  .lvl .trk b{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--green-darkest);opacity:.45;}
+  .dep-list{border-top:1px solid var(--line-soft);}
+  .dep-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 20px;border-top:1px solid var(--line-soft);transition:background .12s;}
+  .dep-row:first-child{border-top:0;}
+  .dep-row:hover{background:#f3f8ec;}
+  .dep-row b{color:var(--green-dark);font-size:.88rem;}
+  @media(max-width:480px){ .dep-row{padding:10px 14px;flex-wrap:wrap;} }
+</style>
 </head>
 <body>
 <script>
@@ -39,13 +55,35 @@ var inTransit = deliveries.filter(function(x){ return x.status==='In transit'; }
 
 // ---- render ----
 var html = '';
+var chartJobs = [];
+// A panel in the conventions' shape: header (title, context, actions) then the body.
+function panel(title, sub, actions, body, extra){
+  return '<div class="card'+(extra?' '+extra:'')+'"><div class="card-h"><div><h3>'+title+'</h3>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(actions||'')+'</div>'+body+'</div>';
+}
+function openLink(href, label){
+  if(BB.auth && typeof BB.auth.canPage==='function' && !BB.auth.canPage(href)) return '';
+  return '<a class="btn ghost sm" href="'+href+'">'+(label||'Open')+BB.icon('chevron')+'</a>';
+}
+// stock level against reorder: the reorder level sits at the midpoint of the track
+function levelCell(qty, reorder){
+  var cap = Math.max(1, (reorder||0)*2), pct = Math.max(0, Math.min(100, qty/cap*100));
+  var col = qty<=0 ? 'var(--red)' : (qty<reorder ? 'var(--amber)' : 'var(--green-bright)');
+  return '<div class="bar-cell lvl"><div class="trk"><i style="width:'+pct+'%;background:'+col+'"></i><b title="reorder level"></b></div></div>';
+}
 
-html += '<section class="page-head">'+
-  '<div class="eyebrow">Operations</div>'+
+var headActions = [
+  {href:'orders.html', ic:'receipt', t:'Orders'},
+  {href:'stock.html', ic:'package', t:'Stock'},
+  {href:'deliveries.html', ic:'truck', t:'Deliveries'}
+].filter(function(a){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(a.href); });
+
+html += '<section class="page-head row between" style="gap:16px;">'+
+  '<div><div class="eyebrow">Operations</div>'+
   '<h1>The board</h1>'+
   '<p>'+(liveBoard
-    ? 'The whole business on one screen, straight from your accounting system \u2014 what has been invoiced and received, who is behind, who is selling it and what is going out the door. Read three times a day.'
-    : 'The whole business on one screen — sales, stock, blending and deliveries, live as the team works. Everything here is saved on this device and syncs when you have signal.')+'</p>'+
+    ? 'The whole business on one screen, straight from your accounting system — what has been invoiced and received, who is behind, who is selling it and what is going out the door. Read three times a day.'
+    : 'The whole business on one screen — sales, stock, blending and deliveries, live as the team works. Everything here is saved on this device and syncs when you have signal.')+'</p></div>'+
+  (headActions.length ? '<div class="row" style="gap:8px;">'+headActions.map(function(a,i){ return '<a class="btn'+(i?' ghost':'')+'" href="'+a.href+'">'+BB.icon(a.ic)+a.t+'</a>'; }).join('')+'</div>' : '')+
 '</section>';
 
 // ---- top stat row ----
@@ -83,7 +121,7 @@ if(sg && sg.live){
     {l:'Blending jobs', v:blending.length, s:'across depots', cls:''}
   ];
 }
-html += '<div class="grid g3">';
+html += '<div class="grid g6 ops-kpi">';
 STATS.forEach(function(st){
   html += '<div class="stat'+(st.cls?' '+st.cls:'')+'">'+
     '<div class="l">'+st.l+'</div>'+
@@ -125,72 +163,61 @@ if(liveBoard && sgB && sgB.live){
   });
   var agentRows = Object.keys(byAgent).map(function(k){ return {k:k, v:byAgent[k].v, n:byAgent[k].n}; })
     .sort(function(a,b){ return b.v-a.v; });
-  var maxA = agentRows.reduce(function(m,x){ return Math.max(m,x.v); }, 0) || 1;
-
-  html += '<div class="sec"><h2>This month, by agent</h2><span class="ln"></span><span class="cnt">invoiced, from your accounting system</span>'+BB.liveChip()+'</div>';
-  html += '<div class="card card-p">';
-  if(!agentRows.length){
-    html += '<div class="empty">Nothing invoiced yet this month.</div>';
-  } else {
-    agentRows.forEach(function(x){
-      var pct = Math.round(x.v/maxA*100);
-      var unalloc = !x.k;
-      html += '<div style="margin-bottom:13px;">'+
-        '<div class="row between" style="margin-bottom:5px;">'+
-          '<div class="row" style="gap:8px;"><span style="width:11px;height:11px;border-radius:3px;background:'+(unalloc?'#b9c4ad':'var(--green-bright)')+';display:inline-block;"></span>'+
-            '<b style="font-size:.9rem;color:var(--green-dark);">'+BB.esc(agentName(x.k))+'</b>'+
-            '<span class="faint" style="font-size:.74rem;">'+x.n+' invoice'+(x.n===1?'':'s')+'</span></div>'+
-          '<b style="font-size:.88rem;color:var(--green-dark);">'+BB.money(Math.round(x.v))+'</b>'+
-        '</div>'+
-        '<div style="height:9px;border-radius:6px;background:var(--line-soft);overflow:hidden;">'+
-          '<div style="height:100%;width:'+pct+'%;background:'+(unalloc?'#b9c4ad':'var(--green-bright)')+';border-radius:6px;"></div></div>'+
-      '</div>';
-    });
-    if(byAgent['']){
-      html += '<div class="pline faint" style="font-size:.78rem;">'+BB.money(Math.round(byAgent[''].v))+' is not allocated to anyone yet. '+
-        'Allocate those accounts once in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales \u2192 By customer</a> and every report here, and the commission, follows.</div>';
-    }
-  }
-  html += '</div>';
 
   // --- biggest movers, in litres and kilograms ---
   var movers = (sgB.products||[]).map(function(pp){
     var m=(pp.months||{})[ymB]; return { n:pp.name, c:pp.code, q:(m&&m.qty)||0, v:(m&&m.value)||0 };
   }).filter(function(x){ return x.q>0; }).sort(function(a,b){ return b.q-a.q; }).slice(0,10);
-  html += '<div class="sec"><h2>Biggest movers this month</h2><span class="ln"></span><span class="cnt">in the quantity they were invoiced</span>'+BB.liveChip()+'</div>';
-  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th class="right">Quantity</th><th class="right">Invoiced</th></tr></thead><tbody>';
-  if(!movers.length){ html += '<tr><td colspan="4"><div class="empty">Nothing invoiced yet this month.</div></td></tr>'; }
+
+  var agentBody = !agentRows.length ? '<div class="empty">Nothing invoiced yet this month.</div>'
+    : '<div class="card-p"><div id="chAgent"></div></div>'+
+      (byAgent[''] ? '<div class="card-f">'+BB.money(Math.round(byAgent[''].v))+' is not allocated to anyone yet. '+
+        'Allocate those accounts once in <a href="sales-report.html?view=customer" style="color:var(--green-dark);font-weight:600;">Sales → By customer</a> and every report here, and the commission, follows.</div>' : '');
+  if(agentRows.length){
+    var agentPal = ['#3f6b28','#c77d17','#2f6f9e','#7d4f9a','#a3533f','#22431a','#68a53e'];
+    chartJobs.push(function(){ BB.chart.hbar('#chAgent', { money:true, rows:agentRows.map(function(x,ix){
+      return { label:agentName(x.k), sub:x.n+' invoice'+(x.n===1?'':'s'), value:Math.round(x.v), color:x.k?agentPal[ix%agentPal.length]:'#6b7a5e' }; }) }); });
+  }
+
+  var moverBody = '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th class="num">Quantity</th><th class="num">Invoiced</th></tr></thead><tbody>';
+  if(!movers.length){ moverBody += '<tr><td colspan="4"><div class="empty">Nothing invoiced yet this month.</div></td></tr>'; }
   movers.forEach(function(x){
-    html += '<tr><td><b style="color:var(--green-dark);">'+BB.esc(x.n)+'</b></td><td class="muted">'+BB.esc(x.c||'')+'</td>'+
-      '<td class="right">'+(Math.round(x.q*10)/10).toLocaleString('en-ZA')+'</td><td class="right">'+BB.money(Math.round(x.v))+'</td></tr>';
+    moverBody += '<tr><td><b style="color:var(--green-dark);">'+BB.esc(x.n)+'</b></td><td class="muted">'+BB.esc(x.c||'')+'</td>'+
+      '<td class="num">'+(Math.round(x.q*10)/10).toLocaleString('en-ZA')+'</td><td class="num">'+BB.money(Math.round(x.v))+'</td></tr>';
   });
-  html += '</tbody></table></div></div>';
-  html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;"><a href="dispatch.html" style="color:var(--green-dark);">Every product, month by month \u203a</a></div>';
+  moverBody += '</tbody></table></div>';
+
+  html += '<div class="grid g2 ops-row">'+
+    panel('This month, by agent', 'invoiced, from your accounting system', BB.liveChip(), agentBody)+
+    panel('Biggest movers this month', 'in the quantity they were invoiced', openLink('dispatch.html','Every product'), moverBody)+
+  '</div>';
+
+  // --- six months of invoiced vs received, beside what is owed by age (all counted off the ledger) ---
+  if((sgB.invoices||[]).length){
+    var M6 = (function(){ var out=[], t=new Date(); t.setDate(1); for(var k=5;k>=0;k--){ var x=new Date(t.getFullYear(), t.getMonth()-k, 1); out.push({ ym:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'), l:BB.monthName(x.getMonth()) }); } return out; })();
+    var invBy = M6.map(function(m){ return invB.filter(function(i){ return (i.date||'').slice(0,7)===m.ym; }).reduce(function(t,i){ return t+(i.amount||0); },0); });
+    var payBy = M6.map(function(m){ return (sgB.payments||[]).filter(function(x){ return (x.date||'').slice(0,7)===m.ym; }).reduce(function(t,x){ return t+(x.amount||0); },0); });
+    var t0g = new Date(new Date().toISOString().slice(0,10));
+    var openG = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+    var ageG = [{label:'Current',value:0,color:'#3f6b28'},{label:'1–30 days',value:0,color:'#8fbf5a'},{label:'31–60 days',value:0,color:'#c77d17'},{label:'61–90 days',value:0,color:'#a3533f'},{label:'90+ days',value:0,color:'#b8382a'}];
+    (sgB.invoices||[]).forEach(function(i){ var v=openG(i); if(v<=0.5) return; var dd=i.dueDate?Math.round((t0g-new Date(i.dueDate))/86400000):0;
+      ageG[dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4].value+=v; });
+    html += '<div class="split ops-row">'+
+      panel('Invoiced vs received', 'last six months · from your accounting system', BB.liveChip(), '<div class="card-p"><div id="chTrade"></div></div>')+
+      panel('What is owed, by age', 'open invoices', '', '<div class="card-p"><div id="chAgeOps"></div></div>')+
+    '</div>';
+    chartJobs.push(function(){ BB.chart.bar('#chTrade', { labels:M6.map(function(m){ return m.l; }), money:true, height:230, table:true,
+      series:[{name:'Invoiced',values:invBy,color:'#3f6b28'},{name:'Received',values:payBy,color:'#8fbf5a'}] }); });
+    chartJobs.push(function(){ BB.chart.donut('#chAgeOps', { rows:ageG, money:true, centreLabel:'owed' }); });
+  }
 } else {
 // ---- sales by rep ----
 var repRows = reps.map(function(r){
-  var val = orders.filter(function(o){ return o.rep===r.id; }).reduce(function(s,o){ return s+d.orderValue(o); }, 0);
-  var cnt = orders.filter(function(o){ return o.rep===r.id; }).length;
-  return { rep:r, val:val, cnt:cnt };
+  var mine = orders.filter(function(o){ return o.rep===r.id; });
+  var val = mine.reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+  var won = mine.filter(function(o){ return o.status==='Confirmed'||o.status==='Delivered'; }).reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+  return { rep:r, val:val, won:won, cnt:mine.length };
 }).sort(function(a,b){ return b.val-a.val; });
-var maxRepVal = repRows.reduce(function(m,x){ return Math.max(m,x.val); }, 0) || 1;
-
-html += '<div class="sec"><h2>Sales by rep</h2><span class="ln"></span><span class="cnt">all orders this season</span></div>';
-html += '<div class="card card-p">';
-repRows.forEach(function(x){
-  var pct = Math.round(x.val/maxRepVal*100);
-  html += '<div style="margin-bottom:13px;">'+
-    '<div class="row between" style="margin-bottom:5px;">'+
-      '<div class="row" style="gap:8px;"><span style="width:11px;height:11px;border-radius:3px;background:'+BB.esc(x.rep.colour)+';display:inline-block;"></span>'+
-        '<b style="font-size:.9rem;color:var(--green-dark);">'+BB.esc(x.rep.name)+'</b>'+
-        '<span class="faint" style="font-size:.74rem;">'+BB.esc(x.rep.region)+' · '+x.cnt+' order'+(x.cnt===1?'':'s')+'</span></div>'+
-      '<b style="font-size:.88rem;color:var(--green-dark);">'+BB.money(x.val)+'</b>'+
-    '</div>'+
-    '<div style="height:9px;border-radius:6px;background:var(--line-soft);overflow:hidden;">'+
-      '<div style="height:100%;width:'+pct+'%;background:'+BB.esc(x.rep.colour)+';border-radius:6px;"></div></div>'+
-  '</div>';
-});
-html += '</div>';
 
 // ---- sales vs actuals (invoiced-vs-sale reconciliation) ----
 // Reported = what reps count as sold (Confirmed + Delivered orders).
@@ -206,49 +233,65 @@ var recRows = reps.map(function(r){
 }).sort(function(a,b){ return b.gap-a.gap; });
 var recTot = recRows.reduce(function(t,x){ t.reported+=x.reported; t.actual+=x.actual; t.gap+=x.gap; return t; }, {reported:0,actual:0,gap:0});
 
-html += '<div class="sec"><h2>Sales vs actuals</h2><span class="ln"></span><span class="cnt">reported vs invoiced</span></div>';
-html += '<div class="card"><div class="card-p" style="padding-bottom:12px;">'+
-  '<p class="muted" style="font-size:.84rem;">The <b>gap</b> is product that reps have delivered and counted as a sale, but that has not been invoiced yet. Only invoiced product is actual revenue — so the gap is exactly what makes the rep numbers and the finance numbers differ.</p>'+
-'</div>';
-html += '<div class="scroll"><table class="bb"><thead><tr>'+
-  '<th>Rep</th><th class="right">Reported (rep sales)</th><th class="right">Actual (invoiced)</th><th class="right">Gap</th></tr></thead><tbody>';
+var recBody = '<div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Rep</th><th class="num">Reported</th><th class="num">Invoiced</th><th class="num">Gap</th></tr></thead><tbody>';
 recRows.forEach(function(x){
-  var gapCls = x.gap>0 ? 'b-warn' : 'b-ok';
-  html += '<tr>'+
-    '<td><span class="row" style="gap:8px;"><span style="width:10px;height:10px;border-radius:3px;background:'+BB.esc(x.rep.colour)+';display:inline-block;"></span><b style="color:var(--green-dark);">'+BB.esc(x.rep.name)+'</b></span></td>'+
-    '<td class="right muted">'+BB.money(x.reported)+'</td>'+
-    '<td class="right muted">'+BB.money(x.actual)+'</td>'+
-    '<td class="right"><span class="badge '+gapCls+'">'+BB.money(x.gap)+'</span></td>'+
+  recBody += '<tr>'+
+    '<td><span class="row" style="gap:8px;flex-wrap:nowrap;"><span class="sw" style="background:'+BB.esc(x.rep.colour)+';"></span><b style="color:var(--green-dark);white-space:nowrap;">'+BB.esc(x.rep.name)+'</b></span></td>'+
+    '<td class="num">'+BB.money(x.reported)+'</td>'+
+    '<td class="num">'+BB.money(x.actual)+'</td>'+
+    '<td class="num"><span class="badge '+(x.gap>0?'b-warn':'b-ok')+'">'+BB.money(x.gap)+'</span></td>'+
   '</tr>';
 });
-html += '<tr style="border-top:2px solid var(--line);">'+
-  '<td><b style="color:var(--green-dark);">Total</b></td>'+
-  '<td class="right"><b style="color:var(--green-dark);">'+BB.money(recTot.reported)+'</b></td>'+
-  '<td class="right"><b style="color:var(--green-dark);">'+BB.money(recTot.actual)+'</b></td>'+
-  '<td class="right"><span class="badge '+(recTot.gap>0?'b-warn':'b-ok')+'">'+BB.money(recTot.gap)+'</span></td>'+
-'</tr>';
-html += '</tbody></table></div></div>';
+recBody += '</tbody><tfoot><tr><td>Total</td><td class="num">'+BB.money(recTot.reported)+'</td><td class="num">'+BB.money(recTot.actual)+'</td>'+
+  '<td class="num"><span class="badge '+(recTot.gap>0?'b-warn':'b-ok')+'">'+BB.money(recTot.gap)+'</span></td></tr></tfoot></table></div>'+
+  '<div class="card-f">The <b>gap</b> is product reps have delivered and counted as a sale that has not been invoiced yet. Only invoiced product is actual revenue, so the gap is exactly what makes the rep numbers and the finance numbers differ.</div>';
 
-// ---- stock health by depot ----
-html += '<div class="sec"><h2>Stock health by depot</h2><span class="ln"></span><span class="cnt">'+depots.length+' depots</span></div>';
-html += '<div class="grid g3">';
+html += '<div class="grid g2 ops-row">'+
+  panel('Sales by rep', 'all orders this season · confirmed and still in the pipeline', openLink('orders.html','Orders'), '<div class="card-p"><div id="chReps"></div></div>')+
+  panel('Sales vs actuals', 'reported by reps vs invoiced', '', recBody)+
+'</div>';
+chartJobs.push(function(){ BB.chart.hbar('#chReps', { money:true,
+  legend:[{name:'Confirmed + delivered',color:'#22431a'},{name:'Pipeline',color:'#68a53e'}],
+  rows:repRows.map(function(x){ return { label:x.rep.name, sub:x.rep.region+' · '+x.cnt+' order'+(x.cnt===1?'':'s'),
+    parts:[{name:'Confirmed + delivered',value:x.won,color:'#22431a'},{name:'Pipeline',value:x.val-x.won,color:'#68a53e'}] }; }) }); });
+
+// ---- stock vs reorder, beside stock health by depot ----
+var stockRows = inventory.slice().sort(function(a,b){ return (a.qty/(a.reorder||1))-(b.qty/(b.reorder||1)); });
+var stockBody = '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Depot</th><th class="num">On hand</th><th class="num">Reorder at</th><th style="min-width:160px;">Level</th><th>Status</th></tr></thead><tbody>';
+if(!stockRows.length) stockBody += '<tr><td colspan="6"><div class="empty">No stock lines yet.</div></td></tr>';
+stockRows.forEach(function(i){
+  var p = d.product(i.prod), st = i.qty<=0?'Out of stock':(i.qty<i.reorder?'Low stock':'In stock');
+  stockBody += '<tr class="click" data-href="stock.html">'+
+    '<td><b style="color:var(--green-dark);white-space:nowrap;">'+BB.esc(p.name)+'</b></td>'+
+    '<td class="muted">'+BB.esc(d.depot(i.depot).name.replace(/ Depot$/,''))+'</td>'+
+    '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
+    '<td class="num muted">'+BB.num(i.reorder)+'</td>'+
+    '<td>'+levelCell(i.qty, i.reorder)+'</td>'+
+    '<td>'+BB.statusBadge(st)+'</td></tr>';
+});
+stockBody += '</tbody></table></div><div class="card-f">The mark on each bar is the reorder level. Lowest first.</div>';
+
+var depotList = '<div class="dep-list">';
+var depOk = [], depLow = [];
 depots.forEach(function(dep){
   var items = inventory.filter(function(i){ return i.depot===dep.id; });
   var low = items.filter(function(i){ return i.qty<i.reorder; });
-  var bad = low.length>0;
-  html += '<a class="card card-p" href="stock.html" style="display:block;'+(bad?'border-left:3px solid var(--red);':'border-left:3px solid var(--green-bright);')+'">'+
-    '<div class="row between">'+
-      '<b style="color:var(--green-dark);">'+BB.esc(dep.name)+'</b>'+
-      BB.statusBadge(dep.status)+
-    '</div>'+
-    '<div class="faint" style="font-size:.74rem;margin:3px 0 10px;">'+BB.esc(dep.region)+'</div>'+
-    '<div class="row between">'+
-      '<div><div class="v" style="font-family:var(--display);font-size:1.3rem;color:var(--green-dark);">'+items.length+'</div><div class="faint" style="font-size:.7rem;">stock lines</div></div>'+
-      '<div class="right"><div class="v" style="font-family:var(--display);font-size:1.3rem;color:'+(bad?'var(--red)':'var(--green-dark)')+';">'+low.length+'</div><div class="faint" style="font-size:.7rem;">below reorder</div></div>'+
-    '</div>'+
+  depOk.push(items.length-low.length); depLow.push(low.length);
+  depotList += '<a class="dep-row" href="stock.html">'+
+    '<div style="min-width:0;"><b>'+BB.esc(dep.name)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(dep.region)+' · '+items.length+' lines</div></div>'+
+    '<div class="row" style="gap:8px;flex:none;">'+(low.length?'<span class="badge b-bad">'+low.length+' low</span>':'<span class="badge b-ok">All above</span>')+BB.statusBadge(dep.status)+'</div>'+
   '</a>';
 });
-html += '</div>';
+depotList += '</div>';
+
+html += '<div class="split ops-row">'+
+  panel('Stock vs reorder', inventory.length+' lines across '+depots.length+' depots', openLink('stock.html','Stock'), stockBody)+
+  panel('Stock health by depot', 'lines above and below reorder', '', '<div class="card-p"><div id="chDepots"></div></div>'+depotList)+
+'</div>';
+chartJobs.push(function(){ BB.chart.bar('#chDepots', { labels:depots.map(function(x){ return x.name.replace(/ Depot$/,''); }), stacked:true, height:190, table:true,
+  max:Math.max(4, Math.ceil(Math.max.apply(null, depOk.map(function(v,k){ return v+depLow[k]; }).concat([0]))/4)*4),
+  series:[{name:'Above reorder',values:depOk,color:'#3f6b28'},{name:'Below reorder',values:depLow,color:'#b8382a'}] }); });
 
 }
 
@@ -266,7 +309,7 @@ if(liveBoard && sgB && sgB.live){
   var overN = function(i){ return i.dueDate ? Math.round((t0N-new Date(i.dueDate))/86400000) : 0; };
   invN.filter(function(i){ return openN(i)>0.5 && overN(i)>=90; })
     .sort(function(a,b){ return overN(b)-overN(a); }).slice(0,8).forEach(function(i){
-      actions.push({ kind:'90+ days', what:(byIdN[i.customer]||{name:'\u2014'}).name+' \u00b7 '+(i.label||i.ref||''),
+      actions.push({ kind:'90+ days', what:(byIdN[i.customer]||{name:'—'}).name+' · '+(i.label||i.ref||''),
         val:BB.money(Math.round(openN(i))), badge:'Overdue', href:'finance.html?show=overdue' });
     });
   custN.filter(function(c){ return c.creditLimit>0 && c.balance>c.creditLimit; })
@@ -303,65 +346,83 @@ if(!liveBoard) leaf.filter(function(l){ return l.status==='New'||l.status==='Awa
   actions.push({ kind:'Leaf sample', what:d.farmer(l.farmer).name+' · '+l.status, val:'', badge:l.status, href:'bioanalyze-leaf.html' });
 });
 
-
-html += '<div class="sec"><h2>Needs action</h2><span class="ln"></span><span class="cnt">'+actions.length+' open</span></div>';
-html += '<div class="card">';
+var actBody;
 if(!actions.length){
-  html += '<div class="empty"><div class="big">✓</div>Nothing waiting — the board is clear.</div>';
+  actBody = '<div class="empty"><div class="big">'+BB.icon('check')+'</div>Nothing waiting — the board is clear.</div>';
 } else {
-  html += '<div class="scroll"><table class="bb"><tbody>';
+  actBody = '<div class="scroll tall"><table class="bb"><thead><tr><th>What</th><th>Detail</th><th class="num">Value</th><th class="num">Status</th></tr></thead><tbody>';
   actions.forEach(function(a){
-    html += '<tr class="click" data-href="'+BB.esc(a.href)+'">'+
+    actBody += '<tr class="click" data-href="'+BB.esc(a.href)+'">'+
       '<td style="white-space:nowrap;"><b style="color:var(--green-dark);font-size:.82rem;">'+BB.esc(a.kind)+'</b></td>'+
       '<td>'+BB.esc(a.what)+'</td>'+
-      '<td class="muted" style="white-space:nowrap;">'+BB.esc(a.val)+'</td>'+
-      '<td class="right">'+BB.statusBadge(a.badge)+'</td>'+
+      '<td class="num muted">'+BB.esc(a.val)+'</td>'+
+      '<td class="num">'+BB.statusBadge(a.badge)+'</td>'+
     '</tr>';
   });
-  html += '</tbody></table></div>';
+  actBody += '</tbody></table></div>';
 }
-html += '</div>';
+var actPanel = panel('Needs action', 'tap a row to open it', '<span class="badge '+(actions.length?'b-warn':'b-ok')+'">'+actions.length+' open</span>', actBody);
+
+// Blending sits beside the action list on the portal's own figures. BioBrix do not keep blending
+// in Sage, so a live client seat does not get demonstration jobs.
+if(!liveBoard){
+  var blendBody;
+  if(!blending.length){ blendBody = '<div class="empty">No blending jobs on the floor.</div>'; }
+  else {
+    blendBody = '<div class="dep-list" style="border-top:0;">';
+    blending.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).forEach(function(b){
+      blendBody += '<div class="dep-row"><div style="min-width:0;"><b>'+BB.esc(b.recipe)+'</b>'+
+        '<div class="faint" style="font-size:.74rem;">'+BB.esc(b.batch)+' · '+BB.esc(d.depot(b.depot).name.replace(/ Depot$/,''))+' · for '+BB.esc(d.farmer(b['for']).name)+'</div></div>'+
+        '<div style="text-align:right;flex:none;">'+BB.statusBadge(b.status)+'<div class="faint" style="font-size:.72rem;margin-top:3px;">due '+BB.shortDate(b.due)+'</div></div></div>';
+    });
+    blendBody += '</div>';
+  }
+  html += '<div class="split ops-row">'+actPanel+
+    panel('Mixing &amp; blending', blending.length+' job'+(blending.length===1?'':'s')+' across the depots', openLink('depots.html','Depots'), blendBody)+'</div>';
+} else {
+  html += '<div class="ops-row">'+actPanel+'</div>';
+}
 
 // ---- latest orders + deliveries in transit (two columns) ----
 var latest = orders.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); }).slice(0,5);
 
-html += '<div class="grid g2" style="margin-top:26px;">';
-
-// latest orders
-html += '<div class="card"><div class="card-p" style="padding-bottom:0;"><div class="row between"><b style="color:var(--green-dark);">Latest orders</b><a class="faint" href="orders.html" style="font-size:.78rem;">All ›</a></div></div>';
-html += '<div class="scroll"><table class="bb"><thead><tr><th>Ref</th><th>Farmer</th><th>Value</th><th class="right">Status</th></tr></thead><tbody>';
+var latestBody = '<div class="scroll"><table class="bb"><thead><tr><th>Ref</th><th>Farmer</th><th class="num">Value</th><th class="num">Status</th></tr></thead><tbody>';
+if(!latest.length) latestBody += '<tr><td colspan="4"><div class="empty">No orders yet.</div></td></tr>';
 latest.forEach(function(o){
-  html += '<tr class="click" data-href="orders.html">'+
+  latestBody += '<tr class="click" data-href="orders.html">'+
     '<td><b style="color:var(--green-dark);">'+BB.esc(o.ref)+'</b></td>'+
     '<td>'+BB.esc(d.farmer(o.farmer).name)+'</td>'+
-    '<td class="muted">'+BB.money(d.orderValue(o))+'</td>'+
-    '<td class="right">'+BB.statusBadge(o.status)+'</td>'+
+    '<td class="num">'+BB.money(d.orderValue(o))+'</td>'+
+    '<td class="num">'+BB.statusBadge(o.status)+'</td>'+
   '</tr>';
 });
-html += '</tbody></table></div></div>';
+latestBody += '</tbody></table></div>';
 
-// deliveries in transit
-html += '<div class="card"><div class="card-p" style="padding-bottom:0;"><div class="row between"><b style="color:var(--green-dark);">Deliveries in transit</b><a class="faint" href="deliveries.html" style="font-size:.78rem;">All ›</a></div></div>';
+var transitBody;
 if(!inTransit.length){
-  html += '<div class="empty">Nothing on the road right now.</div>';
+  transitBody = '<div class="empty">Nothing on the road right now.</div>';
 } else {
-  html += '<div class="scroll"><table class="bb"><thead><tr><th>Farmer</th><th>Depot</th><th class="right">ETA</th></tr></thead><tbody>';
+  transitBody = '<div class="scroll"><table class="bb"><thead><tr><th>Farmer</th><th>Depot</th><th>Transport</th><th class="num">ETA</th></tr></thead><tbody>';
   inTransit.forEach(function(x){
-    html += '<tr class="click" data-href="deliveries.html">'+
+    transitBody += '<tr class="click" data-href="deliveries.html">'+
       '<td><b style="color:var(--green-dark);">'+BB.esc(d.farmer(x.farmer).name)+'</b></td>'+
       '<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>'+
-      '<td class="right muted" style="white-space:nowrap;">'+BB.date(x.eta)+'</td>'+
+      '<td class="muted">'+BB.esc(x.transport||'')+'</td>'+
+      '<td class="num muted">'+BB.date(x.eta)+'</td>'+
     '</tr>';
   });
-  html += '</tbody></table></div>';
+  transitBody += '</tbody></table></div>';
 }
-html += '</div>';
 
-html += '</div>';
+html += '<div class="grid g2 ops-row">'+
+  panel('Latest orders', 'the five most recent', openLink('orders.html','All'), latestBody)+
+  panel('Deliveries in transit', inTransit.length+' on the road', openLink('deliveries.html','All'), transitBody)+
+'</div>';
 
 html += '<div style="height:24px;"></div>';
 
 document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 
 // row navigation
 Array.prototype.forEach.call(document.querySelectorAll('tr.click[data-href]'), function(tr){

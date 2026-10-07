@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>My Farm · BioBrix</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -34,34 +34,51 @@ var css=''+
 '.fp-preview{display:inline-flex;align-items:center;gap:6px;font-size:.62rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;'+
   'padding:4px 10px;border-radius:20px;background:#eef6dc;color:var(--green-mid);border:1px solid var(--line);}'+
 '.fp-preview .dot{width:7px;height:7px;border-radius:50%;background:var(--green-bright);}'+
-'.fp-hero{background:linear-gradient(120deg,var(--green-darkest),var(--green-dark) 58%,var(--green-mid));color:#eaf4d8;'+
-  'border-radius:var(--radius);padding:24px 24px 22px;box-shadow:var(--shadow-lg);margin-top:14px;position:relative;overflow:hidden;}'+
+'.fp-hero{background:linear-gradient(112deg,var(--green-darkest),var(--green-dark) 62%,var(--green-mid));color:#eaf4d8;'+
+  'border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow);margin-top:14px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px 28px;align-items:center;}'+
+'@media(max-width:1000px){.fp-hero{grid-template-columns:minmax(0,1fr);}}'+
 '.fp-hero .eyebrow{color:var(--lime);}'+
-'.fp-hero h1{font-family:var(--display);font-size:1.7rem;font-weight:600;margin:4px 0 2px;line-height:1.1;letter-spacing:-.3px;}'+
-'.fp-hero .farm{font-size:.98rem;opacity:.9;}'+
+'.fp-hero .farm{font-family:var(--display);font-size:1.35rem;font-weight:600;line-height:1.2;color:#f3f9ea;}'+
+'.fp-hero .crops{font-size:.9rem;opacity:.85;margin-top:2px;}'+
 '.fp-hero .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}'+
-'.fp-pill{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;padding:6px 12px;border-radius:20px;'+
-  'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);}'+
-'.fp-advisor{margin-top:16px;padding-top:15px;border-top:1px solid rgba(255,255,255,.16);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}'+
+'.fp-pill{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;padding:5px 11px;border-radius:20px;'+
+  'background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);}'+
+'.fp-pill .ico{width:14px;height:14px;color:var(--lime);}'+
+'.fp-advisor{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:var(--radius-sm);background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.1);}'+
 '.fp-av{width:44px;height:44px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;'+
   'font-family:var(--display);font-weight:700;font-size:1rem;color:#13260c;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.25);}'+
-'.fp-advisor .who .r{font-size:.66rem;letter-spacing:1.4px;text-transform:uppercase;opacity:.7;}'+
+'.fp-advisor .who{flex:1;min-width:160px;}'+
+'.fp-advisor .who .r{font-size:.62rem;letter-spacing:1.4px;text-transform:uppercase;opacity:.7;}'+
 '.fp-advisor .who .n{font-family:var(--display);font-weight:600;font-size:1rem;}'+
-'.fp-advisor .who .c{font-size:.82rem;opacity:.9;}'+
-'.fp-advisor .call{margin-left:auto;}'+
-'.readline{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:var(--radius-sm);'+
-  'padding:14px 16px;box-shadow:var(--shadow);font-size:.92rem;color:var(--ink);line-height:1.55;}'+
-'.readline b{color:var(--green-dark);}'+
-'.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;min-width:0;max-width:100%;}'+
-'.selbar select{flex:1 1 220px;min-width:0;max-width:100%;}'+
+'.fp-advisor .who .c{font-size:.8rem;opacity:.85;}'+
+'.fp-advisor .call{display:flex;gap:8px;flex-wrap:wrap;}'+
+'.readlist .rl{display:flex;gap:12px;align-items:flex-start;padding:13px 20px;border-top:1px solid var(--line-soft);font-size:.9rem;line-height:1.55;}'+
+'.readlist .rl:first-child{border-top:0;}'+
+'.readlist .rl .ico{width:17px;height:17px;color:var(--green-bright);margin-top:3px;}'+
+'.readlist .rl b{color:var(--green-dark);}'+
+'.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;max-width:100%;}'+
+'.selbar select{flex:1 1 240px;min-width:0;max-width:100%;padding:8px 11px;font-size:.85rem;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-family:inherit;}'+
 '@media(max-width:480px){.selbar select{flex:1 1 100%;}}'+
-'.selbar select{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;}'+
-'.pline{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);}'+
-'.fcard{display:flex;align-items:center;gap:12px;padding:14px 16px;}'+
-'.fic{width:40px;height:40px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-size:1.15rem;'+
-  'background:var(--green-darkest);color:var(--lime);}'+
-'.foot{margin:22px 0 26px;padding:18px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);}'+
-'.foot .brand{font-family:var(--display);font-weight:600;color:var(--green-dark);}';
+'.pline{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);}'+
+'.pline .ico{width:15px;height:15px;color:var(--green-mid);}'+
+'.cu{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:14px 20px;border-top:1px solid var(--line-soft);}'+
+'.cu:first-child{border-top:0;}'+
+'.fcard{display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line-soft);}'+
+'.fcard:first-child{border-top:0;}'+
+'.fic{width:36px;height:36px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:#eef4e4;color:var(--green-dark);}'+
+'.fic .ico{width:17px;height:17px;}'+
+'.stmt .tx{display:flex;justify-content:space-between;gap:12px;padding:10px 20px;border-top:1px solid var(--line-soft);font-size:.84rem;}'+
+'.stmt .tx:first-child{border-top:0;}'+
+'.stmt .tx .d{color:var(--faint);font-size:.74rem;}'+
+'.qcard{border-left:3px solid var(--amber);}'+
+'.foot{margin:28px 0 8px;padding:18px 20px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);}'+
+'.foot .brand{font-family:var(--display);font-weight:600;color:var(--green-dark);}'+
+'.sec[id]{scroll-margin-top:80px;}'+
+'@media(max-width:640px){table.inv th:nth-child(2),table.inv td:nth-child(2){display:none;} table.inv th,table.inv td{padding:10px 10px;}}'+
+'@media(max-width:640px){table.inv th:nth-child(5),table.inv td:nth-child(5){display:none;}'+
+  'table.ord th:nth-child(2),table.ord td:nth-child(2),table.ord th:nth-child(5),table.ord td:nth-child(5){display:none;}'+
+  'table.rep th:nth-child(3),table.rep td:nth-child(3),table.rep th:nth-child(5),table.rep td:nth-child(5){display:none;}'+
+  'table.ord th,table.ord td,table.rep th,table.rep td{padding:10px 10px;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 // ---- small helpers -----------------------------------------------
@@ -116,11 +133,16 @@ function progValue(p){
 }
 
 // =================================================================
+var chartJobs = [];
+var LEVER_COL = { Biology:'#3f6b28', Chemistry:'#2f6f9e', Physics:'#c77d17' };
 function render(){
+  chartJobs = [];
   var id = currentFarmerId();
   var f = d.farmer(id);
   var rep = d.rep(f.rep);
   var first = String(f.name||'').split(' ')[0];
+  var repFirst = String(rep.name||'').split(' ')[0];
+  var repWa = String(rep.cell||'').replace(/\D/g,'').replace(/^0/,'27');
 
   var blocks = d.where('blocks', function(b){ return b.farmer===id; });
   var soil = d.where('soil', function(s){ return s.farmer===id; })
@@ -141,192 +163,194 @@ function render(){
 
   var html='';
 
-  // ---- viewing-as selector (staff demo only — never shown to a farmer) ----
-  if(!isFarmerSeat) html += '<div class="row between" style="margin-top:14px;gap:10px;">'+
-    '<span class="fp-preview"><span class="dot"></span>Farmer preview</span>'+
-    '<div class="selbar"><span class="faint" style="font-size:.76rem;">Viewing as</span>'+
-      '<select id="whoSel">'+
-        d.all('farmers').map(function(fm){
-          return '<option value="'+fm.id+'"'+(fm.id===id?' selected':'')+'>'+BB.esc(fm.name)+' — '+BB.esc(fm.farm)+'</option>';
-        }).join('')+
-      '</select>'+
-    '</div></div>';
-
-  // ---- hero band ----
+  // ---- page head: the farmer's own greeting, or the staff preview with its "viewing as" switch ----
+  var hour = new Date().getHours();
+  var greet = hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
   var crops = (f.crops||[]).join(' · ');
+  if(isFarmerSeat){
+    html += '<div class="page-head row between" style="gap:16px;">'+
+      '<div><div class="eyebrow">The Biological Way · '+BB.esc(new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'long'}))+'</div>'+
+      '<h1>'+greet+', '+BB.esc(first)+'.</h1>'+
+      '<p>Your programme, orders, account and documents. Everything opens on this phone, even without signal.</p></div>'+
+      '<div class="row"><a class="btn ghost" href="#account">'+BB.icon('receipt')+'My account</a><a class="btn" href="#orders">'+BB.icon('package')+'My orders</a></div></div>';
+  } else {
+    html += '<div class="page-head row between" style="gap:16px;">'+
+      '<div><div class="eyebrow"><span class="fp-preview"><span class="dot"></span>Farmer preview</span></div>'+
+      '<h1>Farmer portal</h1><p>Exactly what '+BB.esc(f.name)+' sees on their phone. Switch farmer to check another account.</p></div>'+
+      '<div class="selbar"><span class="faint" style="font-size:.76rem;">Viewing as</span>'+
+        '<select id="whoSel">'+
+          d.all('farmers').map(function(fm){
+            return '<option value="'+fm.id+'"'+(fm.id===id?' selected':'')+'>'+BB.esc(fm.name)+' — '+BB.esc(fm.farm)+'</option>';
+          }).join('')+
+        '</select>'+
+      '</div></div>';
+  }
+
+  // ---- farm header ----
   var editOpen = window.__editFarm===true;
   html += '<section class="fp-hero">'+
-    '<div class="eyebrow">The Biological Way</div>'+
-    '<h1>Welcome back, '+BB.esc(first)+'.</h1>'+
-    '<div class="farm">'+BB.esc(f.farm)+(crops?' · '+BB.esc(crops):'')+'</div>'+
-    '<div class="meta">'+
-      '<span class="fp-pill">📍 '+BB.esc(f.town)+', '+BB.esc(f.region)+'</span>'+
-      '<span class="fp-pill">🌾 '+BB.num(f.ha)+' ha under management</span>'+
-      '<span class="fp-pill">🌱 '+blocks.length+' block'+(blocks.length===1?'':'s')+'</span>'+
-    '</div>'+
+    '<div><div class="eyebrow">Your farm</div>'+
+      '<div class="farm">'+BB.esc(f.farm)+'</div>'+
+      '<div class="crops">'+BB.esc(f.name)+(crops?' · '+BB.esc(crops):'')+'</div>'+
+      '<div class="meta">'+
+        '<span class="fp-pill">'+BB.icon('map')+BB.esc(f.town)+', '+BB.esc(f.region)+'</span>'+
+        '<span class="fp-pill">'+BB.icon('farm')+BB.num(f.ha)+' ha under management</span>'+
+        '<span class="fp-pill">'+BB.icon('sprout')+blocks.length+' block'+(blocks.length===1?'':'s')+'</span>'+
+      '</div></div>'+
     '<div class="fp-advisor">'+
       '<div class="fp-av" style="background:'+(rep.colour||'#68a53e')+';">'+BB.initials(rep.name)+'</div>'+
-      '<div class="who"><div class="r">Your BioBrix advisor · your regenerative partner</div>'+
+      '<div class="who"><div class="r">Your BioBrix advisor</div>'+
         '<div class="n">'+BB.esc(rep.name)+'</div>'+
         '<div class="c">'+BB.esc(rep.role||'Crop Advisor')+(rep.cell?' · '+BB.esc(rep.cell):'')+'</div></div>'+
-      (rep.cell? '<div class="call" style="display:flex;gap:8px;flex-wrap:wrap;">'+
-          '<a class="btn lime" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">Call '+BB.esc(String(rep.name).split(' ')[0])+'</a>'+
-          '<a class="btn" style="background:#25D366;color:#0a2417;" target="_blank" href="https://wa.me/'+BB.esc(String(rep.cell).replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', it\'s '+f.name+' from '+f.farm+' — ')+'">WhatsApp</a>'+
+      (rep.cell? '<div class="call">'+
+          '<a class="btn lime sm" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">'+BB.icon('phone')+'Call '+BB.esc(repFirst)+'</a>'+
+          '<a class="btn sm" style="background:#25D366;color:#0a2417;" target="_blank" href="https://wa.me/'+BB.esc(repWa)+'?text='+encodeURIComponent('Hi '+repFirst+', it\'s '+f.name+' from '+f.farm+' — ')+'">'+BB.icon('message')+'WhatsApp</a>'+
         '</div>' : '')+
     '</div>'+
   '</section>';
-  html += '<div class="row between" style="margin-top:8px;"><span class="faint" style="font-size:.76rem;">Something changed on the farm? Keep '+BB.esc(String(rep.name).split(' ')[0])+' up to date.</span><button class="btn ghost sm" id="editFarm">'+(editOpen?'Close':'✎ Update my farm details')+'</button></div>';
+  html += '<div class="row between" style="margin-top:8px;"><span class="faint" style="font-size:.76rem;">Something changed on the farm? Keep '+BB.esc(repFirst)+' up to date.</span><button class="btn ghost sm" id="editFarm">'+(editOpen?'Close':BB.icon('clipboard')+'Update my farm details')+'</button></div>';
   if(editOpen){
-    html += '<div class="card card-p" style="margin-top:8px;"><div class="grid g3">'+
+    html += '<div class="card" style="margin-top:8px;"><div class="card-h"><div><h3>Your farm details</h3><div class="sub">'+BB.esc(repFirst)+' sees the update straight away</div></div></div><div class="card-p"><div class="grid g3">'+
       '<div class="fld"><label>Hectares under management</label><input id="efHa" type="number" min="0" value="'+BB.esc(f.ha||0)+'"></div>'+
       '<div class="fld"><label>Crops (comma separated)</label><input id="efCrops" value="'+BB.esc((f.crops||[]).join(', '))+'"></div>'+
       '<div class="fld"><label>% of hectares on the BioBrix programme</label><input id="efPct" type="number" min="0" max="100" value="'+BB.esc(f.programmePct!=null?f.programmePct:'')+'" placeholder="e.g. 40"></div>'+
       '<div class="fld"><label>Cell</label><input id="efCell" value="'+BB.esc(f.cell||'')+'"></div>'+
       '<div class="fld"><label>Town</label><input id="efTown" value="'+BB.esc(f.town||'')+'"></div>'+
-    '</div><button class="btn" id="saveFarm">Save</button></div>';
+    '</div><button class="btn" id="saveFarm">'+BB.icon('check')+'Save</button></div></div>';
   }
 
-  // ---- farm health summary ----
-  html += '<div class="sec"><h2>Your farm at a glance</h2><span class="ln"></span></div>';
-  html += '<div class="grid g4">';
+  // ---- farm at a glance ----
+  html += '<div class="grid g4" style="margin-top:16px;">';
   html += '<div class="stat"><div class="l">Blocks</div><div class="v">'+blocks.length+'</div><div class="s">'+BB.num(f.ha)+' ha total</div></div>';
-  html += '<div class="stat"><div class="l">Latest soil read</div><div class="v" style="font-size:1.05rem;">'+
+  html += '<div class="stat"><div class="l">Latest soil read</div><div class="v" style="font-size:1.15rem;">'+
     BB.esc(latestSoil? latestSoil.status : 'Awaiting')+'</div><div class="s">'+
     BB.esc(latestSoil? (d.by('blocks', latestSoil.block)||{name:'—'}).name : 'no report yet')+'</div></div>';
-  html += '<div class="stat'+(activeProg?'':' warn')+'"><div class="l">Active programme</div><div class="v" style="font-size:1.05rem;">'+
+  html += '<div class="stat'+(activeProg?'':' warn')+'"><div class="l">Active programme</div><div class="v" style="font-size:1.15rem;">'+
     BB.esc(activeProg? activeProg.season : 'None yet')+'</div><div class="s">'+
     BB.esc(activeProg? activeProg.goal : 'advisor building yours')+'</div></div>';
-  html += '<div class="stat"><div class="l">Latest field vigour</div><div class="v" style="font-size:1.05rem;">'+
+  html += '<div class="stat"><div class="l">Latest field vigour</div><div class="v" style="font-size:1.15rem;">'+
     BB.esc(latestVigour)+'</div><div class="s">'+BB.esc(watch[0]? 'seen '+BB.date(watch[0].date) : 'no visit logged')+'</div></div>';
   html += '</div>';
 
-  // plain-language read
-  html += '<div style="margin-top:14px;display:grid;gap:10px;">';
-  farmReadLines(id).forEach(function(ln){
-    html += '<div class="readline">'+ln+'</div>';
-  });
-  html += '</div>';
-
-  // ---- coming up on your farm (programme timing → dated reminder + weather window) ----
+  // ---- plain-language read beside what is coming up ----
   var ups = d.where('followups', function(x){ return x.farmer===id && x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); });
+  html += '<div class="'+(ups.length?'split':'')+'" style="margin-top:16px;align-items:start;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Your farm right now</h3><div class="sub">in plain words, from your latest soil, leaf and field readings</div></div></div><div class="readlist">';
+  farmReadLines(id).forEach(function(ln){
+    html += '<div class="rl">'+BB.icon('leaf')+'<div>'+ln+'</div></div>';
+  });
+  html += '</div></div>';
   if(ups.length){
-    html += '<div class="sec" id="comingup" style="scroll-margin-top:110px;"><h2>Coming up on your farm</h2><span class="ln"></span><span class="cnt">reminders come by email &amp; WhatsApp, 3 days before</span></div>';
-    html += '<div class="card card-p">';
+    html += '<div class="card" id="comingup" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Coming up on your farm</h3><div class="sub">reminders come by email &amp; WhatsApp, 3 days before</div></div></div><div>';
     ups.slice(0,3).forEach(function(fu, i){
       var pd=d.product(fu.prod), blk=d.by('blocks',fu.block)||{name:''};
       var days=Math.round((new Date(fu.due)-new Date(new Date().toISOString().slice(0,10)))/86400000);
-      html += '<div class="row between" style="align-items:flex-start;gap:14px;'+(i?'border-top:1px solid var(--line-soft);margin-top:12px;padding-top:12px;':'')+'">'+
-        '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><b style="color:var(--green-dark);">'+BB.date(fu.due)+' · '+BB.esc(fu.what)+'</b></div>'+
-          '<div class="faint" style="font-size:.8rem;margin-top:3px;">'+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+(pd.sheet?' · '+BB.esc(pd.sheet):'')+'</div>'+
-          (i===0?'<div id="wxLine" class="faint" style="font-size:.8rem;margin-top:6px;">Checking the 7-day weather for '+BB.esc(f.town)+'…</div>':'')+
+      html += '<div class="cu">'+
+        '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><span class="faint" style="font-size:.76rem;">'+BB.date(fu.due)+'</span></div>'+
+          '<div style="font-weight:600;color:var(--green-darkest);margin-top:4px;">'+BB.esc(fu.what)+'</div>'+
+          '<div class="faint" style="font-size:.78rem;margin-top:2px;">'+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+'</div>'+
+          (i===0?'<div id="wxLine" class="faint" style="font-size:.8rem;margin-top:8px;">Checking the 7-day weather for '+BB.esc(f.town)+'…</div>':'')+
         '</div>'+
-        '<a class="btn ghost sm" style="flex:none;" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&name='+encodeURIComponent('RenewAg programme')+'">How to apply ›</a>'+
+        '<a class="btn ghost sm" style="flex:none;" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&name='+encodeURIComponent('RenewAg programme')+'">How to apply</a>'+
       '</div>';
     });
-    html += '</div>';
+    html += '</div></div>';
   }
-
-  // ---- my reports (soil + leaf) ----
-  html += '<div class="sec" id="reports" style="scroll-margin-top:110px;"><h2>My reports</h2><span class="ln"></span><span class="cnt">tap Open — works without signal</span></div>';
-  if(!soil.length && !leaf.length){
-    html += '<div class="card card-p"><div class="empty"><div class="big">🧪</div>No lab reports yet. Your advisor will load these as samples come back.</div></div>';
-  } else {
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
-      '<th>Type</th><th>Block</th><th>Date</th><th>Status</th><th>What it means</th><th></th></tr></thead><tbody>';
-    soil.forEach(function(s){
-      var blk = d.by('blocks', s.block) || { name:'—' };
-      html += '<tr><td><span class="badge b-lime">Soil</span></td>'+
-        '<td>'+BB.esc(blk.name)+'</td>'+
-        '<td>'+BB.date(s.date)+'</td>'+
-        '<td>'+BB.statusBadge(s.status)+'</td>'+
-        '<td><span class="badge '+statusFlagBadge(s.flag)+'">'+BB.esc(s.flag)+'</span></td>'+
-        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Soil&id='+encodeURIComponent(s.id)+'&name='+encodeURIComponent('Soil report — '+blk.name)+'">Open</a></td></tr>';
-    });
-    leaf.forEach(function(l){
-      var blk = d.by('blocks', l.block) || { name:'—' };
-      html += '<tr><td><span class="badge b-blue">Leaf</span></td>'+
-        '<td>'+BB.esc(blk.name)+'</td>'+
-        '<td>'+BB.date(l.date)+'</td>'+
-        '<td>'+BB.statusBadge(l.status)+'</td>'+
-        '<td><span class="badge '+statusFlagBadge(l.flag)+'">'+BB.esc(l.flag)+'</span></td>'+
-        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Leaf&id='+encodeURIComponent(l.id)+'&name='+encodeURIComponent('Leaf-sap report — '+blk.name)+'">Open</a></td></tr>';
-    });
-    html += '</tbody></table></div></div>';
-    html += '<div class="pline" style="margin-top:8px;">🧪 Every report opens as a full page with <b style="color:var(--green-mid);">what it means</b> and <b style="color:var(--green-mid);">what to do next</b> — saved on this phone, so it opens in the orchard too.</div>';
-  }
+  html += '</div>';
 
   // ---- my RenewAg programme ----
-  html += '<div class="sec" id="programme" style="scroll-margin-top:110px;"><h2>My RenewAg programme</h2><span class="ln"></span><span class="cnt">what to buy, how much, when</span></div>';
+  html += '<div class="sec" id="programme"><h2>My RenewAg programme</h2><span class="ln"></span><span class="cnt">what to buy, how much, when</span></div>';
   var activePrograms = progs.filter(function(p){ return p.status==='Active'; });
   var showPrograms = activePrograms.length ? activePrograms : progs;
   if(!showPrograms.length){
-    html += '<div class="card card-p"><div class="empty"><div class="big">📑</div>Your season programme is being prepared by '+BB.esc(rep.name)+'.</div></div>';
+    html += '<div class="card"><div class="empty">Your season programme is being prepared by '+BB.esc(rep.name)+'.</div></div>';
   } else {
+    // value by lever across the programmes shown
+    var lv={}; showPrograms.forEach(function(p){ (p.lines||[]).forEach(function(ln){ var k=d.product(ln.prod).lever||'Other'; lv[k]=(lv[k]||0)+(ln.cost||0); }); });
+    var lvRows=Object.keys(lv).map(function(k){ return { label:k, value:lv[k], color:LEVER_COL[k]||'#6b7a5e' }; }).sort(function(a,b){ return b.value-a.value; });
+    html += '<div class="split" style="align-items:start;"><div style="display:grid;gap:16px;min-width:0;">';
     showPrograms.forEach(function(p){
       var blk = d.by('blocks', p.block) || { name:'—' };
-      html += '<div class="card card-p" style="margin-bottom:14px;">'+
-        '<div class="row between" style="align-items:flex-start;">'+
-          '<div><div class="eyebrow">RenewAg · '+BB.esc(p.crop)+' · '+BB.esc(p.season)+'</div>'+
-            '<div style="font-family:var(--display);font-weight:600;font-size:1.05rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(p.goal)+'</div>'+
-            '<div class="faint" style="font-size:.8rem;">'+BB.esc(blk.name)+' · guided by '+BB.esc(d.rep(p.advisor).name)+'</div></div>'+
-          '<div class="row" style="gap:8px;flex:none;">'+BB.statusBadge(p.status)+'<a class="btn sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&id='+encodeURIComponent(p.id)+'&name='+encodeURIComponent('RenewAg programme — '+p.season+' '+p.crop)+'">Open programme</a></div>'+
+      html += '<div class="card"><div class="card-h">'+
+          '<div><div class="eyebrow" style="margin-bottom:2px;">RenewAg · '+BB.esc(p.crop)+' · '+BB.esc(p.season)+'</div><h3>'+BB.esc(p.goal)+'</h3>'+
+            '<div class="sub">'+BB.esc(blk.name)+' · guided by '+BB.esc(d.rep(p.advisor).name)+'</div></div>'+
+          '<div class="row" style="gap:8px;">'+BB.statusBadge(p.status)+'<a class="btn sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&id='+encodeURIComponent(p.id)+'&name='+encodeURIComponent('RenewAg programme — '+p.season+' '+p.crop)+'">'+BB.icon('file')+'Open programme</a></div>'+
         '</div>';
-      html += '<div class="scroll" style="margin-top:12px;"><table class="bb"><thead><tr>'+
-        '<th>Product</th><th>Rate</th><th>Timing</th><th class="right">Value</th></tr></thead><tbody>';
+      html += '<div class="scroll"><table class="bb"><thead><tr>'+
+        '<th>Product</th><th>Rate</th><th>Timing</th><th class="num">Value</th></tr></thead><tbody>';
       (p.lines||[]).forEach(function(ln){
         var prod = d.product(ln.prod);
-        html += '<tr><td>'+BB.esc(prod.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(prod.lever||'')+'</div></td>'+
+        html += '<tr><td><b style="font-weight:600;">'+BB.esc(prod.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(prod.lever||'')+'</div></td>'+
           '<td>'+BB.esc(ln.rate)+'</td>'+
           '<td>'+BB.esc(ln.timing)+'</td>'+
-          '<td class="right">'+BB.money(ln.cost)+'</td></tr>';
+          '<td class="num">'+BB.money(ln.cost)+'</td></tr>';
       });
-      html += '<tr><td colspan="3" class="right"><b>Programme total</b></td>'+
-        '<td class="right"><b>'+BB.money(progValue(p))+'</b></td></tr>';
-      html += '</tbody></table></div></div>';
+      html += '</tbody><tfoot><tr><td colspan="3">Programme total</td><td class="num">'+BB.money(progValue(p))+'</td></tr></tfoot></table></div></div>';
     });
+    html += '</div>';
+    html += '<div class="card"><div class="card-h"><div><h3>Where it goes</h3><div class="sub">programme value by lever</div></div></div><div class="card-p">'+(lvRows.length?'<div id="chLever"></div>':'<div class="empty" style="padding:20px;">No product lines yet.</div>')+'</div>'+
+      '<div class="card-f">Biology feeds the soil life, chemistry corrects what the lab found, physics fixes structure and water.</div></div>';
+    html += '</div>';
+    if(lvRows.length) chartJobs.push(function(){ BB.chart.donut('#chLever',{ rows:lvRows, money:true, centreLabel:'total', size:140 }); });
   }
 
   // ---- my orders & deliveries ----
   var lastOrder = orders[0] || null;
-  html += '<div class="sec" id="orders" style="scroll-margin-top:110px;"><h2>My orders &amp; deliveries</h2><span class="ln"></span>'+
-    (lastOrder ? '<button class="btn sm" data-reorder="'+BB.esc(lastOrder.id)+'" title="Order again — '+BB.esc(rep.name)+' confirms quantities with you">＋ Place an order</button>'
-               : '<a class="btn sm" href="https://wa.me/'+BB.esc(String(rep.cell||'').replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', I\'d like to place an order — ')+'" target="_blank" rel="noopener">＋ Place an order</a>')+
+  html += '<div class="sec" id="orders"><h2>My orders &amp; deliveries</h2><span class="ln"></span>'+
+    (lastOrder ? '<button class="btn sm" data-reorder="'+BB.esc(lastOrder.id)+'" title="Order again — '+BB.esc(rep.name)+' confirms quantities with you">'+BB.icon('plus')+'Place an order</button>'
+               : '<a class="btn sm" href="https://wa.me/'+BB.esc(repWa)+'?text='+encodeURIComponent('Hi '+repFirst+', I\'d like to place an order — ')+'" target="_blank" rel="noopener">'+BB.icon('plus')+'Place an order</a>')+
     '</div>';
   // ---- quotes waiting for the farmer's approval ----
   orders.filter(function(o){ return d.quoteStatus(o)==='Sent to farmer'; }).forEach(function(o){
-    html += '<div class="card card-p" style="margin-bottom:12px;border-left:3px solid var(--amber);background:#fffdf7;">'+
-      '<div class="row between" style="align-items:flex-start;gap:14px;">'+
-        '<div><div class="eyebrow" style="color:var(--amber);">Quote for your approval · '+BB.esc(o.ref)+'</div>'+
-          '<div style="font-family:var(--display);font-weight:600;font-size:1.05rem;color:var(--green-dark);margin-top:2px;">'+BB.money(d.quoteTotal(o))+' · deliver '+BB.monthName(o.deliverMonth)+'</div>'+
-          '<div class="faint" style="font-size:.8rem;">Prepared by '+BB.esc(rep.name)+' · approved by BioBrix</div></div>'+
-        '<div class="row" style="gap:8px;flex:none;"><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+BB.esc(String(rep.cell||'').replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', quick question on quote '+o.ref+' — ')+'">Ask '+BB.esc(String(rep.name).split(' ')[0])+'</a>'+
-          '<button class="btn" data-qok="'+o.id+'">✓ Approve quote</button></div>'+
+    html += '<div class="card qcard" style="margin-bottom:16px;">'+
+      '<div class="card-h">'+
+        '<div><div class="eyebrow" style="color:var(--amber);margin-bottom:2px;">Quote for your approval · '+BB.esc(o.ref)+'</div>'+
+          '<h3>'+BB.money(d.quoteTotal(o))+' · deliver '+BB.monthName(o.deliverMonth)+'</h3>'+
+          '<div class="sub">Prepared by '+BB.esc(rep.name)+' · approved by BioBrix</div></div>'+
+        '<div class="row" style="gap:8px;"><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+BB.esc(repWa)+'?text='+encodeURIComponent('Hi '+repFirst+', quick question on quote '+o.ref+' — ')+'">'+BB.icon('message')+'Ask '+BB.esc(repFirst)+'</a>'+
+          '<button class="btn sm" data-qok="'+o.id+'">'+BB.icon('check')+'Approve quote</button></div>'+
       '</div>'+
-      '<div class="scroll" style="margin-top:10px;"><table class="bb"><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Value</th></tr></thead><tbody>'+
-      (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack)+'</div></td><td class="right">'+BB.num(l.qty)+' '+BB.esc(p.unit||'')+'</td><td class="right">'+BB.money(Math.round((p.price||0)*l.qty*(1+d.quotePct(o)/100)))+'</td></tr>'; }).join('')+
-      '<tr><td colspan="2" class="right"><b>Quote total</b></td><td class="right"><b>'+BB.money(d.quoteTotal(o))+'</b></td></tr></tbody></table></div>'+
-      '<div class="pline" style="margin-top:8px;">Approve here and '+BB.esc(String(rep.name).split(' ')[0])+' invoices and books the delivery. Nothing is charged until you approve.</div>'+
+      '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Value</th></tr></thead><tbody>'+
+      (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack)+'</div></td><td class="num">'+BB.num(l.qty)+' '+BB.esc(p.unit||'')+'</td><td class="num">'+BB.money(Math.round((p.price||0)*l.qty*(1+d.quotePct(o)/100)))+'</td></tr>'; }).join('')+
+      '</tbody><tfoot><tr><td colspan="2">Quote total</td><td class="num">'+BB.money(d.quoteTotal(o))+'</td></tr></tfoot></table></div>'+
+      '<div class="card-f">Approve here and '+BB.esc(repFirst)+' invoices and books the delivery. Nothing is charged until you approve.</div>'+
     '</div>';
   });
   if(!orders.length){
-    html += '<div class="card card-p"><div class="empty"><div class="big">📦</div>No orders yet. When you approve your programme, your orders appear here.</div></div>';
+    html += '<div class="card"><div class="empty">No orders yet. When you approve your programme, your orders appear here.</div></div>';
   } else {
-    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
-      '<th>Ref</th><th>Delivery</th><th class="right">Value</th><th>Status</th><th>Delivery ETA</th><th></th></tr></thead><tbody>';
+    // order value by delivery month — only when it spans enough months to read as a picture
+    var dm = orders.map(function(o){ return o.deliverMonth; }).filter(function(m){ return typeof m==='number'; });
+    var lo = dm.length?Math.min.apply(null,dm):0, hi = dm.length?Math.max.apply(null,dm):-1;
+    var spanM=[]; for(var mi=lo; mi<=hi; mi++) spanM.push(mi);
+    var showOrdChart = orders.length>=3 && spanM.filter(function(m){ return dm.indexOf(m)>=0; }).length>=3;
+    var oVal = function(o){ return d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o); };
+    html += '<div class="'+(showOrdChart?'split':'')+'" style="align-items:start;">';
+    html += '<div class="card"><div class="card-h"><div><h3>Your orders</h3><div class="sub">newest first · delivered orders can be reordered</div></div><span class="badge b-grey">'+orders.length+'</span></div>'+
+      '<div class="scroll"><table class="bb ord"><thead><tr>'+
+      '<th>Ref</th><th>Delivery</th><th class="num">Value</th><th>Status</th><th>Delivery ETA</th><th></th></tr></thead><tbody>';
     orders.forEach(function(o){
       var del = d.where('deliveries', function(x){ return x.order===o.id; })[0];
       var etaTxt = del ? (BB.date(del.eta)+' · '+BB.esc(del.status)) : '—';
-      html += '<tr><td><b>'+BB.esc(o.ref)+'</b></td>'+
+      html += '<tr><td style="white-space:nowrap;"><b>'+BB.esc(o.ref)+'</b></td>'+
         '<td>'+BB.monthName(o.deliverMonth)+'</td>'+
-        '<td class="right">'+BB.money(d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o))+'</td>'+
+        '<td class="num">'+BB.money(oVal(o))+'</td>'+
         '<td>'+(d.quoteStatus(o)==='Sent to farmer'?'<span class="badge b-warn">Quote — approve above</span>':(d.quoteStatus(o)==='Awaiting approval'||d.quoteStatus(o)==='Approved')?'<span class="badge b-grey">Quote being prepared</span>':BB.statusBadge(o.status))+'</td>'+
-        '<td>'+etaTxt+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+etaTxt+'</td>'+
         '<td class="right">'+
-          (o.status==='Delivered'? '<button class="btn ghost sm" data-reorder="'+o.id+'">Reorder</button>' : '')+
+          (o.status==='Delivered'? '<button class="btn ghost sm" data-reorder="'+o.id+'">'+BB.icon('refresh')+'Reorder</button>' : '')+
         '</td></tr>';
     });
-    html += '</tbody></table></div></div>';
-    html += '<div class="pline" style="margin-top:8px;">🔁 Delivered an order before? Tap <b style="color:var(--green-mid);">Reorder</b> and your advisor confirms the rest.</div>';
+    html += '</tbody></table></div>'+
+      '<div class="card-f">Delivered an order before? Tap <b style="color:var(--green-mid);">Reorder</b> and your advisor confirms the rest.</div></div>';
+    if(showOrdChart){
+      var sumM = function(test){ return spanM.map(function(m){ return orders.filter(function(o){ return o.deliverMonth===m && test(o); }).reduce(function(t,o){ return t+oVal(o); },0); }); };
+      var doneO = function(o){ return o.status==='Delivered'; };
+      html += '<div class="card"><div class="card-h"><div><h3>Orders by delivery month</h3><div class="sub">order value</div></div></div><div class="card-p"><div id="chOrders"></div></div></div>';
+      chartJobs.push(function(){ BB.chart.bar('#chOrders',{ labels:spanM.map(BB.monthName), money:true, stacked:true, height:210, table:true,
+        series:[{name:'Delivered', values:sumM(doneO), color:'#22431a'},{name:'Still to come', values:sumM(function(o){ return !doneO(o); }), color:'#68a53e'}] }); });
+    }
+    html += '</div>';
   }
 
   // ---- my account (billing) ----
@@ -335,11 +359,11 @@ function render(){
   var paid = invs.filter(function(i){ return i.status==='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
   var owing = invs.filter(function(i){ return i.status!=='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
   var overdue = invs.filter(function(i){ return i.status==='Overdue'; });
-  html += '<div class="sec" id="account" style="scroll-margin-top:110px;"><h2>My account</h2><span class="ln"></span><span class="cnt">invoices, statement &amp; payments</span></div>';
+  html += '<div class="sec" id="account"><h2>My account</h2><span class="ln"></span><span class="cnt">invoices, statement &amp; payments</span></div>';
   // overdue notice (warm but clear) — shown before the statement so it can't be missed
   if(d.isOverdue(id)){
-    html += '<div class="card card-p" style="border-color:#f2cfca;background:var(--red-bg);margin-bottom:12px;">'+
-      '<div class="pline" style="color:var(--red);font-size:.9rem;">⚠ <b style="color:var(--red);">Your account is overdue</b> — please settle to release pending deliveries.</div></div>';
+    html += '<div class="card card-p" style="border-color:#f2cfca;background:var(--red-bg);margin-bottom:16px;">'+
+      '<div class="pline" style="color:var(--red);font-size:.9rem;"><span style="color:var(--red);display:inline-flex;">'+BB.icon('alert')+'</span><span><b style="color:var(--red);">Your account is overdue</b> — please settle to release pending deliveries.</span></div></div>';
   }
   // statement summary
   var creditLimit = d.creditLimit(id);
@@ -350,18 +374,32 @@ function render(){
     '<div class="stat"><div class="l">Credit limit</div><div class="v">'+BB.money(creditLimit)+'</div><div class="s">'+(creditLimit>0?'available '+BB.money(d.availableCredit(id)):'no credit terms set')+'</div></div>'+
   '</div>';
   if(!invs.length){
-    html += '<div class="card card-p"><div class="empty"><div class="big">🧾</div>No invoices yet.</div></div>';
+    html += '<div class="card" style="margin-top:16px;"><div class="empty">No invoices yet.</div></div>';
   } else {
+    html += '<div class="split" style="margin-top:16px;align-items:start;"><div style="display:grid;gap:16px;min-width:0;">';
+    // invoiced vs paid by month, when the account spans at least three months
+    var mk = function(x){ return (x||'').slice(0,7); };
+    var ms = invs.map(function(i){ return mk(i.date); }).concat(invs.filter(function(i){ return i.paidDate; }).map(function(i){ return mk(i.paidDate); })).filter(Boolean).sort();
+    var monthsA=[];
+    if(ms.length){ var c0=new Date(ms[0]+'-01T00:00:00'), c1=new Date(ms[ms.length-1]+'-01T00:00:00'), g=0;
+      while(c0<=c1 && g<36){ monthsA.push(c0.getFullYear()+'-'+String(c0.getMonth()+1).padStart(2,'0')); c0.setMonth(c0.getMonth()+1); g++; } }
+    if(monthsA.length>=3){
+      var invM = monthsA.map(function(m){ return invs.filter(function(i){ return mk(i.date)===m; }).reduce(function(t,i){ return t+(i.amount||0); },0); });
+      var payM = monthsA.map(function(m){ return invs.filter(function(i){ return i.status==='Paid' && mk(i.paidDate)===m; }).reduce(function(t,i){ return t+(i.amount||0); },0); });
+      html += '<div class="card"><div class="card-h"><div><h3>Invoiced and paid</h3><div class="sub">by month</div></div></div><div class="card-p"><div id="chAcct"></div></div></div>';
+      chartJobs.push(function(){ BB.chart.bar('#chAcct',{ labels:monthsA.map(function(m){ return BB.monthName(+m.slice(5,7)-1); }), money:true, height:210, table:true,
+        series:[{name:'Invoiced', values:invM, color:'#3f6b28'},{name:'Paid', values:payM, color:'#68a53e'}] }); });
+    }
     // outstanding / overdue first with Pay
     var open = invs.filter(function(i){ return i.status!=='Paid'; });
     if(open.length){
-      html += '<div class="card" style="margin-top:12px;"><div class="scroll"><table class="bb"><thead><tr><th>Invoice</th><th>For</th><th>Due</th><th>Amount</th><th></th><th class="right">Pay</th></tr></thead><tbody>';
+      html += '<div class="card"><div class="card-h"><div><h3>To pay</h3><div class="sub">card or EFT, reflects straight away</div></div><span class="badge '+(overdue.length?'b-bad':'b-warn')+'">'+open.length+' open</span></div><div class="scroll"><table class="bb inv"><thead><tr><th>Invoice</th><th>For</th><th>Due</th><th class="num">Amount</th><th>Status</th><th class="right">Pay</th></tr></thead><tbody>';
       open.forEach(function(iv){
         html += '<tr'+(iv.status==='Overdue'?' style="background:var(--red-bg);"':'')+'>'+
-          '<td><b>'+BB.esc(iv.ref)+'</b></td>'+
-          '<td class="muted">'+BB.esc(iv.description)+'</td>'+
-          '<td>'+BB.date(iv.dueDate)+'</td>'+
-          '<td><b>'+BB.money(iv.amount)+'</b></td>'+
+          '<td style="white-space:nowrap;"><b>'+BB.esc(iv.ref)+'</b></td>'+
+          '<td class="muted" style="font-size:.82rem;">'+BB.esc(iv.description)+'</td>'+
+          '<td style="white-space:nowrap;">'+BB.date(iv.dueDate)+'</td>'+
+          '<td class="num"><b>'+BB.money(iv.amount)+'</b></td>'+
           '<td>'+BB.statusBadge(iv.status)+'</td>'+
           '<td class="right"><button class="btn sm" data-pay="'+iv.id+'">Pay now</button></td>'+
         '</tr>';
@@ -371,65 +409,100 @@ function render(){
     // paid history
     var done = invs.filter(function(i){ return i.status==='Paid'; });
     if(done.length){
-      html += '<div style="margin-top:14px;"><div class="faint" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Paid invoices</div>'+
-        '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Invoice</th><th>For</th><th>Paid</th><th class="right">Amount</th></tr></thead><tbody>';
+      html += '<div class="card"><div class="card-h"><div><h3>Paid invoices</h3><div class="sub">settled, newest first</div></div><span class="badge b-ok">'+done.length+'</span></div>'+
+        '<div class="scroll"><table class="bb inv"><thead><tr><th>Invoice</th><th>For</th><th>Paid</th><th class="num">Amount</th></tr></thead><tbody>';
       done.forEach(function(iv){
-        html += '<tr><td><b>'+BB.esc(iv.ref)+'</b></td><td class="muted">'+BB.esc(iv.description)+'</td><td class="muted">'+BB.date(iv.paidDate)+'</td><td class="right">'+BB.money(iv.amount)+'</td></tr>';
+        html += '<tr><td><b>'+BB.esc(iv.ref)+'</b></td><td class="muted" style="font-size:.82rem;">'+BB.esc(iv.description)+'</td><td class="muted" style="white-space:nowrap;">'+BB.date(iv.paidDate)+'</td><td class="num">'+BB.money(iv.amount)+'</td></tr>';
       });
-      html += '</tbody></table></div></div></div>';
+      html += '</tbody></table></div></div>';
     }
-    // transaction history (ledger from invoices)
+    html += '</div>';
+
+    // right: balance split + the statement
+    var odAmt = overdue.reduce(function(t,i){ return t+(i.amount||0); },0);
+    var balRows = [{label:'Paid',value:paid,color:'#3f6b28'},{label:'Outstanding',value:Math.max(0,owing-odAmt),color:'#c77d17'},{label:'Overdue',value:odAmt,color:'#b8382a'}];
     var ledger = [];
     invs.forEach(function(iv){
       ledger.push({ date:iv.date, txt:'Invoice '+iv.ref+' issued — '+iv.description, amt:iv.amount, dir:'debit' });
       if(iv.status==='Paid' && iv.paidDate) ledger.push({ date:iv.paidDate, txt:'Payment received — '+iv.ref, amt:iv.amount, dir:'credit' });
     });
     ledger.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-    html += '<div style="margin-top:14px;"><div class="faint" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Transaction history</div>'+
-      '<div class="card card-p">';
+    html += '<div style="display:grid;gap:16px;min-width:0;">';
+    html += '<div class="card"><div class="card-h"><div><h3>Your account</h3><div class="sub">everything invoiced to date</div></div></div><div class="card-p"><div id="chBal"></div></div></div>';
+    chartJobs.push(function(){ BB.chart.donut('#chBal',{ rows:balRows, money:true, centreLabel:'invoiced', size:140 }); });
+    html += '<div class="card"><div class="card-h"><div><h3>Statement</h3><div class="sub">transaction history</div></div></div><div class="stmt scroll'+(ledger.length>8?' tall':'')+'">';
     ledger.forEach(function(t){
-      html += '<div class="row between" style="padding:8px 2px;border-bottom:1px solid var(--line-soft);">'+
-        '<span style="font-size:.86rem;"><span class="faint">'+BB.shortDate(t.date)+'</span> &nbsp; '+BB.esc(t.txt)+'</span>'+
-        '<span style="font-weight:600;color:'+(t.dir==='credit'?'var(--ok)':'var(--muted)')+';white-space:nowrap;">'+(t.dir==='credit'?'− ':'+ ')+BB.money(t.amt)+'</span>'+
-      '</div>';
+      html += '<div class="tx"><div style="min-width:0;"><div class="d">'+BB.shortDate(t.date)+'</div>'+BB.esc(t.txt)+'</div>'+
+        '<span style="font-weight:600;color:'+(t.dir==='credit'?'var(--ok)':'var(--muted)')+';white-space:nowrap;">'+(t.dir==='credit'?'− ':'+ ')+BB.money(t.amt)+'</span></div>';
     });
-    html += '<div class="row between" style="padding:10px 2px 2px;"><b>Balance outstanding</b><b style="color:'+(owing>0?'var(--amber)':'var(--ok)')+'">'+BB.money(owing)+'</b></div>';
+    html += '</div><div class="row between" style="padding:12px 20px;border-top:1px solid var(--line);background:var(--panel-2);border-radius:0 0 var(--radius) var(--radius);"><b>Balance outstanding</b><b style="color:'+(owing>0?'var(--amber)':'var(--ok)')+'">'+BB.money(owing)+'</b></div></div>';
     html += '</div></div>';
-    html += '<div class="pline" style="margin-top:8px;">🧾 Invoices &amp; statements sync from BioBrix\'s accounts — pay by card/EFT here and it reflects straight away.</div>';
+    html += '<div class="pline" style="margin-top:10px;">'+BB.icon('receipt')+'Invoices &amp; statements sync from BioBrix\'s accounts. Pay by card or EFT here and it reflects straight away.</div>';
   }
 
-  // ---- my documents ----
-  html += '<div class="sec" id="docs" style="scroll-margin-top:110px;"><h2>My documents</h2><span class="ln"></span><span class="cnt">one place for every file</span></div>';
-  if(!files.length){
-    html += '<div class="card card-p"><div class="empty"><div class="big">🗂</div>No documents shared yet.</div></div>';
+  // ---- my reports and documents ----
+  html += '<div class="sec" id="docs"><h2>My reports &amp; documents</h2><span class="ln"></span><span class="cnt">tap Open — works without signal</span></div>';
+  html += '<div class="split" style="align-items:start;">';
+  html += '<div class="card" id="reports" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Lab reports</h3><div class="sub">each opens with what it means and what to do next</div></div><span class="badge b-grey">'+(soil.length+leaf.length)+'</span></div>';
+  if(!soil.length && !leaf.length){
+    html += '<div class="empty">No lab reports yet. Your advisor will load these as samples come back.</div>';
   } else {
-    html += '<div class="grid g2">';
+    html += '<div class="scroll"><table class="bb rep"><thead><tr>'+
+      '<th>Type</th><th>Block</th><th>Date</th><th>Status</th><th>What it means</th><th></th></tr></thead><tbody>';
+    soil.forEach(function(s){
+      var blk = d.by('blocks', s.block) || { name:'—' };
+      html += '<tr><td><span class="badge b-lime">Soil</span></td>'+
+        '<td>'+BB.esc(blk.name)+'</td>'+
+        '<td style="white-space:nowrap;">'+BB.shortDate(s.date)+'</td>'+
+        '<td>'+BB.statusBadge(s.status)+'</td>'+
+        '<td><span class="badge '+statusFlagBadge(s.flag)+'" style="white-space:normal;">'+BB.esc(s.flag)+'</span></td>'+
+        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Soil&id='+encodeURIComponent(s.id)+'&name='+encodeURIComponent('Soil report — '+blk.name)+'">Open</a></td></tr>';
+    });
+    leaf.forEach(function(l){
+      var blk = d.by('blocks', l.block) || { name:'—' };
+      html += '<tr><td><span class="badge b-blue">Leaf</span></td>'+
+        '<td>'+BB.esc(blk.name)+'</td>'+
+        '<td style="white-space:nowrap;">'+BB.shortDate(l.date)+'</td>'+
+        '<td>'+BB.statusBadge(l.status)+'</td>'+
+        '<td><span class="badge '+statusFlagBadge(l.flag)+'" style="white-space:normal;">'+BB.esc(l.flag)+'</span></td>'+
+        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Leaf&id='+encodeURIComponent(l.id)+'&name='+encodeURIComponent('Leaf-sap report — '+blk.name)+'">Open</a></td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  html += '<div class="card"><div class="card-h"><div><h3>Documents</h3><div class="sub">one place for every file</div></div><span class="badge b-grey">'+files.length+'</span></div>';
+  if(!files.length){
+    html += '<div class="empty">No documents shared yet.</div>';
+  } else {
+    html += '<div>';
     files.forEach(function(fl){
-      html += '<div class="card"><div class="fcard">'+
-        '<div class="fic">🗂</div>'+
-        '<div style="min-width:0;flex:1;"><div style="font-weight:600;color:var(--green-dark);">'+BB.esc(fl.name)+'</div>'+
-          '<div class="faint" style="font-size:.76rem;">'+BB.esc(fl.kind)+' · '+BB.date(fl.date)+' · '+BB.esc(fl.size||'')+'</div></div>'+
+      html += '<div class="fcard">'+
+        '<div class="fic">'+BB.icon('file')+'</div>'+
+        '<div style="min-width:0;flex:1;"><div style="font-weight:600;color:var(--green-dark);font-size:.88rem;">'+BB.esc(fl.name)+'</div>'+
+          '<div class="faint" style="font-size:.74rem;">'+BB.esc(fl.kind)+' · '+BB.date(fl.date)+' · '+BB.esc(fl.size||'')+'</div></div>'+
         '<button class="btn ghost sm" data-open="'+BB.esc(fl.name)+'" data-fk="'+BB.esc(fl.kind)+'">Open</button>'+
-      '</div></div>';
+      '</div>';
     });
     html += '</div>';
   }
+  html += '</div></div>';
 
   // ---- footer ----
   html += '<div class="foot">'+
     '<div class="row between" style="align-items:flex-start;gap:14px;">'+
       '<div><div class="brand">BioBrix · The Biological Way</div>'+
-        '<div class="faint" style="font-size:.82rem;margin-top:3px;max-width:420px;">Your regenerative partner across Southern Africa. '+
+        '<div class="faint" style="font-size:.82rem;margin-top:3px;max-width:460px;">Your regenerative partner across Southern Africa. '+
           'Questions about your programme or an order? Speak to '+BB.esc(rep.name)+', your advisor.</div></div>'+
-      '<div style="text-align:right;">'+
-        (rep.cell? '<a class="btn ghost sm" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">'+BB.esc(rep.cell)+'</a><br>' : '')+
-        '<a class="pline" style="justify-content:flex-end;margin-top:8px;font-size:.8rem;" href="https://claireboshoff.github.io/biobrix-website/" target="_blank" rel="noopener">Visit biobrix.co.za ›</a>'+
-        '<a class="pline" style="justify-content:flex-end;margin-top:6px;font-size:.8rem;" href="login.html">Sign out · switch seat ›</a>'+
+      '<div class="row" style="gap:8px;">'+
+        (rep.cell? '<a class="btn ghost sm" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">'+BB.icon('phone')+BB.esc(rep.cell)+'</a>' : '')+
+        '<a class="btn ghost sm" href="https://claireboshoff.github.io/biobrix-website/" target="_blank" rel="noopener">Visit biobrix.co.za</a>'+
+        '<a class="btn ghost sm" href="login.html">'+BB.icon('logout')+'Sign out · switch seat</a>'+
       '</div>'+
     '</div>'+
   '</div>';
 
   document.getElementById('portalMain').innerHTML = html;
+  chartJobs.forEach(function(fn){ try{ fn(); }catch(e){ console.warn('chart', e); } });
   bind();
   if(location.hash){ var tgt=document.querySelector(location.hash); if(tgt) setTimeout(function(){ tgt.scrollIntoView({behavior:'smooth',block:'start'}); },60); }
 }
@@ -508,13 +581,13 @@ function bind(){
       var iv = d.by('invoices', this.dataset.pay); if(!iv) return;
       var td=this.closest('td'); if(!td) return;
       td.innerHTML='<div style="display:grid;gap:6px;min-width:220px;text-align:left;">'+
-        '<button class="btn sm" data-paycard="'+iv.id+'">💳 Pay by card (Yoco)</button>'+
-        '<button class="btn ghost sm" data-payeft="'+iv.id+'">🏦 EFT — bank details &amp; proof</button>'+
+        '<button class="btn sm" data-paycard="'+iv.id+'">'+BB.icon('wallet')+'Pay by card (Yoco)</button>'+
+        '<button class="btn ghost sm" data-payeft="'+iv.id+'">'+BB.icon('receipt')+'EFT — bank details &amp; proof</button>'+
       '</div>';
       td.querySelector('button[data-paycard]').onclick=function(){ d.update('invoices', iv.id, { status:'Paid', paidDate:new Date().toISOString().slice(0,10), method:'Card' }); BB.toast('Paid — thank you. Your statement is updated.'); render(); };
       td.querySelector('button[data-payeft]').onclick=function(){
         td.innerHTML='<div style="text-align:left;font-size:.78rem;line-height:1.5;min-width:240px;"><b>BioBrix (Pty) Ltd</b><br>FNB · Acc 62 000 000 000 · Branch 250655<br>Ref: <b>'+BB.esc(iv.ref)+'</b>'+
-          '<div style="margin-top:8px;"><label class="btn ghost sm" style="cursor:pointer;">📎 Upload proof of payment<input type="file" accept="image/*,.pdf" style="display:none;" data-pop="'+iv.id+'"></label></div></div>';
+          '<div style="margin-top:8px;"><label class="btn ghost sm" style="cursor:pointer;">'+BB.icon('file')+'Upload proof of payment<input type="file" accept="image/*,.pdf" style="display:none;" data-pop="'+iv.id+'"></label></div></div>';
         td.querySelector('input[data-pop]').onchange=function(){ d.update('invoices', iv.id, { status:'Proof received', proofAt:new Date().toISOString().slice(0,10), method:'EFT' }); BB.toast('Proof received — we\u2019ll mark it paid as soon as the funds land.'); render(); };
       };
     };

@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Farm files · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -19,16 +19,36 @@ var d = BB.data, u = BB.user;
 var farmers = d.all('farmers');
 
 var css=''+
-'.kind{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.66rem;font-weight:700;}'+
+'.kind{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.68rem;font-weight:700;white-space:nowrap;}'+
 '.k-Soil{background:var(--amber-bg);color:var(--amber);}'+
 '.k-Leaf{background:var(--ok-bg);color:var(--ok);}'+
 '.k-Programme{background:#eef6dc;color:var(--green-mid);}'+
 '.k-Monitoring{background:var(--blue-bg);color:var(--blue);}'+
 '.k-Delivery{background:#eef1ea;color:var(--muted);}'+
-'.fico{width:34px;height:34px;border-radius:9px;background:var(--green-darkest);color:var(--lime);display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;flex:none;}';
+'.fico{width:34px;height:34px;border-radius:9px;background:#eef4e4;color:var(--green-dark);display:inline-flex;align-items:center;justify-content:center;flex:none;}'+
+'.fico .ico{width:17px;height:17px;}'+
+'.fold{display:flex;flex-direction:column;padding:6px;}'+
+'.fold button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;font:inherit;font-size:.86rem;color:var(--ink);padding:9px 12px;border-radius:8px;cursor:pointer;text-align:left;}'+
+'.fold button .ico{width:17px;height:17px;color:var(--faint);}'+
+'.fold button span.n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'+
+'.fold button em{font-style:normal;font-size:.74rem;color:var(--faint);font-weight:600;}'+
+'.fold button:hover{background:var(--panel-2);}'+
+'.fold button.on{background:#eef4e4;color:var(--green-darkest);font-weight:600;}'+
+'.fold button.on .ico{color:var(--green-dark);}'+
+'.srch{position:relative;flex:1 1 240px;max-width:380px;}'+
+'.srch .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--faint);pointer-events:none;}'+
+'.srch input,.tsel{width:100%;padding:8px 12px 8px 34px;font:inherit;font-size:.86rem;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);outline:none;}'+
+'.tsel{padding-left:12px;width:auto;max-width:100%;}'+
+'.srch input:focus,.tsel:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}'+
+'.card-h .toolbar{margin:0;flex:1 1 100%;}'+
+'.lib{display:grid;gap:16px;grid-template-columns:270px minmax(0,1fr);align-items:start;margin-top:16px;}'+
+'.lib > .side{display:grid;gap:16px;min-width:0;} .lib > .main{display:grid;gap:16px;min-width:0;}'+
+'@media(max-width:1100px){.lib{grid-template-columns:minmax(0,1fr);} .lib > .side{order:2;}}'+
+'@media(max-width:560px){.tsel{width:100%;}.srch{max-width:none;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var KINDS = ['All','Soil','Leaf','Programme','Monitoring','Delivery'];
+var KIND_IC = { All:'folder', Soil:'flask', Leaf:'leaf', Programme:'clipboard', Monitoring:'eye', Delivery:'truck' };
 var state = { q:'', kind:'All', farmer:'' };
 
 function files(){
@@ -45,53 +65,71 @@ function statRow(){
   var withFiles=all.map(function(f){ return f.farmer; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
   var now=new Date(); var monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
   var thisMonth=all.filter(function(f){ return (f.date||'') >= monthStart; }).length;
-  return '<div class="grid g3">'+
+  var newest=all.map(function(f){ return f.date||''; }).sort().pop();
+  return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Total files</div><div class="v">'+all.length+'</div><div class="s">one indexed place</div></div>'+
     '<div class="stat"><div class="l">Farms with files</div><div class="v">'+withFiles+'</div><div class="s">tagged to a farm</div></div>'+
-    '<div class="stat"><div class="l">Filed this month</div><div class="v">'+thisMonth+'</div><div class="s">newest first</div></div>'+
+    '<div class="stat"><div class="l">Filed this month</div><div class="v">'+thisMonth+'</div><div class="s">since the 1st</div></div>'+
+    '<div class="stat"><div class="l">Last filed</div><div class="v">'+(newest?BB.shortDate(newest):'—')+'</div><div class="s">newest document</div></div>'+
   '</div>';
 }
 
+function folders(){
+  var all=d.all('files');
+  var html='<div class="card"><div class="card-h"><div><h3>Folders</h3><div class="sub">by kind of document</div></div></div><div class="fold">';
+  KINDS.forEach(function(k){
+    var n = k==='All' ? all.length : all.filter(function(f){ return f.kind===k; }).length;
+    html += '<button class="kind-chip'+(state.kind===k?' on':'')+'" data-kind="'+k+'">'+BB.icon(KIND_IC[k]||'folder')+'<span class="n">'+(k==='All'?'All files':k)+'</span><em>'+n+'</em></button>';
+  });
+  html += '</div></div>';
+  // farms that have files, busiest first
+  var byF={}; all.forEach(function(f){ byF[f.farmer]=(byF[f.farmer]||0)+1; });
+  var fk=Object.keys(byF).sort(function(a,b){ return byF[b]-byF[a]; });
+  if(fk.length){
+    html += '<div class="card"><div class="card-h"><div><h3>Farms</h3><div class="sub">files per farm</div></div></div><div class="fold">';
+    html += '<button class="farm-pick'+(!state.farmer?' on':'')+'" data-farm="">'+BB.icon('farm')+'<span class="n">All farms</span><em>'+all.length+'</em></button>';
+    fk.forEach(function(id){ var fm=d.farmer(id);
+      html += '<button class="farm-pick'+(state.farmer===id?' on':'')+'" data-farm="'+BB.esc(id)+'">'+BB.icon('farm')+'<span class="n">'+BB.esc(fm.farm)+'</span><em>'+byF[id]+'</em></button>'; });
+    html += '</div></div>';
+  }
+  return html;
+}
+
 function controls(){
-  var html='';
-  html += '<div class="fld" style="margin-top:20px;"><input id="search" placeholder="Search file name…" value="'+BB.esc(state.q)+'"></div>';
-  html += '<div class="row" style="margin-bottom:10px;">';
-  KINDS.forEach(function(k){ html += '<button class="chip kind-chip'+(state.kind===k?' on':'')+'" data-kind="'+k+'">'+k+'</button>'; });
-  html += '</div>';
-  html += '<div class="fld" style="max-width:340px;"><label>Farm</label><select id="farmerFilter"><option value="">All farms</option>'+
+  var html='<div class="toolbar">';
+  html += '<label class="srch">'+BB.icon('search')+'<input id="search" type="search" placeholder="Search file name…" value="'+BB.esc(state.q)+'" aria-label="Search file name"></label>';
+  html += '<select id="farmerFilter" class="tsel" aria-label="Farm"><option value="">All farms</option>'+
     farmers.map(function(f){ return '<option value="'+f.id+'"'+(f.id===state.farmer?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(f.name)+'</option>'; }).join('')+
-    '</select></div>';
+    '</select>';
+  html += '</div>';
   return html;
 }
 
 function table(){
   var list=files();
-  var html='<div class="card">';
+  var html='';
   if(!list.length){
-    html += '<div class="empty"><div class="big">🗂</div>No files match. Try a different filter, or file a new one below.</div>';
+    html += '<div class="empty">No files match. Try a different filter, or file a new one below.</div>';
   } else {
-    html += '<div class="scroll"><table class="bb"><thead><tr><th>File</th><th>Kind</th><th>Farm</th><th>Date</th><th>Size</th><th class="right"></th></tr></thead><tbody>';
+    html += '<div class="scroll'+(list.length>12?' tall':'')+'"><table class="bb"><thead><tr><th>File</th><th>Kind</th><th>Farm</th><th>Date</th><th class="num">Size</th><th></th></tr></thead><tbody>';
     list.forEach(function(f){
       var fm=d.farmer(f.farmer);
       html += '<tr>'+
-        '<td><div class="row" style="gap:9px;flex-wrap:nowrap;"><span class="fico">📄</span><b style="color:var(--green-dark);">'+BB.esc(f.name)+'</b></div></td>'+
+        '<td><div class="row" style="gap:10px;flex-wrap:nowrap;"><span class="fico">'+BB.icon(KIND_IC[f.kind]||'file')+'</span><b style="color:var(--green-dark);font-weight:600;">'+BB.esc(f.name)+'</b></div></td>'+
         '<td><span class="kind k-'+BB.esc(f.kind)+'">'+BB.esc(f.kind)+'</span></td>'+
-        '<td><b>'+BB.esc(fm.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(fm.name)+'</div></td>'+
+        '<td style="white-space:nowrap;">'+BB.esc(fm.farm)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(fm.name)+'</div></td>'+
         '<td class="muted" style="white-space:nowrap;">'+BB.shortDate(f.date)+'</td>'+
-        '<td class="muted">'+BB.esc(f.size)+'</td>'+
-        '<td class="right"><div class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end;"><button class="btn ghost sm openF" data-name="'+BB.esc(f.name)+'" data-farmer="'+BB.esc(f.farmer)+'" data-fk="'+BB.esc(f.kind)+'">Open</button><button class="btn ghost sm dlF" data-name="'+BB.esc(f.name)+'" data-farmer="'+BB.esc(f.farmer)+'" data-fk="'+BB.esc(f.kind)+'" title="Open / print">⬇</button></div></td>'+
+        '<td class="num muted">'+BB.esc(f.size)+'</td>'+
+        '<td class="right"><div class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end;"><button class="btn ghost sm openF" data-name="'+BB.esc(f.name)+'" data-farmer="'+BB.esc(f.farmer)+'" data-fk="'+BB.esc(f.kind)+'">'+BB.icon('eye')+'Open</button><button class="btn ghost sm dlF" data-name="'+BB.esc(f.name)+'" data-farmer="'+BB.esc(f.farmer)+'" data-fk="'+BB.esc(f.kind)+'" title="Open / print" aria-label="Open / print">'+BB.icon('download')+'</button></div></td>'+
       '</tr>';
     });
     html += '</tbody></table></div>';
   }
-  html += '</div>';
   return html;
 }
 
 function uploadForm(){
-  var html='<div class="sec"><h2>Upload / capture a file</h2><span class="ln"></span></div>';
-  html += '<div class="card card-p">';
-  html += '<p class="muted" style="font-size:.85rem;margin-bottom:14px;">Anything you capture files itself to the right farm automatically — no more hunting across a dozen drives. One place, everything tagged to the farm it belongs to.</p>';
+  var html='<div class="card" id="upload" style="scroll-margin-top:80px;"><div class="card-h"><div><h3>Upload or capture a file</h3><div class="sub">it files itself to the farm it belongs to</div></div></div><div class="card-p">';
   html += '<div class="grid g3">';
   html += '<div class="fld"><label>Farm</label><select id="uFarmer">'+
     farmers.map(function(f){ return '<option value="'+f.id+'">'+BB.esc(f.farm)+' — '+BB.esc(f.name)+'</option>'; }).join('')+'</select></div>';
@@ -99,21 +137,27 @@ function uploadForm(){
     KINDS.filter(function(k){ return k!=='All'; }).map(function(k){ return '<option>'+k+'</option>'; }).join('')+'</select></div>';
   html += '<div class="fld"><label>File name</label><input id="uName" placeholder="e.g. Rietvlei — Soil Report Block B.pdf"></div>';
   html += '</div>';
-  html += '<div class="row"><input id="uFile" type="file" style="padding:8px;"><button class="btn" id="fileIt">File it</button></div>';
-  html += '</div>';
+  html += '<div class="row between"><input id="uFile" type="file" style="padding:6px 0;font-size:.84rem;max-width:100%;"><button class="btn" id="fileIt">'+BB.icon('folder')+'File it</button></div>';
+  html += '</div></div>';
   return html;
 }
 
 function render(){
   var html='';
-  html += '<div class="page-head"><h1>Farm files</h1>'+
-    '<p>One home for every document — soil reports, programmes, monitoring, delivery notes — all tagged to the farm. No more time lost searching across scattered drives.</p></div>';
+  var shown=files().length;
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioServices · Documents</div><h1>Farm files</h1>'+
+    '<p>One home for every document: soil reports, programmes, monitoring and delivery notes, all tagged to the farm.</p></div>'+
+    '<div class="row"><a class="btn" href="#upload">'+BB.icon('plus')+'Upload a file</a></div></div>';
   html += statRow();
-  html += controls();
-  html += '<div class="sec"><h2>All files</h2><span class="ln"></span><span class="cnt">'+files().length+' shown</span></div>';
+  html += '<div class="lib">';
+  html += '<div class="side">'+folders()+'</div>';
+  html += '<div class="main">';
+  html += '<div class="card"><div class="card-h"><div><h3>'+(state.kind==='All'?'All files':BB.esc(state.kind)+' files')+'</h3><div class="sub">newest first</div></div><span class="badge b-grey">'+shown+' shown</span>'+controls()+'</div>';
   html += table();
+  html += '</div>';
   html += uploadForm();
-  html += '<div style="height:24px;"></div>';
+  html += '</div></div>';
   document.querySelector('main.wrap').innerHTML=html;
   wire();
 }
@@ -123,6 +167,9 @@ function wire(){
   if(s) s.oninput=function(){ state.q=s.value; refreshList(); };
   Array.prototype.forEach.call(document.querySelectorAll('.kind-chip'), function(c){
     c.onclick=function(){ state.kind=c.getAttribute('data-kind'); render(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.farm-pick'), function(c){
+    c.onclick=function(){ state.farmer=c.getAttribute('data-farm')||''; render(); };
   });
   var ff=document.getElementById('farmerFilter');
   if(ff) ff.onchange=function(){ state.farmer=ff.value; refreshList(); };

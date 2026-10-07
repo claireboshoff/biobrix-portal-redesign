@@ -6,15 +6,20 @@
 <title>Commission · BioBrix OS</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <style>
-  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
-  td.num,th.num{text-align:right;white-space:nowrap;}
-  .rate{width:92px;padding:7px 9px;text-align:right;font-size:.88rem;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;}
+  .rate{width:96px;padding:7px 9px;text-align:right;font-size:.88rem;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;background:#fff;}
+  .rate:focus{border-color:var(--green-bright);outline:none;box-shadow:0 0 0 3px rgba(104,165,62,.15);}
   .mini{font-size:.72rem;color:var(--faint);}
-  .note{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:.86rem;line-height:1.55;}
+  td.mini{white-space:nowrap;}
+  .note{display:flex;gap:10px;align-items:flex-start;background:var(--blue-bg);color:#1f4d70;border-radius:10px;padding:11px 14px;font-size:.84rem;line-height:1.5;margin-top:14px;}
+  .note .ico{color:var(--blue);margin-top:1px;}
+  .house{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .house .big{font-family:var(--display);font-size:1.6rem;font-weight:600;color:var(--green-darkest);}
+  .cm-note{font-size:.78rem;margin-top:10px;}
+  .cm-col{display:grid;gap:16px;align-content:start;}
 </style>
 </head>
 <body>
@@ -32,85 +37,111 @@ function render(){
   var canEdit = BB.auth.can('finance') || u.roleKey==='director';
   var comm = pl.commission || { default:0, byProduct:{}, byAgent:{} };
 
-  var html = '<div class="page-head"><h1>Commission</h1>'+
-    '<p>Set the rate once — per agent, per product, or a house rate for everyone — and it is worked out on every invoice automatically, ready at month end. No spreadsheet, no recalculating by hand.</p></div>';
-
-  if(!canEdit){
-    html += '<div class="note">Commission rates are set by finance. Ask Wikus or Nadine if something looks wrong.</div>';
-  }
-
-  // ---- house rate ----
-  html += '<div class="sec"><h2>House rate</h2><span class="ln"></span><span class="cnt">used when an agent has no rate of their own</span></div>';
-  html += '<div class="card card-p"><div class="row" style="gap:12px;align-items:center;">'+
-    (canEdit? '<input class="rate" id="defRate" inputmode="decimal" value="'+(comm.default||'')+'" placeholder="0">' : '<b>'+(comm.default||0)+'</b>')+
-    '<span>% of what is invoiced</span></div></div>';
-
-  // ---- per agent ----
   var reps = (sg && sg.reps) || [];
   var portalReps = d.allUnscoped('reps');
   var agentList = portalReps.map(function(r){ return {k:r.id, t:r.name, from:'portal'}; })
     .concat(reps.map(function(r){ return {k:'sage_rep_'+r.id, t:r.name, from:'accounts'}; }));
-  html += '<div class="sec"><h2>Per agent</h2><span class="ln"></span><span class="cnt">overrides the house rate</span></div>';
-  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th>Where they come from</th><th class="num">Rate</th></tr></thead><tbody>';
-  agentList.forEach(function(a){
-    var r = (comm.byAgent&&comm.byAgent[a.k]!=null) ? comm.byAgent[a.k] : '';
-    html += '<tr><td><b>'+BB.esc(a.t)+'</b></td><td class="mini">'+(a.from==='accounts'?'your accounting system':'set up in the portal')+'</td>'+
-      '<td class="num">'+(canEdit
-        ? '<input class="rate" data-agent="'+BB.esc(a.k)+'" inputmode="decimal" value="'+r+'" placeholder="house rate">'
-        : (r!==''? r+'%' : '<span class="faint">house rate</span>'))+'</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-
-  // ---- per product ---- (their own products, ranked by what they sell)
   var sageProducts = (sg && sg.products) || [];
   var products = sageProducts.length
     ? sageProducts.slice(0,60).map(function(x){ return { id:'sp_'+x.code, name:x.name, code:x.code, sold:x.value, real:true, src:'sage' }; })
     : d.allUnscoped('products');
   var stock = (sg && sg.stock) || [];
   var realP = products.length && products[0].real;
-  html += '<div class="sec"><h2>Per product</h2><span class="ln"></span><span class="cnt">'+(realP? 'your 60 biggest sellers · rate applies to that product on every invoice':'to push the lines you want sold')+'</span>'+(realP?BB.liveChip():'')+'</div>';
-  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th class="num">Rate</th></tr></thead><tbody>';
-  products.forEach(function(p){
-    var r = (comm.byProduct&&comm.byProduct[p.id]!=null) ? comm.byProduct[p.id] : '';
-    html += '<tr><td><b>'+BB.esc(p.name)+'</b>'+BB.sampleChip(p)+'</td><td class="mini">'+BB.esc(p.code||'')+'</td>'+
-      '<td class="num">'+(canEdit? '<input class="rate" data-product="'+BB.esc(p.id)+'" inputmode="decimal" value="'+r+'" placeholder="house rate">' : (r!==''? r+'%':'<span class="faint">house rate</span>'))+'</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-  if(realP){
-    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">These are the products on your invoices, biggest first. A rate set here is used for that product wherever it appears.</div>';
-  }
+  var nAgentRates = Object.keys(comm.byAgent||{}).filter(function(k){ return comm.byAgent[k]!=null; }).length;
+  var nProdRates = Object.keys(comm.byProduct||{}).filter(function(k){ return comm.byProduct[k]!=null; }).length;
 
-  // ---- this month, worked out ----
-  if(sg && sg.live){
+  // ---- this month, worked out (ledger only) ----
+  var live = !!(sg && sg.live), keys=[], rows={}, total=0, invTotal=0, chartJob=null, agentName=null;
+  if(live){
     var pl2 = pl, byId={}; (sg.customers||[]).forEach(function(c){ byId[c.id]=c; });
-    function agentOf(c){ var s=pl2.agents&&pl2.agents['sage_'+c.id]; if(s) return s; return c.sageRep? ('sage_rep_'+c.sageRep):null; }
-    function agentName(k){ if(!k) return 'Not allocated'; var m=agentList.find(function(a){return a.k===k;}); return m? m.t : k; }
+    var agentOf = function(c){ var s=pl2.agents&&pl2.agents['sage_'+c.id]; if(s) return s; return c.sageRep? ('sage_rep_'+c.sageRep):null; };
+    agentName = function(k){ if(!k) return 'Not allocated'; var m=agentList.find(function(a){return a.k===k;}); return m? m.t : k; };
     var thisMonth = new Date().toISOString().slice(0,7);
-    var rows = {};
     (sg.invoices||[]).filter(function(i){ return i.kind!=='opening' && ym(i.date)===thisMonth; }).forEach(function(i){
       var c=byId[i.customer]||{}; var a=agentOf(c)||'none';
       rows[a]=rows[a]||{v:0,n:0}; rows[a].v+=(i.amount||0); rows[a].n++;
     });
-    var keys=Object.keys(rows).sort(function(a,b){ return rows[b].v-rows[a].v; });
-    var total=0;
-    html += '<div class="sec"><h2>This month, worked out</h2><span class="ln"></span><span class="cnt">on what has been invoiced so far</span>'+BB.liveChip()+'</div>';
-    if(!keys.length){
-      html += '<div class="card card-p"><div class="empty">Nothing invoiced yet this month.</div></div>';
-    } else {
-      html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th class="num">Rate</th><th class="num">Commission</th></tr></thead><tbody>';
-      keys.forEach(function(k){
-        var rate = k==='none'? 0 : ((comm.byAgent&&comm.byAgent[k]!=null)? comm.byAgent[k] : (comm.default||0));
-        var c = rows[k].v*rate/100; total+=c;
-        html += '<tr><td><b>'+BB.esc(agentName(k==='none'?null:k))+'</b><div class="mini">'+rows[k].n+' invoices</div></td>'+
-          '<td class="num">'+money(rows[k].v)+'</td><td class="num">'+(rate||0)+'%</td>'+
-          '<td class="num"><b>'+(rate? money(c) : '<span class="faint">—</span>')+'</b></td></tr>';
-      });
-      html += '</tbody><tfoot><tr><td colspan="3" class="num"><b>Total for the month</b></td><td class="num"><b>'+money(total)+'</b></td></tr></tfoot></table></div></div>';
-      html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Based on invoices, not on orders — so nobody earns commission on something that was never billed. Accounts with no agent are listed so they can be allocated in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales → By customer</a>.</div>';
-    }
+    keys=Object.keys(rows).sort(function(a,b){ return rows[b].v-rows[a].v; });
+    keys.forEach(function(k){
+      var rate = k==='none'? 0 : ((comm.byAgent&&comm.byAgent[k]!=null)? comm.byAgent[k] : (comm.default||0));
+      rows[k].rate = rate; rows[k].c = rows[k].v*rate/100; total += rows[k].c; invTotal += rows[k].v;
+    });
   }
 
+  var html = '<div class="page-head"><div class="eyebrow">Sales</div><h1>Commission</h1>'+
+    '<p>Set the rate once, per agent, per product or a house rate for everyone, and it is worked out on every invoice, ready at month end.</p></div>';
+
+  if(!canEdit){
+    html += '<div class="note">'+BB.icon('alert')+'<div>Commission rates are set by finance. Ask Wikus or Nadine if something looks wrong.</div></div>';
+  }
+
+  html += '<div class="grid g4" style="margin-top:16px;">'+
+    '<div class="stat"><div class="l">House rate</div><div class="v">'+(comm.default||0)+'%</div><div class="s">when an agent has no rate of their own</div></div>'+
+    '<div class="stat"><div class="l">Agents with their own rate</div><div class="v">'+nAgentRates+' <span style="font-size:.9rem;color:var(--faint);">of '+agentList.length+'</span></div><div class="s">the rest use the house rate</div></div>'+
+    '<div class="stat"><div class="l">Products with a rate</div><div class="v">'+nProdRates+'</div><div class="s">'+(realP?'of your '+products.length+' biggest sellers':'to push the lines you want sold')+'</div></div>'+
+    '<div class="stat"><div class="l">Commission this month</div><div class="v">'+(live? money(total) : '—')+'</div><div class="s">'+(live? 'on '+money(invTotal)+' invoiced so far' : 'worked out once your accounting system is read')+'</div></div>'+
+  '</div>';
+
+  // ---- this month, worked out ----
+  if(live){
+    var tb;
+    if(!keys.length){
+      tb = '<div class="empty">Nothing invoiced yet this month.</div>';
+    } else {
+      tb = '<div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th class="num">Rate</th><th class="num">Commission</th></tr></thead><tbody>';
+      keys.forEach(function(k){
+        var r = rows[k];
+        tb += '<tr><td><b>'+BB.esc(agentName(k==='none'?null:k))+'</b><div class="mini">'+r.n+' invoices</div></td>'+
+          '<td class="num">'+money(r.v)+'</td><td class="num">'+(r.rate||0)+'%</td>'+
+          '<td class="num"><b>'+(r.rate? money(r.c) : '<span class="faint">—</span>')+'</b></td></tr>';
+      });
+      tb += '</tbody><tfoot><tr><td>Total for the month</td><td class="num">'+money(invTotal)+'</td><td></td><td class="num">'+money(total)+'</td></tr></tfoot></table></div>';
+    }
+    html += '<div class="split" style="margin-top:16px;">'+
+      '<div class="card"><div class="card-h"><div><h3>This month, worked out</h3><div class="sub">on what has been invoiced so far</div></div>'+BB.liveChip()+'</div>'+tb+'</div>'+
+      '<div class="card"><div class="card-h"><div><h3>Invoiced this month, by agent</h3><div class="sub">the dark part is what they earn on it</div></div></div><div class="card-p"><div id="chComm"></div></div></div>'+
+    '</div>';
+    if(keys.length) chartJob = function(){ BB.chart.hbar('#chComm',{ money:true,
+      rows:keys.map(function(k){ var r=rows[k]; return { label:agentName(k==='none'?null:k), sub:r.rate? r.rate+'%' : 'no rate', value:r.v,
+        parts:[{name:'Commission',value:r.c,color:'#22431a'},{name:'Rest of the invoice',value:r.v-r.c,color:'#8fbf5a'}] }; }),
+      legend:[{name:'Commission',color:'#22431a'},{name:'Rest of the invoice',color:'#8fbf5a'}] }); };
+    else chartJob = function(){ var el=document.getElementById('chComm'); if(el) el.innerHTML='<div class="empty">Nothing invoiced yet this month.</div>'; };
+    if(keys.length) html += '<div class="cm-note faint">Based on invoices, not on orders, so nobody earns commission on something that was never billed. Accounts with no agent are listed so they can be allocated in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales, by customer</a>.</div>';
+  }
+
+  // ---- the rates: house + per agent beside per product ----
+  var left = '<div class="cm-col">';
+  left += '<div class="card"><div class="card-h"><div><h3>House rate</h3><div class="sub">used when an agent has no rate of their own</div></div></div><div class="card-p"><div class="house">'+
+    (canEdit? '<input class="rate" id="defRate" inputmode="decimal" value="'+(comm.default||'')+'" placeholder="0">' : '<span class="big">'+(comm.default||0)+'</span>')+
+    '<span class="muted">% of what is invoiced</span></div></div></div>';
+
+  left += '<div class="card"><div class="card-h"><div><h3>Per agent</h3><div class="sub">overrides the house rate</div></div><span class="badge b-grey">'+agentList.length+'</span></div>';
+  left += '<div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th>Where they come from</th><th class="num">Rate %</th></tr></thead><tbody>';
+  agentList.forEach(function(a){
+    var r = (comm.byAgent&&comm.byAgent[a.k]!=null) ? comm.byAgent[a.k] : '';
+    left += '<tr><td><b>'+BB.esc(a.t)+'</b></td><td class="mini">'+(a.from==='accounts'?'your accounting system':'set up in the portal')+'</td>'+
+      '<td class="num">'+(canEdit
+        ? '<input class="rate" data-agent="'+BB.esc(a.k)+'" inputmode="decimal" value="'+r+'" placeholder="house rate">'
+        : (r!==''? r+'%' : '<span class="faint">house rate</span>'))+'</td></tr>';
+  });
+  left += '</tbody></table></div></div></div>';
+
+  // per product (their own products, ranked by what they sell)
+  var right = '<div class="card"><div class="card-h"><div><h3>Per product</h3><div class="sub">'+(realP? 'your 60 biggest sellers · the rate applies to that product on every invoice':'to push the lines you want sold')+'</div></div>'+(realP?BB.liveChip():'<span class="badge b-grey">'+products.length+'</span>')+'</div>';
+  right += '<div class="scroll tall"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th class="num">Rate %</th></tr></thead><tbody>';
+  products.forEach(function(p){
+    var r = (comm.byProduct&&comm.byProduct[p.id]!=null) ? comm.byProduct[p.id] : '';
+    right += '<tr><td><b>'+BB.esc(p.name)+'</b>'+BB.sampleChip(p)+'</td><td class="mini">'+BB.esc(p.code||'')+'</td>'+
+      '<td class="num">'+(canEdit? '<input class="rate" data-product="'+BB.esc(p.id)+'" inputmode="decimal" value="'+r+'" placeholder="house rate">' : (r!==''? r+'%':'<span class="faint">house rate</span>'))+'</td></tr>';
+  });
+  right += '</tbody></table></div>';
+  if(realP) right += '<div class="card-f">These are the products on your invoices, biggest first. A rate set here is used for that product wherever it appears.</div>';
+  right += '</div>';
+
+  html += '<div class="grid g2" style="margin-top:16px;align-items:start;">'+left+right+'</div>';
+
   host.innerHTML = html;
+  if(chartJob){ try{ chartJob(); }catch(e){ console.warn('chart', e); } }
 
   function save(patch){ d.savePlan({commission:patch}).then(function(){ BB.toast('Saved — used from the next invoice on'); render(); }).catch(function(){ render(); }); }
   var dr = document.getElementById('defRate');

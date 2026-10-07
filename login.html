@@ -6,58 +6,109 @@
 <meta name="robots" content="noindex, nofollow">
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Sign in · BioBrix OS</title>
+<meta name="theme-color" content="#12210c">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <style>
+:root{
+  --green-darkest:#12210c; --green-dark:#22431a; --green:#3f6b28; --green-mid:#43782a; --green-bright:#68a53e; --lime:#b7d97a;
+  --bg:#f4f6f1; --panel:#fff; --panel-2:#f8faf5; --ink:#17240f; --muted:#526047; --faint:#66745b; --line:#e2e8da; --line-soft:#eef2e9;
+  --red:#b8382a; --red-bg:#fcebe9;
+  --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,-apple-system,sans-serif;
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:linear-gradient(120deg,#12210c,#22431a 60%,#3f6b28);color:#16240f;position:relative;overflow:hidden;}
-.bgfield{position:absolute;inset:0;background:url('assets/hero-field.webp') center/cover;opacity:.16;filter:saturate(1.1);}
-.shell{position:relative;width:100%;max-width:440px;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden;}
-.head{padding:30px 32px 18px;text-align:center;background:linear-gradient(120deg,#12210c,#22431a);color:#eaf4d8;}
-.mark{width:56px;height:56px;border-radius:15px;margin:0 auto 12px;background:linear-gradient(140deg,#68a53e,#b7d97a);
-  display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:1.7rem;color:#13260c;}
-.brand{font-family:'Space Grotesk';font-weight:700;font-size:1.5rem;letter-spacing:.5px;}
-.brand .os{color:#b7d97a;font-weight:500;}
-.sub{font-size:.64rem;letter-spacing:3px;text-transform:uppercase;opacity:.72;margin-top:5px;}
-.body{padding:24px 32px 28px;}
-.body h1{font-family:'Space Grotesk';color:#22431a;font-size:1.25rem;font-weight:600;margin-bottom:4px;}
-.body .lead{font-size:.9rem;color:#5d6b52;margin-bottom:18px;}
-label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#5d6b52;margin-bottom:6px;}
-input{width:100%;padding:13px 15px;font-family:inherit;font-size:1rem;border:1.5px solid #e2e8d8;border-radius:11px;outline:none;transition:.15s;margin-bottom:14px;}
-input:focus{border-color:#68a53e;}
-button.go{width:100%;padding:14px;background:#3f6b28;color:#fff;border:none;border-radius:11px;font-family:inherit;font-weight:600;font-size:1rem;cursor:pointer;transition:.15s;}
-button.go:hover{background:#22431a;}
-.msg{margin-top:12px;font-size:.86rem;padding:10px 13px;border-radius:9px;display:none;}
-.msg.err{display:block;background:#fcebe9;color:#c0392b;border-left:3px solid #c0392b;}
-.divider{display:flex;align-items:center;gap:12px;margin:22px 0 14px;color:#8a9880;font-size:.7rem;text-transform:uppercase;letter-spacing:1px;}
-.divider .ln{flex:1;height:1px;background:#e2e8d8;}
-.personas{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-.persona{border:1.5px solid #e2e8d8;border-radius:11px;padding:11px 12px;cursor:pointer;transition:.15s;background:#fbfdf7;text-align:left;}
-.persona:hover{border-color:#68a53e;background:#f3f9e9;}
-.persona .n{font-weight:600;font-size:.86rem;color:#22431a;}
-.persona .r{font-size:.7rem;color:#5d6b52;margin-top:1px;}
-.hint{margin-top:16px;font-size:.72rem;color:#8a9880;text-align:center;line-height:1.5;}
-.hint code{background:#eef2e7;padding:1px 6px;border-radius:5px;color:#3f6b28;font-weight:600;}
+html,body{max-width:100%;overflow-x:hidden;}
+body{font-family:var(--body);min-height:100vh;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);}
+a{color:var(--green);}
+.ico{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* brand panel */
+.brandside{position:relative;overflow:hidden;background:var(--green-darkest);color:#eaf4d8;display:flex;flex-direction:column;justify-content:space-between;padding:40px 48px;min-height:100vh;}
+/* the photo carries its own lettering on its left half — show only the right, text-free side */
+.brandside .photo{position:absolute;inset:0;background:url('assets/hero-field-clean.webp') center bottom/cover no-repeat;opacity:.6;filter:saturate(1.05);}
+.brandside .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,33,12,.55) 0%,rgba(18,33,12,.35) 40%,rgba(18,33,12,.92) 100%),linear-gradient(90deg,rgba(18,33,12,.5),rgba(18,33,12,0) 70%);}
+.brandside > *:not(.photo):not(.shade){position:relative;}
+.logo{display:flex;align-items:center;gap:12px;}
+.mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(140deg,var(--green-bright),var(--lime));display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:1.25rem;color:#13260c;}
+.word{font-family:var(--display);font-weight:700;font-size:1.15rem;letter-spacing:.5px;line-height:1;color:#f1f7e8;}
+.word .os{color:var(--lime);font-weight:500;}
+.tagline{font-size:.6rem;letter-spacing:2.4px;text-transform:uppercase;color:rgba(222,236,203,.6);margin-top:5px;}
+.pitch{max-width:500px;}
+.pitch .eyebrow{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--lime);}
+.pitch h2{font-family:var(--display);font-weight:600;font-size:clamp(2rem,3.4vw,3rem);line-height:1.05;letter-spacing:-.8px;color:#fff;margin-top:10px;}
+.pitch p{font-size:.98rem;line-height:1.55;color:rgba(234,244,216,.8);margin-top:14px;max-width:440px;}
+.feats{display:flex;flex-direction:column;gap:10px;margin-top:24px;}
+.feat{display:flex;align-items:center;gap:12px;font-size:.88rem;color:rgba(234,244,216,.88);}
+.feat .ic{width:32px;height:32px;border-radius:9px;background:rgba(183,217,122,.12);border:1px solid rgba(183,217,122,.2);display:flex;align-items:center;justify-content:center;color:var(--lime);flex:none;}
+.feat .ic .ico{width:16px;height:16px;}
+.foot{font-size:.72rem;color:rgba(222,236,203,.5);}
+.foot b{color:rgba(222,236,203,.75);font-weight:600;}
+
+/* form panel */
+.formside{display:flex;align-items:center;justify-content:center;padding:40px 32px;min-height:100vh;}
+.form{width:100%;max-width:420px;}
+.form h1{font-family:var(--display);font-weight:600;font-size:1.75rem;letter-spacing:-.4px;color:var(--green-darkest);}
+.form .lead{font-size:.92rem;color:var(--muted);margin-top:6px;margin-bottom:26px;line-height:1.5;}
+label{display:block;font-size:.74rem;font-weight:600;color:var(--muted);margin-bottom:6px;}
+input{width:100%;padding:12px 14px;font-family:inherit;font-size:1rem;border:1px solid var(--line);border-radius:10px;outline:none;background:#fff;color:var(--ink);transition:border-color .15s,box-shadow .15s;margin-bottom:16px;}
+input:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}
+button.go{width:100%;min-height:48px;padding:12px;background:var(--green-dark);color:#fff;border:none;border-radius:10px;font-family:inherit;font-weight:600;font-size:1rem;cursor:pointer;transition:background .15s;margin-top:4px;}
+button.go:hover{background:var(--green-darkest);}
+button.go:disabled{opacity:.6;cursor:default;}
+:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px;}
+.msg{margin-top:14px;font-size:.86rem;padding:10px 13px;border-radius:9px;display:none;line-height:1.45;}
+.msg.err{display:block;background:var(--red-bg);color:var(--red);border-left:3px solid var(--red);}
+.divider{display:flex;align-items:center;gap:12px;margin:28px 0 14px;color:var(--faint);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;}
+.divider .ln{flex:1;height:1px;background:var(--line);}
+.personas{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.persona{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;cursor:pointer;transition:border-color .15s,background .15s;background:#fff;text-align:left;font:inherit;color:inherit;min-width:0;}
+.persona:hover{border-color:var(--green-bright);background:var(--panel-2);}
+.persona .av{width:30px;height:30px;border-radius:50%;background:var(--green-dark);color:var(--lime);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.68rem;flex:none;}
+.persona .tx{min-width:0;}
+.persona .n{font-weight:600;font-size:.84rem;color:var(--green-darkest);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.persona .r{font-size:.7rem;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hint{margin-top:18px;font-size:.76rem;color:var(--faint);line-height:1.55;}
+.hint code{background:#eef4e4;padding:1px 7px;border-radius:5px;color:var(--green);font-weight:600;font-size:.78rem;}
+
+@media(max-width:900px){
+  body{grid-template-columns:minmax(0,1fr);align-content:start;}
+  .brandside{min-height:0;padding:22px 22px 26px;gap:26px;}
+  .brandside .photo{background-size:auto 190%;background-position:right top;}
+  .pitch h2{font-size:1.7rem;}
+  .pitch p{font-size:.88rem;margin-top:8px;}
+  .feats,.foot{display:none;}
+  .formside{min-height:0;padding:28px 20px 40px;align-items:flex-start;}
+}
+@media(max-width:420px){ .personas{grid-template-columns:minmax(0,1fr);} }
 </style>
 </head>
 <body>
-<div class="bgfield"></div>
-<div class="shell">
-  <div class="head">
-    <div class="mark">B</div>
-    <div class="brand">BIOBRIX <span class="os">OS</span></div>
-    <div class="sub">The Biological Way</div>
+<aside class="brandside" aria-label="BioBrix">
+  <div class="photo"></div><div class="shade"></div>
+  <div class="logo"><div class="mark">B</div><div><div class="word">BIOBRIX <span class="os">OS</span></div><div class="tagline">Operating system</div></div></div>
+  <div class="pitch">
+    <div class="eyebrow">BioBrix</div>
+    <h2>The Biological Way.</h2>
+    <p>Your operations, sales and BioServices in one place — in the office, and on a phone in the field.</p>
+    <div class="feats">
+      <div class="feat"><span class="ic"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg></span>Soil, leaf and monitoring, farm by farm</div>
+      <div class="feat"><span class="ic"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg></span>Orders captured by voice, in front of the farmer</div>
+      <div class="feat"><span class="ic"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>Works with no signal, syncs when it returns</div>
+    </div>
   </div>
-  <div class="body">
+  <div class="foot"><b>FreedomHub</b> · Business OS · freedomhub.io</div>
+</aside>
+
+<main class="formside">
+  <div class="form">
     <h1>Sign in</h1>
-    <p class="lead">Your operations, sales &amp; BioServices — in one place. Works offline in the field.</p>
+    <p class="lead">Use your BioBrix email to open your seat.</p>
     <form id="f">
-      <label>Email</label>
+      <label for="email">Email</label>
       <input id="email" type="email" placeholder="you@biobrix.co.za" autocomplete="username">
-      <label id="pinLabel">Password</label>
+      <label id="pinLabel" for="pin">Password</label>
       <input id="pin" type="password" placeholder="Password" autocomplete="current-password">
       <button class="go" type="submit" id="go">Sign in</button>
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg" role="alert"></div>
     </form>
 
     <div id="demoBits" style="display:none;">
@@ -65,11 +116,11 @@ button.go:hover{background:#22431a;}
       <div class="personas" id="personas"></div>
       <div class="hint">Demo access code: <code>biobrix</code> · Every seat sees only what its role needs.</div>
     </div>
-    <div class="hint" id="liveHint">Your own sign-in. Every seat sees only what its role needs. Forgotten your password? Ask the team on <a href="mailto:info@freedomhub.io" style="color:#3f6b28;">info@freedomhub.io</a> and it is reset the same day.</div>
+    <div class="hint" id="liveHint">Your own sign-in. Forgotten your password? Ask the team on <a href="mailto:info@freedomhub.io">info@freedomhub.io</a> and it is reset the same day.</div>
   </div>
-</div>
+</main>
 
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
 <script>
 (function(){
   var params = new URLSearchParams(location.search);
@@ -88,7 +139,9 @@ button.go:hover{background:#22431a;}
     var box = document.getElementById('personas');
     BB.auth.users.forEach(function(u){
       var b=document.createElement('button'); b.type='button'; b.className='persona';
-      b.innerHTML='<div class="n">'+u.name+'</div><div class="r">'+u.role+' · '+u.region+'</div>';
+      var ini=String(u.name||'?').split(/\s+/).map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      b.innerHTML='<span class="av">'+ini+'</span><span class="tx"><div class="n">'+u.name+'</div><div class="r">'+u.role+' · '+u.region+'</div></span>';
+      b.title=u.name+' — '+u.role+' · '+u.region;
       b.onclick=function(){ BB.auth.persona(u.id); location.replace(ret); };
       box.appendChild(b);
     });

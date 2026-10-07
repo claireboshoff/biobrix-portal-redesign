@@ -7,9 +7,22 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Suppliers · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+  .cc{display:inline-flex;align-items:center;justify-content:center;min-width:28px;padding:1px 6px;border-radius:5px;font-size:.66rem;font-weight:700;letter-spacing:.5px;}
+  .cc.loc{background:#eef6dc;color:var(--green-mid);} .cc.imp{background:var(--blue-bg);color:var(--blue);}
+  .side{display:grid;gap:16px;align-content:start;min-width:0;}
+  table.bb tr.sup-row.on td{background:#f3f8ec;} table.bb tr.sup-row.on td:first-child{box-shadow:inset 3px 0 0 var(--green-bright);}
+  table.bb tr.r-low td{background:#fffaf0;} table.bb tr.r-out td{background:#fdf2f0;}
+  table.bb tr.r-low td:first-child{box-shadow:inset 3px 0 0 var(--amber);} table.bb tr.r-out td:first-child{box-shadow:inset 3px 0 0 var(--red);}
+  .sup-detail{border-top:3px solid var(--green-bright);}
+  .po{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 20px;border-top:1px solid var(--line-soft);}
+  .po:first-child{border-top:0;}
+  .po b{color:var(--green-dark);font-size:.88rem;}
+  @media(max-width:480px){ .po{padding:12px 14px;} }
+</style>
 </head>
 <body>
 <script>
@@ -21,73 +34,59 @@ var products = d.all('products');
 var inventory = d.all('inventory');
 var selected = null;
 
-var FLAG = { ZA:'🇿🇦', US:'🇺🇸', DE:'🇩🇪', AU:'🇦🇺' };
-function flag(c){ return FLAG[c] || '🏳'; }
+// Country as a small code badge — local in green, imports in blue (no flag emoji).
+function flag(c){ return '<span class="cc '+(isLocal(c)?'loc':'imp')+'" title="'+(isLocal(c)?'Local':'Imported')+'">'+BB.esc(c||'—')+'</span>'; }
 function isLocal(c){ return c==='ZA'; }
 
 function prodCount(supId){ return products.filter(function(p){ return p.supplier===supId; }).length; }
+function panel(title, sub, actions, body, cls){
+  return '<div class="card'+(cls?' '+cls:'')+'"><div class="card-h"><div><h3>'+title+'</h3>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+(actions||'')+'</div>'+body+'</div>';
+}
 
 function renderProducts(supId){
   var list = products.filter(function(p){ return p.supplier===supId; });
   var sup = d.supplier(supId);
-  var html = '<div class="card card-p" style="margin-top:8px;border-top:3px solid var(--green-bright);">';
-  html += '<div class="eyebrow">'+flag(sup.country)+' Sourced from</div>';
-  html += '<b style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+BB.esc(sup.name)+'</b>';
-  html += '<p class="muted" style="font-size:.82rem;margin:2px 0 4px;">'+BB.esc(sup.note)+' · lead time '+sup.lead+' days</p>';
+  var body;
   if(!list.length){
-    html += '<div class="empty">No products currently sourced from this supplier.</div>';
+    body = '<div class="empty">No products currently sourced from this supplier.</div>';
   } else {
-    html += '<div class="scroll" style="margin-top:12px;"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Pack</th><th>Lever</th><th class="right">Price</th></tr></thead><tbody>';
+    body = '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Pack</th><th>Lever</th><th class="num">Price</th></tr></thead><tbody>';
     list.forEach(function(p){
-      html += '<tr>'+
+      body += '<tr>'+
         '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b></td>'+
         '<td class="muted">'+BB.esc(p.code)+'</td>'+
         '<td class="muted">'+BB.esc(p.pack)+'</td>'+
         '<td>'+BB.statusBadge(p.lever)+'</td>'+
-        '<td class="right"><b>'+BB.money(p.price)+'</b><span class="faint" style="font-size:.72rem;">/'+BB.esc(p.unit)+'</span></td>'+
+        '<td class="num"><b>'+BB.money(p.price)+'</b><span class="faint" style="font-size:.72rem;">/'+BB.esc(p.unit)+'</span></td>'+
       '</tr>';
     });
-    html += '</tbody></table></div>';
+    body += '</tbody></table></div>';
   }
-  html += '</div>';
-  return html;
+  return '<div class="card sup-detail" style="margin-top:16px;"><div class="card-h"><div><div class="eyebrow" style="margin-bottom:2px;">Sourced from '+flag(sup.country)+'</div><h3>'+BB.esc(sup.name)+'</h3>'+
+    '<div class="sub">'+BB.esc(sup.note)+' · lead time '+sup.lead+' days</div></div><button class="btn ghost sm" data-sup-close="1">Close</button></div>'+body+'</div>';
 }
 
 function render(){
   var localCount = suppliers.filter(function(s){ return isLocal(s.country); }).length;
   var imported = suppliers.length - localCount;
   var avgLead = Math.round(suppliers.reduce(function(s,x){ return s+x.lead; }, 0) / (suppliers.length||1));
+  var pos = d.all('purchaseOrders');
+  var openPos = pos.filter(function(po){ return po.status!=='Delivered' && po.status!=='Received'; });
 
   var html = '';
-  html += '<section class="page-head">'+
-    '<div class="eyebrow">Operations · Suppliers</div>'+
+  html += '<section class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">Operations · Suppliers</div>'+
     '<h1>Our supply network</h1>'+
-    '<p>BioBrix sources across many suppliers, not one — local blends alongside imported biologicals. This is who each product comes from, and what needs ordering right now.</p>'+
+    '<p>BioBrix sources across many suppliers, not one — local blends alongside imported biologicals. This is who each product comes from, and what needs ordering right now.</p></div>'+
+    ((BB.auth && BB.auth.canPage && BB.auth.canPage('stock.html')) ? '<div class="row"><a class="btn ghost" href="stock.html">'+BB.icon('package')+'Stock</a></div>' : '')+
   '</section>';
 
-  html += '<div class="grid g3">'+
+  html += '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Suppliers</div><div class="v">'+suppliers.length+'</div><div class="s">across the network</div></div>'+
     '<div class="stat"><div class="l">Local · imported</div><div class="v">'+localCount+' · '+imported+'</div><div class="s">ZA vs overseas</div></div>'+
     '<div class="stat"><div class="l">Avg lead time</div><div class="v">'+avgLead+' <span style="font-size:.9rem;">days</span></div><div class="s">order to arrival</div></div>'+
+    '<div class="stat"><div class="l">Purchase orders open</div><div class="v">'+openPos.length+'</div><div class="s">with suppliers now</div></div>'+
   '</div>';
-
-  // supplier table
-  html += '<div class="sec"><h2>Suppliers</h2><span class="ln"></span><span class="cnt">tap for products</span></div>';
-  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Supplier</th><th>Country</th><th>Lead</th><th>Note</th><th class="right">Products</th></tr></thead><tbody>';
-  suppliers.forEach(function(s){
-    var on = selected===s.id;
-    html += '<tr class="click sup-row" data-sup="'+s.id+'"'+(on?' style="background:#f5f9ee;"':'')+'>'+
-      '<td><b style="color:var(--green-dark);">'+BB.esc(s.name)+'</b></td>'+
-      '<td>'+flag(s.country)+' <span class="muted" style="font-size:.78rem;">'+BB.esc(s.country)+'</span></td>'+
-      '<td class="muted" style="white-space:nowrap;">'+s.lead+' days</td>'+
-      '<td class="faint" style="font-size:.78rem;">'+BB.esc(s.note)+'</td>'+
-      '<td class="right"><b>'+prodCount(s.id)+'</b></td>'+
-    '</tr>';
-  });
-  html += '</tbody></table></div></div>';
-
-  // selected supplier products
-  html += '<div id="supdetail">'+(selected?renderProducts(selected):'')+'</div>';
 
   // reorder radar
   var low = inventory.filter(function(i){ return i.qty<i.reorder; });
@@ -98,49 +97,84 @@ function render(){
     return { i:i, p:p, sup:sup };
   }).sort(function(a,b){ return b.sup.lead-a.sup.lead; });
 
-  html += '<div class="sec"><h2>Reorder radar</h2><span class="ln"></span><span class="cnt">'+radar.length+' below reorder</span></div>';
-  html += '<div class="card">';
+  var radarBody;
   if(!radar.length){
-    html += '<div class="empty"><div class="big">✓</div>Every line is above its reorder level.</div>';
+    radarBody = '<div class="empty"><div class="big">'+BB.icon('check')+'</div>Every line is above its reorder level.</div>';
   } else {
-    html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Depot</th><th>On hand</th><th>Supplier</th><th>Lead</th><th class="right"></th></tr></thead><tbody>';
+    radarBody = '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Depot</th><th class="num">On hand</th><th>Supplier</th><th class="num">Lead</th><th class="num"></th></tr></thead><tbody>';
     radar.forEach(function(r){
-      html += '<tr'+(r.i.qty<=0?' style="background:var(--red-bg);"':' style="background:var(--amber-bg);"')+'>'+
-        '<td><b style="color:var(--green-dark);">'+BB.esc(r.p.name)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(r.p.code)+'</span></td>'+
-        '<td class="muted">'+BB.esc(d.depot(r.i.depot).name)+'</td>'+
-        '<td>'+BB.num(r.i.qty)+' / '+BB.num(r.i.reorder)+'</td>'+
-        '<td>'+flag(r.sup.country)+' '+BB.esc(r.sup.name)+'</td>'+
-        '<td class="muted" style="white-space:nowrap;">'+r.sup.lead+' days</td>'+
-        '<td class="right"><button class="btn ghost sm" data-order="'+r.p.id+'" data-depot="'+r.i.depot+'" data-qty="'+Math.max(r.i.reorder, r.i.reorder*2-r.i.qty)+'">Raise PO</button></td>'+
+      radarBody += '<tr class="'+(r.i.qty<=0?'r-out':'r-low')+'">'+
+        '<td><b style="color:var(--green-dark);white-space:nowrap;">'+BB.esc(r.p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(r.p.code)+'</div></td>'+
+        '<td class="muted">'+BB.esc(String(d.depot(r.i.depot).name).replace(/ Depot$/,''))+'</td>'+
+        '<td class="num">'+BB.num(r.i.qty)+' <span class="faint">/ '+BB.num(r.i.reorder)+'</span></td>'+
+        '<td><span class="row" style="gap:6px;flex-wrap:nowrap;">'+flag(r.sup.country)+'<span>'+BB.esc(r.sup.name)+'</span></span></td>'+
+        '<td class="num muted">'+r.sup.lead+' days</td>'+
+        '<td class="num"><button class="btn ghost sm" data-order="'+r.p.id+'" data-depot="'+r.i.depot+'" data-qty="'+Math.max(r.i.reorder, r.i.reorder*2-r.i.qty)+'">'+BB.icon('plus')+'Raise PO</button></td>'+
       '</tr>';
     });
-    html += '</tbody></table></div>';
+    radarBody += '</tbody></table></div>';
   }
-  html += '</div>';
 
   // open purchase orders (the ops "order from the States" flow — real records, not just a prompt)
-  var pos = d.all('purchaseOrders');
-  html += '<div class="sec"><h2>Purchase orders</h2><span class="ln"></span><span class="cnt">'+pos.length+' with suppliers</span></div>';
-  html += '<div class="card">';
-  if(!pos.length){ html += '<div class="empty"><div class="big">📦</div>No open purchase orders.</div>'; }
+  var poBody;
+  if(!pos.length){ poBody = '<div class="empty"><div class="big">'+BB.icon('package')+'</div>No open purchase orders.</div>'; }
   else {
-    html += '<div class="scroll"><table class="bb"><thead><tr><th>Raised</th><th>Supplier</th><th>Items</th><th>To depot</th><th>ETA</th><th>Status</th></tr></thead><tbody>';
+    poBody = '<div class="po-list">';
     pos.slice().sort(function(a,b){return (b.date).localeCompare(a.date);}).forEach(function(po){
       var items = (po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
-      html += '<tr><td class="muted">'+BB.date(po.date)+'</td>'+
-        '<td>'+flag(d.supplier(po.supplier).country)+' '+BB.esc(d.supplier(po.supplier).name)+'</td>'+
-        '<td>'+BB.esc(items)+'</td><td class="muted">'+BB.esc(d.depot(po.depot).name)+'</td>'+
-        '<td class="muted">'+BB.date(po.eta)+'</td><td>'+BB.statusBadge(po.status)+'</td></tr>';
+      var sup = d.supplier(po.supplier);
+      (poBody += '<div class="po">'+
+        '<div style="min-width:0;"><div class="row" style="gap:6px;flex-wrap:nowrap;">'+flag(sup.country)+'<b>'+BB.esc(sup.name)+'</b></div>'+
+          '<div style="font-size:.84rem;margin-top:2px;">'+BB.esc(items)+' <span class="faint">→ '+BB.esc(d.depot(po.depot).name)+'</span></div>'+
+          '<div class="faint" style="font-size:.72rem;margin-top:1px;">Raised '+BB.date(po.date)+'</div></div>'+
+        '<div style="text-align:right;flex:none;">'+BB.statusBadge(po.status)+'<div class="faint" style="font-size:.72rem;margin-top:4px;">ETA '+BB.shortDate(po.eta)+'</div></div>'+
+      '</div>');
     });
-    html += '</tbody></table></div>';
+    poBody += '</div>';
   }
-  html += '</div>';
+
+  html += '<div class="split" style="margin-top:16px;">'+
+    panel('Reorder radar', 'below reorder · longest lead first, so order these soonest', '<span class="badge '+(radar.length?'b-warn':'b-ok')+'">'+radar.length+' below reorder</span>', radarBody)+
+    panel('Purchase orders', pos.length+' with suppliers', '', poBody)+
+  '</div>';
+
+  // supplier table beside the network picture
+  var supBody = '<div class="scroll"><table class="bb"><thead><tr><th>Supplier</th><th>Country</th><th class="num">Lead</th><th>Note</th><th class="num">Products</th></tr></thead><tbody>';
+  suppliers.forEach(function(s){
+    var on = selected===s.id;
+    supBody += '<tr class="click sup-row'+(on?' on':'')+'" data-sup="'+s.id+'">'+
+      '<td><b style="color:var(--green-dark);">'+BB.esc(s.name)+'</b></td>'+
+      '<td>'+flag(s.country)+'</td>'+
+      '<td class="num muted">'+s.lead+' days</td>'+
+      '<td class="faint" style="font-size:.78rem;">'+BB.esc(s.note)+'</td>'+
+      '<td class="num"><b>'+prodCount(s.id)+'</b></td>'+
+    '</tr>';
+  });
+  supBody += '</tbody><tfoot><tr><td>'+suppliers.length+' suppliers</td><td></td><td class="num">avg '+avgLead+' days</td><td></td><td class="num">'+products.filter(function(p){ return !!p.supplier; }).length+'</td></tr></tfoot></table></div>';
+
+  html += '<div class="split" style="margin-top:16px;">'+
+    '<div style="min-width:0;">'+panel('Suppliers', 'tap a supplier for its products', '', supBody)+
+      // selected supplier products
+      '<div id="supdetail">'+(selected?renderProducts(selected):'')+'</div></div>'+
+    '<div class="side">'+
+      panel('Lead time', 'days from order to arrival · longest first', '', '<div class="card-p"><div id="chLead"></div></div>')+
+      panel('Where products come from', 'product lines by source', '', '<div class="card-p"><div id="chSource"></div></div>')+
+    '</div>'+
+  '</div>';
 
   html += '<div style="height:24px;"></div>';
 
   var main = document.querySelector('main.wrap');
   main.innerHTML = html;
   wire();
+
+  try{
+    BB.chart.hbar('#chLead', { fmt:function(v){ return v+' days'; },
+      legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#2f6f9e'}],
+      rows:suppliers.slice().sort(function(a,b){ return b.lead-a.lead; }).map(function(s){ return { label:s.name, value:s.lead, color:isLocal(s.country)?'#3f6b28':'#2f6f9e' }; }) });
+    var locP = products.filter(function(p){ var sp=d.supplier(p.supplier); return sp && isLocal(sp.country); }).length;
+    BB.chart.donut('#chSource', { centreLabel:'products', rows:[{label:'Local (ZA)', value:locP, color:'#3f6b28'},{label:'Imported', value:products.length-locP, color:'#2f6f9e'}] });
+  }catch(e){ console.warn('chart', e); }
 }
 
 function wire(){
@@ -151,6 +185,8 @@ function wire(){
       render();
     };
   });
+  var cl = document.querySelector('[data-sup-close]');
+  if(cl) cl.onclick = function(){ selected = null; render(); };
   Array.prototype.forEach.call(document.querySelectorAll('button[data-order]'), function(btn){
     btn.onclick = function(e){
       e.stopPropagation();

@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Product library · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -20,74 +20,113 @@ var products = d.all('products');
 var suppliers = d.all('suppliers');
 
 var css=''+
-'.pcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:.15s;position:relative;}'+
-'.pcard:hover{border-color:var(--green-bright);box-shadow:var(--shadow-lg);}'+
+'.pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}'+
+'@media(min-width:1500px){.pgrid{grid-template-columns:repeat(3,minmax(0,1fr));}}'+
+'@media(max-width:640px){.pgrid{grid-template-columns:minmax(0,1fr);}}'+
+'.pcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative;display:flex;flex-direction:column;min-width:0;}'+
+'.pcard:hover{border-color:var(--green-bright);box-shadow:0 4px 18px -6px rgba(18,33,12,.18);}'+
 '.pcard.open{border-color:var(--green-bright);}'+
-'.ltag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}'+
+'.pcard .pc-b{padding:16px 18px 14px;flex:1;}'+
+'.pcard .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}'+
+'.pcard .pc-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;}'+
+'.pcard .pc-ic .ico{width:19px;height:19px;}'+
+'.pcard .nm{font-family:var(--display);font-size:1rem;font-weight:600;color:var(--green-darkest);line-height:1.25;}'+
+'.pcard .cd{font-size:.72rem;color:var(--faint);letter-spacing:.3px;}'+
+'.pcard .pc-f{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;border-top:1px solid var(--line-soft);background:var(--panel-2);border-radius:0 0 var(--radius) var(--radius);}'+
+'.pcard .price{font-family:var(--display);font-weight:600;font-size:1.05rem;color:var(--green-darkest);}'+
+'.pcard .price small{font-family:var(--body);font-weight:500;font-size:.74rem;color:var(--faint);}'+
+'.ltag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.68rem;font-weight:700;letter-spacing:.2px;white-space:nowrap;}'+
 '.lv-Biology{background:var(--ok-bg);color:var(--ok);}'+
 '.lv-Chemistry{background:var(--blue-bg);color:var(--blue);}'+
 '.lv-Physics{background:var(--amber-bg);color:var(--amber);}'+
+'.ic-Biology{background:var(--ok-bg);color:var(--ok);} .ic-Chemistry{background:var(--blue-bg);color:var(--blue);} .ic-Physics{background:var(--amber-bg);color:var(--amber);}'+
 '.pcard .sheet{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);font-size:.85rem;line-height:1.6;color:var(--muted);}'+
 '.pcard.open .sheet{display:block;}'+
-'.pmeta{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:.76rem;color:var(--faint);}'+
-'.pmeta b{color:var(--green-mid);}';
+'.pmeta{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:10px;font-size:.76rem;color:var(--faint);}'+
+'.pmeta b{color:var(--green-mid);font-weight:600;}'+
+'.klabel{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:4px;}'+
+'.srch{position:relative;flex:1 1 260px;max-width:380px;}'+
+'.srch .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--faint);pointer-events:none;}'+
+'.srch input,.tsel{width:100%;padding:9px 12px 9px 34px;font:inherit;font-size:.86rem;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);outline:none;}'+
+'.tsel{padding-left:12px;width:auto;max-width:100%;}'+
+'.srch input:focus,.tsel:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}'+
+'@media(max-width:560px){.toolbar .seg{width:100%;overflow-x:auto;} .tsel{width:100%;} .srch{max-width:none;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
-var state={ lever:'All', supplier:'', open:{} };
+var state={ lever:'All', supplier:'', q:'', open:{} };
+var LEVER_COL={ Biology:'#3f6b28', Chemistry:'#2f6f9e', Physics:'#c77d17' };
+var LEVER_IC={ Biology:'sprout', Chemistry:'flask', Physics:'leaf' };
 
 function levers(){ return ['All','Biology','Chemistry','Physics']; }
 
 function filtered(){
+  var q=state.q.trim().toLowerCase();
   return products.filter(function(p){
     if(state.lever!=='All' && p.lever!==state.lever) return false;
     if(state.supplier && p.supplier!==state.supplier) return false;
+    if(q){
+      var sup=d.supplier(p.supplier)||{};
+      var hay=[p.name,p.code,p.cat,p.lever,p.sheet,sup.name].join(' ').toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
     return true;
   });
 }
 
 function statRow(){
-  var reps = products.map(function(p){ return p.supplier; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
+  var reps = products.map(function(p){ return p.supplier; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
   var bio=products.filter(function(p){ return p.lever==='Biology'; }).length;
   var chem=products.filter(function(p){ return p.lever==='Chemistry'; }).length;
   var phys=products.filter(function(p){ return p.lever==='Physics'; }).length;
-  return '<div class="grid g3">'+
-    '<div class="stat"><div class="l">Products</div><div class="v">'+products.length+'</div><div class="s">data sheets on file</div></div>'+
-    '<div class="stat"><div class="l">Suppliers represented</div><div class="v">'+reps+'</div><div class="s">of '+suppliers.length+' in the network</div></div>'+
-    '<div class="stat"><div class="l">By lever</div><div class="v" style="font-size:1.05rem;">'+bio+' Bio · '+chem+' Chem · '+phys+' Phys</div><div class="s">the three levers</div></div>'+
+  var sups=reps.map(function(id){ return d.supplier(id)||{}; });
+  var imported=products.filter(function(p){ var s=d.supplier(p.supplier)||{}; return s.country && s.country!=='ZA'; }).length;
+  var leads=sups.map(function(s){ return s.lead; }).filter(function(x){ return typeof x==='number'; });
+  var avgLead=leads.length? Math.round(leads.reduce(function(a,b){ return a+b; },0)/leads.length) : null;
+  return '<div class="grid g4" style="margin-top:14px;">'+
+    '<div class="stat"><div class="l">Products</div><div class="v">'+products.length+'</div><div class="s">'+bio+' biology · '+chem+' chemistry · '+phys+' physics</div></div>'+
+    '<div class="stat"><div class="l">Suppliers represented</div><div class="v">'+reps.length+'</div><div class="s">of '+suppliers.length+' in the network</div></div>'+
+    '<div class="stat"><div class="l">Imported lines</div><div class="v">'+imported+'</div><div class="s">supplied from outside SA</div></div>'+
+    '<div class="stat"><div class="l">Average lead time</div><div class="v">'+(avgLead!=null?avgLead+' days':'—')+'</div><div class="s">across these suppliers</div></div>'+
   '</div>';
 }
 
-function chips(){
-  var html='<div class="row" style="margin:20px 0 10px;">';
+function toolbar(){
+  var html='<div class="toolbar">';
+  html += '<label class="srch">'+BB.icon('search')+'<input id="prodSearch" type="search" placeholder="Search name, code or use…" value="'+BB.esc(state.q)+'" aria-label="Search products"></label>';
+  html += '<div class="seg" role="group" aria-label="Lever">';
   levers().forEach(function(l){
-    html += '<button class="chip lever-chip'+(state.lever===l?' on':'')+'" data-lever="'+l+'">'+l+'</button>';
+    html += '<button class="lever-chip'+(state.lever===l?' on':'')+'" data-lever="'+l+'">'+l+'</button>';
   });
   html += '</div>';
-  html += '<div class="fld" style="max-width:340px;"><label>Supplier</label><select id="supFilter"><option value="">All suppliers</option>'+
+  html += '<select id="supFilter" class="tsel" aria-label="Supplier"><option value="">All suppliers</option>'+
     suppliers.map(function(s){ return '<option value="'+s.id+'"'+(s.id===state.supplier?' selected':'')+'>'+BB.esc(s.name)+'</option>'; }).join('')+
-    '</select></div>';
+    '</select>';
+  html += '</div>';
   return html;
 }
 
 function cards(){
   var list=filtered();
-  if(!list.length) return '<div class="card"><div class="empty"><div class="big">📚</div>No products match that filter.</div></div>';
-  var html='<div class="grid g3">';
+  if(!list.length) return '<div class="card"><div class="empty">No products match that filter.</div></div>';
+  var html='<div class="pgrid">';
   list.forEach(function(p){
-    var sup=d.supplier(p.supplier);
+    var sup=d.supplier(p.supplier)||{name:'—'};
     var open=!!state.open[p.id];
     html += '<div class="pcard'+(open?' open':'')+'" data-prod="'+p.id+'">'+
-      '<div class="row between" style="align-items:flex-start;">'+
-        '<div><b style="font-family:var(--display);font-size:1rem;color:var(--green-dark);">'+BB.esc(p.name)+'</b>'+
-          '<div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+'</div></div>'+
-        '<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever)+'</span>'+
+      '<div class="pc-b">'+
+        '<div class="pc-top">'+
+          '<div class="row" style="gap:12px;flex-wrap:nowrap;min-width:0;align-items:flex-start;"><span class="pc-ic ic-'+BB.esc(p.lever)+'">'+BB.icon(LEVER_IC[p.lever]||'package')+'</span>'+
+            '<div style="min-width:0;"><div class="nm">'+BB.esc(p.name)+'</div><div class="cd">'+BB.esc(p.code)+' · '+BB.esc(p.cat)+'</div></div></div>'+
+          '<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever)+'</span>'+
+        '</div>'+
+        '<div class="pmeta"><span>Pack <b>'+BB.esc(p.pack)+'</b></span><span>'+BB.esc(sup.name)+'</span>'+(sup.lead!=null?'<span>Lead <b>'+sup.lead+' days</b></span>':'')+'</div>'+
+        '<div class="sheet"><div class="klabel">Application &amp; notes</div>'+
+          BB.esc(p.sheet)+
+          '<div class="pmeta" style="margin-top:10px;"><span>Category <b>'+BB.esc(p.cat)+'</b></span><span>Supplier <b>'+BB.esc(sup.name)+'</b></span>'+(sup.country?'<span>From <b>'+BB.esc(sup.country)+'</b></span>':'')+'</div>'+
+        '</div>'+
       '</div>'+
-      '<div class="pmeta"><span>Pack <b>'+BB.esc(p.pack)+'</b></span><span><b>'+BB.money(p.price)+'</b>/'+BB.esc(p.unit)+'</span><span>'+BB.esc(sup.name)+'</span></div>'+
-      '<div class="sheet"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:4px;">Application &amp; notes</div>'+
-        BB.esc(p.sheet)+
-        '<div class="divider" style="margin:12px 0;"></div>'+
-        '<div class="pmeta" style="margin-top:0;"><span>Category <b>'+BB.esc(p.cat)+'</b></span><span>Supplier <b>'+BB.esc(sup.name)+'</b></span><span>Lead <b>'+sup.lead+' days</b></span></div>'+
-      '</div>'+
+      '<div class="pc-f"><div class="price">'+BB.money(p.price)+' <small>per '+BB.esc(p.unit)+'</small></div>'+
+        '<span class="btn ghost sm" role="button" aria-expanded="'+(open?'true':'false')+'">'+BB.icon('file')+(open?'Hide sheet':'Data sheet')+'</span></div>'+
     '</div>';
   });
   html += '</div>';
@@ -96,30 +135,66 @@ function cards(){
 
 function render(){
   var html='';
-  html += '<div class="page-head"><h1>Product library</h1>'+
-    '<p>Every data sheet across the 13 suppliers, at the push of a button — biology, chemistry and physics inputs in one quick reference. Tap a product for the full sheet.</p></div>';
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioServices · Reference</div><h1>Product library</h1>'+
+    '<p>Every data sheet across the suppliers in one quick reference: biology, chemistry and physics inputs. Tap a product for the full sheet.</p></div></div>';
   html += statRow();
-  html += chips();
-  html += '<div class="sec"><h2>Products</h2><span class="ln"></span><span class="cnt">'+filtered().length+' shown</span></div>';
-  html += '<div id="cardWrap">'+cards()+'</div>';
-  html += '<div style="height:24px;"></div>';
+
+  html += '<div class="split" style="margin-top:16px;align-items:start;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Catalogue</h3><div class="sub" id="shownCnt">'+filtered().length+' of '+products.length+' shown</div></div></div>'+
+    '<div class="card-p" style="padding-top:2px;">'+toolbar()+'<div id="cardWrap">'+cards()+'</div></div></div>';
+
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  html += '<div class="card"><div class="card-h"><div><h3>The three levers</h3><div class="sub">products per lever</div></div></div><div class="card-p">'+(products.length?'<div id="chLever"></div>':'<div class="empty" style="padding:20px;">No products.</div>')+'</div></div>';
+  html += '<div class="card"><div class="card-h"><div><h3>Supplier lead times</h3><div class="sub">days from order to depot</div></div></div><div class="card-p">'+(products.length?'<div id="chLead"></div>':'<div class="empty" style="padding:20px;">No suppliers.</div>')+'</div></div>';
+  html += '</div></div>';
   document.querySelector('main.wrap').innerHTML=html;
+
+  if(products.length){
+    try{
+      var cnt={}; products.forEach(function(p){ cnt[p.lever]=(cnt[p.lever]||0)+1; });
+      BB.chart.donut('#chLever',{ centreLabel:'products', size:136, rows:Object.keys(cnt).map(function(k){ return { label:k, value:cnt[k], color:LEVER_COL[k]||'#6b7a5e' }; }) });
+      var seen={}, rows=[];
+      products.forEach(function(p){ if(seen[p.supplier]) return; seen[p.supplier]=1; var s=d.supplier(p.supplier); if(s && s.lead!=null) rows.push({ label:s.name, sub:s.country||'', value:s.lead, color:(s.country&&s.country!=='ZA')?'#c77d17':'#3f6b28' }); });
+      rows.sort(function(a,b){ return b.value-a.value; });
+      BB.chart.hbar('#chLead',{ rows:rows, fmt:function(v){ return v+' days'; }, legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#c77d17'}] });
+    }catch(e){ console.warn('chart', e); }
+  }
   wire();
 }
 
-function wire(){
-  Array.prototype.forEach.call(document.querySelectorAll('.lever-chip'), function(c){
-    c.onclick=function(){ state.lever=c.getAttribute('data-lever'); render(); };
-  });
-  var sf=document.getElementById('supFilter');
-  if(sf) sf.onchange=function(){ state.supplier=sf.value; render(); };
+// redraw just the catalogue, so typing in the search box keeps its focus
+function refreshCards(){
+  var w=document.getElementById('cardWrap'); if(w) w.innerHTML=cards();
+  var c=document.getElementById('shownCnt'); if(c) c.textContent=filtered().length+' of '+products.length+' shown';
+  wireCards();
+}
+
+function wireCards(){
   Array.prototype.forEach.call(document.querySelectorAll('.pcard'), function(card){
     card.onclick=function(){
       var id=card.getAttribute('data-prod');
       state.open[id]=!state.open[id];
       card.classList.toggle('open');
+      var b=card.querySelector('.pc-f .btn');
+      if(b){ b.setAttribute('aria-expanded', state.open[id]?'true':'false'); b.innerHTML=BB.icon('file')+(state.open[id]?'Hide sheet':'Data sheet'); }
     };
   });
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('.lever-chip'), function(c){
+    c.onclick=function(){
+      state.lever=c.getAttribute('data-lever');
+      Array.prototype.forEach.call(document.querySelectorAll('.lever-chip'), function(x){ x.classList.toggle('on', x===c); });
+      refreshCards();
+    };
+  });
+  var sf=document.getElementById('supFilter');
+  if(sf) sf.onchange=function(){ state.supplier=sf.value; refreshCards(); };
+  var ps=document.getElementById('prodSearch');
+  if(ps) ps.oninput=function(){ state.q=ps.value; refreshCards(); };
+  wireCards();
 }
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');

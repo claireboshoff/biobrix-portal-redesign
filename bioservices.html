@@ -7,9 +7,57 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioServices · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+/* BioServices hub — page-scoped */
+.brk{display:grid;grid-template-columns:40px minmax(0,1fr) auto 18px;gap:16px;align-items:center;padding:16px 20px;border-top:1px solid var(--line-soft);transition:background .12s;}
+.brk:first-child{border-top:0;}
+.brk:hover{background:#fafcf7;}
+.brk .ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#eef4e4;color:var(--green-dark);}
+.brk .ic .ico{width:20px;height:20px;}
+.brk h4{font-family:var(--display);font-weight:600;font-size:.98rem;color:var(--green-darkest);}
+.brk p{font-size:.8rem;color:var(--muted);margin-top:2px;line-height:1.45;max-width:620px;}
+.brk .cnt{text-align:right;min-width:120px;}
+.brk .cnt .n{font-family:var(--display);font-size:1.45rem;font-weight:600;color:var(--green-darkest);line-height:1;}
+.brk .cnt .n small{font-family:var(--body);font-size:.72rem;font-weight:500;color:var(--faint);margin-left:4px;}
+.brk .cnt .badge{margin-top:6px;}
+.brk > .ico{color:var(--faint);}
+.qrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 20px;border-top:1px solid var(--line-soft);}
+.qrow:first-child{border-top:0;}
+.qrow:hover{background:#fafcf7;}
+.qrow .t{font-weight:600;font-size:.88rem;}
+.qrow .m{font-size:.76rem;color:var(--faint);margin-top:1px;}
+.qrow .k{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--amber-bg);color:var(--amber);flex:none;}
+.qrow .k .ico{width:16px;height:16px;}
+.sup{display:flex;gap:12px;align-items:flex-start;}
+.sup .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:#eef4e4;color:var(--green-dark);flex:none;}
+.sup .ic .ico{width:18px;height:18px;}
+.sup h4{font-family:var(--display);font-weight:600;font-size:.92rem;color:var(--green-darkest);}
+.sup p{font-size:.78rem;color:var(--muted);margin-top:2px;line-height:1.45;}
+.sup .meta{font-size:.74rem;color:var(--green-mid);font-weight:600;margin-top:6px;}
+.levers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.lever{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;}
+.lever .lh{font-family:var(--display);font-weight:600;font-size:.92rem;color:#eaf4d8;}
+.lever .lp{font-size:.76rem;opacity:.8;margin-top:2px;}
+.cov{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:14px 20px 18px;border-top:1px solid var(--line-soft);}
+.cov .l{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}
+.cov .v{font-family:var(--display);font-size:1.3rem;font-weight:600;color:var(--green-darkest);margin:2px 0 6px;}
+.cov .v small{font-family:var(--body);font-size:.76rem;font-weight:500;color:var(--faint);}
+.cov .trk{height:6px;border-radius:3px;background:var(--line-soft);overflow:hidden;}
+.cov .trk i{display:block;height:100%;background:var(--green-bright);border-radius:3px;}
+.renew{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:20px;align-items:center;margin-top:16px;}
+@media(max-width:860px){.renew{grid-template-columns:minmax(0,1fr);} }
+@media(max-width:560px){
+  .brk{grid-template-columns:36px minmax(0,1fr);gap:10px 12px;padding:14px;}
+  .brk .cnt{grid-column:2;text-align:left;display:flex;align-items:center;gap:10px;min-width:0;}
+  .brk .cnt .badge{margin-top:0;}
+  .brk > .ico{display:none;}
+  .levers{grid-template-columns:minmax(0,1fr);}
+  .qrow{padding:11px 14px;}
+}
+</style>
 </head>
 <body>
 <script>
@@ -17,15 +65,6 @@ BB.renderHeader({ active:'tech', back:'index.html' });
 
 var d = BB.data, u = BB.user;
 var isAdvisor = u.roleKey==='advisor';
-
-var css=''+
-'.levers{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}'+
-'.lever{flex:1;min-width:140px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px 14px;}'+
-'.lever .lh{font-family:var(--display);font-weight:600;font-size:.95rem;color:#eaf4d8;}'+
-'.lever .lp{font-size:.76rem;opacity:.82;margin-top:2px;}'+
-'.tile .big-cnt{font-family:var(--display);font-size:1.7rem;font-weight:600;color:var(--green-dark);position:absolute;top:14px;right:16px;line-height:1;}'+
-'.tile .sub-cnt{color:var(--amber);font-weight:700;}';
-document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 // live counts (respect advisor scoping to their own farms/records)
 function mine(rows, key){
@@ -52,32 +91,118 @@ var recentVisits = watchRows.filter(function(w){
 var myFarms = isAdvisor ? d.where('farmers', function(f){ return f.rep===u.rep; }).length : d.all('farmers').length;
 
 var BRACKETS = [
-  { ic:'🧪', h:'BioAnalyze — Soil', href:'bioanalyze-soil.html', p:'Soil diagnostics: pH, organic matter, Ca:Mg, microbial life and P — read as a living system, not a number.',
-    cnt:soil.length, meta:'sample'+(soil.length===1?'':'s'), sub:soilPending, subLbl:'to interpret' },
-  { ic:'🍃', h:'BioAnalyze — Leaf', href:'bioanalyze-leaf.html', p:'Leaf-sap analysis for in-season correction — see what the plant is actually taking up, block by block.',
-    cnt:leaf.length, meta:'sample'+(leaf.length===1?'':'s'), sub:leafPending, subLbl:'to interpret' },
-  { ic:'🌱', h:'BioWatch', href:'biowatch.html', p:'Seasonal monitoring visits: crop stage, weather, soil moisture, pest and vigour — the record of every walk.',
-    cnt:watchRows.length, meta:'visit'+(watchRows.length===1?'':'s'), sub:recentVisits, subLbl:'last 30 days' },
-  { ic:'📑', h:'BioConsult', href:'bioconsult.html', p:'Regenerative programmes built from the data — balanced Biology, Chemistry and Physics, costed per hectare.',
-    cnt:programs.length, meta:'programme'+(programs.length===1?'':'s'), sub:activePrograms, subLbl:'active' }
+  { ic:'flask', h:'BioAnalyze — Soil', short:'Soil', href:'bioanalyze-soil.html', p:'Soil diagnostics: pH, organic matter, Ca:Mg, microbial life and P — read as a living system, not a number.',
+    cnt:soil.length, meta:'sample'+(soil.length===1?'':'s'), sub:soilPending, subLbl:'to interpret', done:soil.length-soilPending },
+  { ic:'leaf', h:'BioAnalyze — Leaf', short:'Leaf', href:'bioanalyze-leaf.html', p:'Leaf-sap analysis for in-season correction — see what the plant is actually taking up, block by block.',
+    cnt:leaf.length, meta:'sample'+(leaf.length===1?'':'s'), sub:leafPending, subLbl:'to interpret', done:leaf.length-leafPending },
+  { ic:'eye', h:'BioWatch', short:'BioWatch', href:'biowatch.html', p:'Seasonal monitoring visits: crop stage, weather, soil moisture, pest and vigour — the record of every walk.',
+    cnt:watchRows.length, meta:'visit'+(watchRows.length===1?'':'s'), sub:recentVisits, subLbl:'last 30 days', info:1 },
+  { ic:'clipboard', h:'BioConsult', short:'BioConsult', href:'bioconsult.html', p:'Regenerative programmes built from the data — balanced Biology, Chemistry and Physics, costed per hectare.',
+    cnt:programs.length, meta:'programme'+(programs.length===1?'':'s'), sub:activePrograms, subLbl:'active', info:1 }
 ];
 
 var SECONDARY = [
-  { ic:'🌾', h:'Farms & farmers', href:'farms.html', p:'Every farm and block under management — the drill-down starts here.', meta:myFarms+' farm'+(myFarms===1?'':'s') },
-  { ic:'📚', h:'Product library', href:'products-library.html', p:'RenewAg range and recommended inputs across 13 suppliers, with data sheets.', meta:d.all('products').length+' products' },
-  { ic:'🗂', h:'Farm files', href:'farm-files.html', p:'One place for every soil report, programme and delivery note — tagged to the farm.', meta:d.all('files').length+' files' }
+  { ic:'farm', h:'Farms & farmers', href:'farms.html', p:'Every farm and block under management — the drill-down starts here.', meta:myFarms+' farm'+(myFarms===1?'':'s') },
+  { ic:'book', h:'Product library', href:'products-library.html', p:'RenewAg range and recommended inputs across 13 suppliers, with data sheets.', meta:d.all('products').length+' products' },
+  { ic:'folder', h:'Farm files', href:'farm-files.html', p:'One place for every soil report, programme and delivery note — tagged to the farm.', meta:d.all('files').length+' files' }
 ];
 
+// coverage — how much of the book has been measured and prescribed (counted, never estimated)
+var scopeFarms = isAdvisor ? d.where('farmers', function(f){ return f.rep===u.rep; }) : d.all('farmers');
+var scopeFarmIds = scopeFarms.map(function(f){ return f.id; });
+var scopeBlocks = d.all('blocks').filter(function(b){ return scopeFarmIds.indexOf(b.farmer)>=0; });
+var blkSoil = scopeBlocks.filter(function(b){ return soil.some(function(s){ return s.block===b.id; }); }).length;
+var farmsProg = scopeFarms.filter(function(f){ return programs.some(function(p){ return p.farmer===f.id; }); }).length;
+function pct(a,b){ return b? Math.round(a/b*100) : 0; }
+
 var html='';
-html += '<div class="page-head"><h1>BioServices</h1><p>'+
+html += '<div class="page-head row between" style="gap:16px;">'+
+  '<div><div class="eyebrow">Agronomy hub</div><h1>BioServices</h1><p>'+
   (isAdvisor?'Your agronomy workbench — the soil, leaf, monitoring and programme data for your farms.'
-            :'RenewAg agronomy — soil and leaf diagnostics, field monitoring and the programmes that come out of them.')+'</p></div>';
+            :'RenewAg agronomy — soil and leaf diagnostics, field monitoring and the programmes that come out of them.')+'</p></div>'+
+  '<div class="row" style="gap:8px;">'+
+    '<a class="btn ghost" href="farms.html">'+BB.icon('farm')+'Farms &amp; farmers</a>'+
+    '<a class="btn" href="bioanalyze-soil.html#logSample">'+BB.icon('plus')+'Log a soil sample</a>'+
+  '</div>'+
+'</div>';
+
+// KPI strip — one figure per bracket, each opens its page
+html += '<div class="grid g4" style="margin-top:12px;">';
+BRACKETS.forEach(function(b){
+  var warn = !b.info && b.sub>0;
+  html += '<a class="stat tap'+(warn?' warn':'')+'" href="'+b.href+'"><div class="l">'+BB.esc(b.short)+'</div><div class="v">'+b.cnt+'</div>'+
+    '<div class="s">'+b.sub+' '+BB.esc(b.subLbl)+' ›</div></a>';
+});
+html += '</div>';
+
+// The brackets beside the picture of where each one stands
+html += '<div class="split" style="margin-top:16px;">';
+html += '<div class="card"><div class="card-h"><div><h3>The four brackets</h3><div class="sub">measure, watch, then prescribe</div></div></div><div>';
+BRACKETS.forEach(function(b){
+  html += '<a class="brk" href="'+b.href+'">'+
+    '<div class="ic">'+BB.icon(b.ic)+'</div>'+
+    '<div style="min-width:0;"><h4>'+BB.esc(b.h)+'</h4><p>'+BB.esc(b.p)+'</p></div>'+
+    '<div class="cnt"><div class="n">'+b.cnt+'<small>'+BB.esc(b.meta)+'</small></div>'+
+      (b.sub>0?'<span class="badge '+(b.info?'b-lime':'b-warn')+'">'+b.sub+' '+BB.esc(b.subLbl)+'</span>':'<span class="badge b-grey">0 '+BB.esc(b.subLbl)+'</span>')+'</div>'+
+    BB.icon('chevron')+
+  '</a>';
+});
+html += '</div></div>';
+html += '<div class="card"><div class="card-h"><div><h3>Where each bracket stands</h3><div class="sub">'+(isAdvisor?'your records':'all advisors')+' · done against still open</div></div></div>'+
+  '<div class="card-p"><div id="chBrackets"></div></div>'+
+  '<div class="cov">'+
+    '<div><div class="l">Blocks soil-sampled</div><div class="v">'+blkSoil+'<small> of '+scopeBlocks.length+'</small></div><div class="trk"><i style="width:'+pct(blkSoil,scopeBlocks.length)+'%"></i></div></div>'+
+    '<div><div class="l">Farms on a programme</div><div class="v">'+farmsProg+'<small> of '+scopeFarms.length+'</small></div><div class="trk"><i style="width:'+pct(farmsProg,scopeFarms.length)+'%"></i></div></div>'+
+  '</div></div>';
+html += '</div>';
+
+// What is waiting + which farms carry the work
+var queue = soil.filter(function(s){ return s.status!=='Interpreted'; }).map(function(s){ return {kind:'Soil', ic:'flask', r:s, href:'bioanalyze-soil.html?block='+encodeURIComponent(s.block)}; })
+  .concat(leaf.filter(function(l){ return l.status!=='Interpreted'; }).map(function(l){ return {kind:'Leaf', ic:'leaf', r:l, href:'bioanalyze-leaf.html?block='+encodeURIComponent(l.block)}; }))
+  .sort(function(a,b){ return String(a.r.date).localeCompare(String(b.r.date)); });
+
+var perFarm = {};
+function tally(rows){ rows.forEach(function(r){ if(!r.farmer) return; perFarm[r.farmer]=(perFarm[r.farmer]||0)+1; }); }
+tally(soil); tally(leaf); tally(watchRows); tally(programs);
+var farmRows = Object.keys(perFarm).map(function(fid){ var f=d.farmer(fid); return { id:fid, label:f.farm, sub:f.name, value:perFarm[fid] }; })
+  .sort(function(a,b){ return b.value-a.value; }).slice(0,6);
+
+html += '<div class="grid g2" style="margin-top:16px;">';
+html += '<div class="card"><div class="card-h"><div><h3>Samples waiting on you</h3><div class="sub">collected or at the lab, oldest first</div></div><span class="badge '+(queue.length?'b-warn':'b-ok')+'">'+queue.length+' open</span></div>';
+if(!queue.length){
+  html += '<div class="empty">Nothing waiting. Every sample in view has been interpreted.</div>';
+} else {
+  html += '<div>';
+  queue.forEach(function(q){
+    var f=d.farmer(q.r.farmer), b=d.by('blocks',q.r.block)||{name:'—'};
+    html += '<a class="qrow" href="'+q.href+'">'+
+      '<div class="row" style="gap:12px;flex-wrap:nowrap;min-width:0;"><span class="k">'+BB.icon(q.ic)+'</span>'+
+        '<div style="min-width:0;"><div class="t">'+BB.esc(f.name)+' <span class="faint" style="font-weight:400;">· '+BB.esc(b.name)+'</span></div>'+
+        '<div class="m">'+q.kind+' · sampled '+BB.date(q.r.date)+(q.r.flag?' · '+BB.esc(q.r.flag):'')+'</div></div></div>'+
+      BB.statusBadge(q.r.status)+
+    '</a>';
+  });
+  html += '</div>';
+}
+html += '</div>';
+html += '<div class="card"><div class="card-h"><div><h3>Farms carrying the most work</h3><div class="sub">samples, visits and programmes per farm</div></div><a class="btn ghost sm" href="farms.html">All farms '+BB.icon('chevron')+'</a></div>'+
+  '<div class="card-p">'+(farmRows.length?'<div id="chFarms"></div>':'<div class="empty" style="padding:20px;">No soil, leaf, monitoring or programme records yet.</div>')+'</div></div>';
+html += '</div>';
+
+// supporting
+html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Supporting</h3><div class="sub">the records every bracket draws on</div></div></div><div class="card-p"><div class="grid g3">';
+SECONDARY.forEach(function(s){
+  html += '<a class="sup" href="'+s.href+'">'+
+    '<div class="ic">'+BB.icon(s.ic)+'</div>'+
+    '<div style="min-width:0;"><h4>'+BB.esc(s.h)+'</h4><p>'+BB.esc(s.p)+'</p><div class="meta">'+BB.esc(s.meta)+' ›</div></div></a>';
+});
+html += '</div></div></div>';
 
 // RenewAg philosophy band
-html += '<section class="hero-band">'+
-  '<div class="eyebrow" style="color:var(--lime);">RenewAg · The Biological Way</div>'+
-  '<h2 style="font-family:var(--display);font-size:1.35rem;font-weight:600;margin:3px 0 4px;color:#f2f7ea;">Stop guessing, start knowing.</h2>'+
-  '<p style="opacity:.86;font-size:.9rem;max-width:640px;">A healthy crop stands on three balanced levers. We measure all three, then feed the biology first — the chemistry and physics follow.</p>'+
+html += '<section class="hero-band renew">'+
+  '<div><div class="eyebrow" style="color:var(--lime);">RenewAg · The Biological Way</div>'+
+  '<h2 style="font-family:var(--display);font-size:1.2rem;font-weight:600;margin:3px 0 4px;color:#f2f7ea;">Stop guessing, start knowing.</h2>'+
+  '<p style="opacity:.86;font-size:.86rem;">A healthy crop stands on three balanced levers. We measure all three, then feed the biology first — the chemistry and physics follow.</p></div>'+
   '<div class="levers">'+
     '<div class="lever"><div class="lh">Biology</div><div class="lp">Living soil — microbes, roots, carbon cycling.</div></div>'+
     '<div class="lever"><div class="lh">Chemistry</div><div class="lp">Balanced nutrition, corrected to the analysis.</div></div>'+
@@ -85,36 +210,27 @@ html += '<section class="hero-band">'+
   '</div>'+
 '</section>';
 
-// four brackets
-html += '<div class="sec"><h2>The four brackets</h2><span class="ln"></span><span class="cnt">tap to open</span></div>';
-html += '<div class="grid g2">';
-BRACKETS.forEach(function(b){
-  html += '<a class="tile" href="'+b.href+'">'+
-    '<div class="big-cnt">'+b.cnt+'</div>'+
-    '<div class="ic">'+b.ic+'</div>'+
-    '<h3>'+BB.esc(b.h)+'</h3>'+
-    '<p>'+BB.esc(b.p)+'</p>'+
-    '<div class="meta"><span><b>'+b.cnt+'</b> '+BB.esc(b.meta)+'</span>'+
-      (b.sub>0?'<span class="sub-cnt">'+b.sub+' '+BB.esc(b.subLbl)+'</span>':'<span class="faint">'+BB.esc(b.subLbl)+'</span>')+
-    '</div></a>';
-});
-html += '</div>';
-
-// secondary
-html += '<div class="sec"><h2>Supporting</h2><span class="ln"></span></div>';
-html += '<div class="grid g3">';
-SECONDARY.forEach(function(s){
-  html += '<a class="tile" href="'+s.href+'">'+
-    '<div class="ic">'+s.ic+'</div>'+
-    '<h3>'+BB.esc(s.h)+'</h3>'+
-    '<p>'+BB.esc(s.p)+'</p>'+
-    '<div class="meta"><b>'+BB.esc(s.meta)+'</b></div></a>';
-});
-html += '</div>';
-
 html += '<div style="height:20px;"></div>';
 
 document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+
+// charts — only counts taken from the records above
+try{
+  BB.chart.hbar('#chBrackets', {
+    rows: BRACKETS.map(function(b){
+      var parts = b.info
+        ? (b.ic==='eye'
+            ? [{name:'Last 30 days', value:b.sub, color:'#3f6b28'}, {name:'Earlier', value:b.cnt-b.sub, color:'#2f6f9e'}]
+            : [{name:'Active', value:b.sub, color:'#3f6b28'}, {name:'Draft / planned', value:b.cnt-b.sub, color:'#2f6f9e'}])
+        : [{name:'Interpreted', value:b.done, color:'#3f6b28'}, {name:'To interpret', value:b.sub, color:'#c77d17'}];
+      return { label:b.short, sub:b.meta, href:b.href, parts:parts, display:String(b.cnt) };
+    }),
+    legend:[{name:'Interpreted / active / last 30 days', color:'#3f6b28'},{name:'To interpret', color:'#c77d17'},{name:'Earlier / not yet active', color:'#2f6f9e'}]
+  });
+}catch(e){ console.warn('chart', e); }
+try{
+  if(farmRows.length) BB.chart.hbar('#chFarms', { rows: farmRows.map(function(r){ return { label:r.label, sub:r.sub, value:r.value, color:'#68a53e', href:'farm-detail.html?farmer='+encodeURIComponent(r.id) }; }) });
+}catch(e){ console.warn('chart', e); }
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>

@@ -317,6 +317,13 @@
     .row [style*="flex:none"], .row [style*="flex: none"]{flex:0 1 auto !important;}
     .card, .card-p, main.wrap, .stat{max-width:100%;}
     .card-p{padding:14px;} .card-h{padding:12px 14px;}
+    .seg{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;} .seg button,.seg a{white-space:nowrap;flex:none;}
+  }
+  @media print{
+    body{padding:0 !important;background:#fff;}
+    #bbNav,#bbOverlay,.bb-top,.bb-nav,.toast,.bbc-tip{display:none !important;}
+    .wrap{max-width:none;padding:0;}
+    .card,.stat{box-shadow:none;break-inside:avoid;}
   }
   @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important;} }
   `;
@@ -817,6 +824,9 @@
     var W=Math.max(240, el.clientWidth||600), H=o.height||220, padL=o.padL||46, padR=12, padT=10, padB=26;
     var series=o.series, n=o.labels.length;
     var max = o.max || niceMax(Math.max.apply(null, plot.maxes.concat([0])));
+    // Counts (orders, farms, visits) must tick in whole numbers: with 4 gridlines that means a max
+    // divisible by 4, or a max of 3 reads "0, 1, 1, 3".
+    if(!o.max && plot.maxes.every(function(v){ return Math.round(v)===v; }) && max<40) max = Math.max(4, Math.ceil(max/4)*4);
     var axisFmt = o.axisFmt || (o.money ? moneyCompact : compact);
     var iw=W-padL-padR, ih=H-padT-padB, g='';
     for(var t=0;t<=4;t++){ var y=padT+ih-ih*t/4; g+='<line class="'+(t?'grid-l':'base-l')+'" x1="'+padL+'" x2="'+(W-padR)+'" y1="'+y+'" y2="'+y+'"/><text class="ax" x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end">'+axisFmt(max*t/4)+'</text>'; }

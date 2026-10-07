@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioWatch · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 </head>
 <body>
 <script>
@@ -20,22 +20,36 @@ var params = new URLSearchParams(location.search);
 var blockFilter = params.get('block') || '';
 
 var css=''+
-'.report{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--green-bright);border-radius:16px;padding:22px;box-shadow:var(--shadow);}'+
-'.report .rh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}'+
-'.rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;}'+
-'@media(max-width:560px){.rgrid{grid-template-columns:1fr;}}'+
-'.rgrid .cell{padding:12px 14px;border-bottom:1px solid var(--line-soft);}'+
-'.rgrid .cell:nth-child(odd){border-right:1px solid var(--line-soft);}'+
+'.report{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}'+
+'.report .rh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:18px 22px;border-bottom:1px solid var(--line-soft);background:var(--panel-2);}'+
+'.report .rb{padding:20px 22px;}'+
+'.report .rf{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 22px;border-top:1px solid var(--line-soft);font-size:.76rem;color:var(--faint);}'+
+'.rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;}'+
+'@media(max-width:860px){.rgrid{grid-template-columns:repeat(2,minmax(0,1fr));}}'+
+'@media(max-width:480px){.rgrid{grid-template-columns:minmax(0,1fr);}}'+
+'.rgrid .cell{padding:12px 14px;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);margin:0 -1px -1px 0;}'+
 '.rgrid .cell .k{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}'+
 '.rgrid .cell .val{font-size:.95rem;color:var(--ink);margin-top:2px;}'+
-'.rec-btn{background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:7px 12px;font-family:inherit;font-weight:600;font-size:.8rem;color:var(--green-dark);cursor:pointer;}'+
+'.klabel{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}'+
+'.note{margin-top:16px;padding:14px 16px;border-left:3px solid var(--green-bright);background:#f7faf1;border-radius:0 var(--radius-sm) var(--radius-sm) 0;}'+
+'.note p{font-size:.95rem;line-height:1.6;margin-top:4px;}'+
+'.rec-btn{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-family:inherit;font-weight:600;font-size:.78rem;color:var(--green-dark);cursor:pointer;}'+
+'.rec-btn .ico{width:15px;height:15px;}'+
 '.rec-btn.live{background:var(--red-bg);border-color:var(--red);color:var(--red);}'+
-'@media print{.bb-head,.bb-nav,.noprint{display:none!important;}body{padding:0;}}';
+'.fld-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px;}'+
+'.fld-head label{margin:0 !important;}'+
+'.wlist .wi{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid var(--line-soft);}'+
+'.wlist .wi:first-child{border-top:0;}'+
+'.wlist .wi .t{font-weight:600;font-size:.86rem;color:var(--ink);}'+
+'.wlist .wi .m{font-size:.76rem;color:var(--faint);margin-top:1px;}'+
+'.wlist a.wi:hover,.wlist .wi.click:hover{background:#f7faf1;cursor:pointer;}'+
+'.filt{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding:10px 16px;border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:var(--radius-sm);background:var(--panel);font-size:.86rem;}'+
+'@media print{#bbNav,.bb-top,.bb-nav,.bb-scope,.noprint{display:none!important;}body{padding:0!important;}.split{display:block!important;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 function vigourBadge(v){
   var m={ 'Excellent':'b-ok','Good':'b-lime','Fair':'b-warn','Poor':'b-bad' };
-  return '<span class="badge '+(m[v]||'b-grey')+'">'+BB.esc(v)+'</span>';
+  return '<span class="badge '+(m[v]||'b-grey')+'">'+BB.esc(v||'—')+'</span>';
 }
 function today(){ return new Date().toISOString().slice(0,10); }
 function inMyScope(w){
@@ -47,8 +61,11 @@ function blockLabel(id){
   var f=d.farmer(b.farmer);
   return { block:b, farmer:f };
 }
+// a pest note that is not "None" is something to keep an eye on
+function hasPest(w){ var p=String(w.pest||'').trim().toLowerCase(); return !!p && p!=='none' && p!=='—'; }
 
 var state = { view:'list', open:null };
+var chartJobs = [];
 
 function visits(){
   var list = d.all('watch').filter(inMyScope);
@@ -61,39 +78,64 @@ function statRow(){
   var farms = list.map(function(w){ return w.farmer; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
   var now = new Date(); var weekAgo = new Date(now.getTime()-7*864e5).toISOString().slice(0,10);
   var thisWeek = list.filter(function(w){ return (w.date||'') >= weekAgo; }).length;
-  return '<div class="grid g3">'+
+  var weak = list.filter(function(w){ return w.vigour==='Fair' || w.vigour==='Poor'; }).length;
+  return '<div class="grid g4" style="margin-top:14px;">'+
     '<div class="stat"><div class="l">Visits logged</div><div class="v">'+list.length+'</div><div class="s">field checks captured</div></div>'+
     '<div class="stat"><div class="l">Farms monitored</div><div class="v">'+farms+'</div><div class="s">under your watch</div></div>'+
     '<div class="stat"><div class="l">Checks this week</div><div class="v">'+thisWeek+'</div><div class="s">last 7 days</div></div>'+
+    '<div class="stat'+(weak?' warn':'')+'"><div class="l">Fair or poor vigour</div><div class="v">'+weak+'</div><div class="s">visits to follow up</div></div>'+
   '</div>';
 }
+
+// Monday of the week a date falls in, as YYYY-MM-DD
+function weekOf(iso){ var t=new Date((iso||'').slice(0,10)+'T00:00:00'); if(isNaN(t)) return null; var dw=(t.getDay()+6)%7; t.setDate(t.getDate()-dw); return t.toISOString().slice(0,10); }
 
 function renderList(){
   var list = visits();
   var html='';
-  html += '<div class="page-head"><h1>BioWatch — seasonal monitoring</h1>'+
-    '<p>Every orchard walk captured in the field: growth stage, weather, soil, pest pressure and vigour — then turned into a report you can send the farmer.</p></div>';
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioServices · BioWatch</div><h1>Seasonal monitoring</h1>'+
+    '<p>Every orchard walk captured in the field: growth stage, weather, soil, pest pressure and vigour, turned into a report you can send the farmer.</p></div>'+
+    '<div class="row"><button class="btn" id="newBtn">'+BB.icon('plus')+'New field check</button></div></div>';
 
   if(blockFilter){
     var bl=blockLabel(blockFilter);
     if(bl && bl.block){
-      html += '<div class="card card-p" style="border-left:3px solid var(--green-bright);margin-bottom:8px;">'+
-        '<div class="eyebrow">Filtered to one block</div>'+
-        '<b style="color:var(--green-dark);">'+BB.esc(bl.block.name)+'</b> · '+BB.esc(bl.farmer.farm)+
-        ' <a href="biowatch.html" style="color:var(--green-mid);font-weight:600;font-size:.82rem;">show all ›</a></div>';
+      html += '<div class="filt"><div><span class="eyebrow" style="margin:0 8px 0 0;">Filtered to one block</span>'+
+        '<b style="color:var(--green-dark);">'+BB.esc(bl.block.name)+'</b> · '+BB.esc(bl.farmer.farm)+'</div>'+
+        '<a class="btn ghost sm" href="biowatch.html">Show all visits</a></div>';
     }
   }
 
   html += statRow();
 
-  html += '<div class="row between" style="margin:24px 0 14px;"><div class="sec" style="margin:0;flex:1;"><h2>Monitoring visits</h2><span class="ln"></span><span class="cnt">'+list.length+'</span></div>'+
-    '<button class="btn sm" id="newBtn" style="margin-left:12px;">＋ New field check</button></div>';
+  // visits per week, only when there are enough weeks to make a trend
+  var weeks = {};
+  list.forEach(function(w){ var k=weekOf(w.date); if(k) weeks[k]=(weeks[k]||0)+1; });
+  var wk = Object.keys(weeks).sort(), weekLabels=[], weekVals=[];
+  if(wk.length){
+    var cur=new Date(wk[0]+'T00:00:00'), last=new Date(wk[wk.length-1]+'T00:00:00'), guard=0;
+    while(cur<=last && guard<60){ var key=cur.toISOString().slice(0,10); weekLabels.push(BB.shortDate(key)); weekVals.push(weeks[key]||0); cur.setDate(cur.getDate()+7); guard++; }
+  }
+  var showTrend = weekLabels.length>=3;
 
-  html += '<div class="card">';
+  var vig = { Excellent:0, Good:0, Fair:0, Poor:0 };
+  list.forEach(function(w){ if(vig[w.vigour]!=null) vig[w.vigour]++; });
+  var vigRows = [{label:'Excellent',value:vig.Excellent,color:'#22431a'},{label:'Good',value:vig.Good,color:'#68a53e'},{label:'Fair',value:vig.Fair,color:'#c77d17'},{label:'Poor',value:vig.Poor,color:'#a3533f'}];
+  var pests = list.filter(hasPest);
+
+  // left: the visits; right: vigour mix + what to keep an eye on
+  html += '<div class="split" style="margin-top:16px;align-items:start;">';
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  if(showTrend){
+    html += '<div class="card"><div class="card-h"><div><h3>Field checks per week</h3><div class="sub">visits logged'+(blockFilter?' on this block':'')+'</div></div></div><div class="card-p"><div id="chWeeks"></div></div></div>';
+    chartJobs.push(function(){ BB.chart.bar('#chWeeks',{ labels:weekLabels, height:200, table:true, series:[{name:'Visits', values:weekVals, color:'#3f6b28'}] }); });
+  }
+  html += '<div class="card"><div class="card-h"><div><h3>Monitoring visits</h3><div class="sub">newest first · tap a visit for the field report</div></div><span class="badge b-grey">'+list.length+'</span></div>';
   if(!list.length){
-    html += '<div class="empty"><div class="big">🌱</div>No monitoring visits yet. Log the first field check.</div>';
+    html += '<div class="empty">No monitoring visits yet. Log the first field check.</div>';
   } else {
-    html += '<div class="scroll"><table class="bb"><thead><tr><th>Date</th><th>Farm · block</th><th>Stage</th><th>Vigour</th><th>Pest</th><th class="right">Photos</th></tr></thead><tbody>';
+    html += '<div class="scroll'+(list.length>12?' tall':'')+'"><table class="bb"><thead><tr><th>Date</th><th>Farm · block</th><th>Stage</th><th>Vigour</th><th>Pest &amp; disease</th><th class="num">Photos</th></tr></thead><tbody>';
     list.forEach(function(w){
       var b=d.by('blocks',w.block)||{name:'—'};
       var f=d.farmer(w.farmer);
@@ -102,15 +144,42 @@ function renderList(){
         '<td><b style="color:var(--green-dark);">'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(b.name)+'</div></td>'+
         '<td class="muted">'+BB.esc(w.stage||'—')+'</td>'+
         '<td>'+vigourBadge(w.vigour)+'</td>'+
-        '<td class="faint" style="font-size:.78rem;">'+BB.esc(w.pest||'—')+'</td>'+
-        '<td class="right muted">'+(w.photos||0)+' 📷</td>'+
+        '<td style="font-size:.8rem;">'+(hasPest(w)?'<span style="color:var(--amber);font-weight:600;">'+BB.esc(w.pest)+'</span>':'<span class="faint">'+BB.esc(w.pest||'—')+'</span>')+'</td>'+
+        '<td class="num muted">'+(w.photos||0)+'</td>'+
       '</tr>';
     });
     html += '</tbody></table></div>';
   }
   html += '</div>';
+  // who is walking the orchards — only worth drawing when more than one advisor is in view
+  var byAdv = {};
+  list.forEach(function(w){ byAdv[w.advisor]=(byAdv[w.advisor]||0)+1; });
+  var advKeys = Object.keys(byAdv);
+  if(advKeys.length>1){
+    html += '<div class="card"><div class="card-h"><div><h3>Visits by advisor</h3><div class="sub">field checks logged</div></div></div><div class="card-p"><div id="chAdv"></div></div></div>';
+    var advRows = advKeys.map(function(k){ var r=d.rep(k); return { label:r.name, sub:r.region||'', value:byAdv[k], color:r.colour||'#3f6b28' }; }).sort(function(a,b){ return b.value-a.value; });
+    chartJobs.push(function(){ BB.chart.hbar('#chAdv',{ rows:advRows }); });
+  }
+  html += '</div>';
 
-  html += '<div style="height:24px;"></div>';
+  html += '<div style="display:grid;gap:16px;min-width:0;">';
+  html += '<div class="card"><div class="card-h"><div><h3>Crop vigour</h3><div class="sub">across the visits shown</div></div></div><div class="card-p">'+
+    (list.length? '<div id="chVigour"></div>' : '<div class="empty" style="padding:20px;">Nothing logged yet.</div>')+'</div></div>';
+  if(list.length) chartJobs.push(function(){ BB.chart.donut('#chVigour',{ rows:vigRows, centreLabel:'visits', size:136 }); });
+
+  html += '<div class="card"><div class="card-h"><div><h3>Pest watch</h3><div class="sub">pressure noted on the walk</div></div><span class="badge '+(pests.length?'b-warn':'b-ok')+'">'+pests.length+'</span></div>';
+  if(!pests.length){
+    html += '<div class="empty" style="padding:22px;">No pest or disease pressure noted.</div>';
+  } else {
+    html += '<div class="wlist">';
+    pests.slice(0,6).forEach(function(w){
+      var b=d.by('blocks',w.block)||{name:'—'}; var f=d.farmer(w.farmer);
+      html += '<div class="wi click" data-open="'+w.id+'"><div style="min-width:0;"><div class="t">'+BB.esc(w.pest)+'</div><div class="m">'+BB.esc(f.farm)+' · '+BB.esc(b.name)+'</div></div><span class="faint" style="font-size:.76rem;white-space:nowrap;">'+BB.shortDate(w.date)+'</span></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div></div>';
   return html;
 }
 
@@ -121,16 +190,22 @@ function renderReport(id){
   var adv=d.rep(w.advisor);
 
   var html='';
-  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm noprint" id="backList">‹ All visits</button></div>';
+  html += '<div class="page-head row between noprint" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioWatch · field report</div><h1>'+BB.esc(f.farm)+'</h1>'+
+    '<p>'+BB.esc(b.name)+(b.crop?' · '+BB.esc(b.crop):'')+' · visited '+BB.date(w.date)+'</p></div>'+
+    '<div class="row"><button class="btn ghost" id="backList">All visits</button>'+
+      '<a class="btn ghost" href="bioconsult.html?farmer='+encodeURIComponent(w.farmer)+'&block='+encodeURIComponent(w.block)+'">'+BB.icon('clipboard')+'Build a recommendation</a>'+
+      '<button class="btn" id="genReport">'+BB.icon('file')+'Generate report</button></div></div>';
+
+  html += '<div class="split" style="margin-top:14px;align-items:start;">';
   html += '<div class="report" id="reportCard">';
   html += '<div class="rh">'+
     '<div><div class="eyebrow">BioWatch field report</div>'+
-      '<h1 style="font-family:var(--display);font-size:1.35rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(f.farm)+'</h1>'+
-      '<div class="muted" style="font-size:.85rem;">'+BB.esc(f.name)+' · '+BB.esc(b.name)+' · '+BB.esc(b.crop||'')+'</div></div>'+
-    '<div style="text-align:right;"><div class="faint" style="font-size:.72rem;">'+BB.date(w.date)+'</div>'+vigourBadge(w.vigour)+'</div>'+
+      '<div style="font-family:var(--display);font-size:1.3rem;font-weight:600;color:var(--green-darkest);">'+BB.esc(f.farm)+'</div>'+
+      '<div class="muted" style="font-size:.85rem;">'+BB.esc(f.name)+' · '+BB.esc(b.name)+(b.crop?' · '+BB.esc(b.crop):'')+'</div></div>'+
+    '<div style="text-align:right;"><div class="faint" style="font-size:.74rem;margin-bottom:4px;">'+BB.date(w.date)+'</div>'+vigourBadge(w.vigour)+'</div>'+
   '</div>';
-
-  html += '<div class="rgrid">'+
+  html += '<div class="rb"><div class="rgrid">'+
     cell('Growth stage', w.stage)+
     cell('Weather', w.weather)+
     cell('Soil moisture', w.soilMoist)+
@@ -138,20 +213,27 @@ function renderReport(id){
     cell('Vigour', w.vigour)+
     cell('Photos on file', (w.photos||0)+' image'+((w.photos||0)===1?'':'s'))+
   '</div>';
-
-  html += '<div style="margin-top:16px;"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);">Advisor note</div>'+
-    '<p style="font-size:.95rem;line-height:1.6;margin-top:4px;">'+BB.esc(w.note||'—')+'</p></div>';
-
-  html += '<div class="divider"></div>'+
-    '<div class="row between"><div class="faint" style="font-size:.76rem;">Reported by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</div>'+
-    '<div class="faint" style="font-size:.76rem;">BioBrix · The Biological Way</div></div>';
+  html += '<div class="note"><div class="klabel">Advisor note</div><p>'+BB.esc(w.note||'—')+'</p></div></div>';
+  html += '<div class="rf"><span>Reported by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</span><span>BioBrix · The Biological Way</span></div>';
   html += '</div>';
 
-  html += '<div class="row noprint" style="margin-top:14px;">'+
-    '<button class="btn" id="genReport">Generate report</button>'+
-    '<a class="btn ghost" href="bioconsult.html?farmer='+encodeURIComponent(w.farmer)+'&block='+encodeURIComponent(w.block)+'">Build a recommendation ›</a>'+
-  '</div>';
-  html += '<div style="height:24px;"></div>';
+  // the same block's other visits, so the report reads in context
+  var hist = d.all('watch').filter(inMyScope).filter(function(x){ return x.block===w.block && x.id!==w.id; })
+    .sort(function(a,c){ return (c.date||'').localeCompare(a.date||''); });
+  html += '<div class="card noprint"><div class="card-h"><div><h3>Earlier checks on this block</h3><div class="sub">'+BB.esc(b.name)+'</div></div><span class="badge b-grey">'+hist.length+'</span></div>';
+  if(!hist.length){
+    html += '<div class="empty" style="padding:22px;">This is the first check logged on this block.</div>';
+  } else {
+    html += '<div class="wlist">';
+    hist.slice(0,8).forEach(function(x){
+      html += '<div class="wi click" data-open="'+x.id+'"><div style="min-width:0;"><div class="t">'+BB.esc(x.stage||'Field check')+'</div><div class="m">'+BB.esc(x.pest||'—')+'</div></div>'+
+        '<div style="text-align:right;flex:none;">'+vigourBadge(x.vigour)+'<div class="faint" style="font-size:.72rem;margin-top:3px;">'+BB.shortDate(x.date)+'</div></div></div>';
+    });
+    html += '</div>';
+  }
+  html += '<div class="card-f"><a href="biowatch.html?block='+encodeURIComponent(w.block)+'" style="color:var(--green-dark);font-weight:600;">All visits on this block ›</a></div>';
+  html += '</div>';
+  html += '</div>';
   return html;
 }
 
@@ -162,11 +244,12 @@ function cell(k,v){
 function renderForm(){
   var blocks=d.all('blocks');
   var html='';
-  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm" id="backList2">‹ All visits</button></div>';
-  html += '<div class="page-head" style="padding-top:6px;"><h1>New field check</h1><p>Capture what you see in the orchard. It saves on this device and syncs when you have signal.</p></div>';
-  html += '<div class="card card-p">';
-  html += '<div class="grid g2">';
-  html += '<div class="fld"><label>Block</label><select id="fBlock">'+
+  html += '<div class="page-head row between" style="gap:16px;">'+
+    '<div><div class="eyebrow">BioWatch · new visit</div><h1>New field check</h1><p>Capture what you see in the orchard. It saves on this device and syncs when you have signal.</p></div>'+
+    '<div class="row"><button class="btn ghost" id="backList2">All visits</button></div></div>';
+  html += '<div class="card" style="margin-top:14px;"><div class="card-h"><div><h3>The visit</h3><div class="sub">block, date and what you saw</div></div></div><div class="card-p">';
+  html += '<div class="grid g4">';
+  html += '<div class="fld span2"><label>Block</label><select id="fBlock">'+
     blocks.map(function(b){ var f=d.farmer(b.farmer); return '<option value="'+b.id+'"'+(b.id===blockFilter?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(b.name)+'</option>'; }).join('')+
     '</select></div>';
   html += '<div class="fld"><label>Date</label><input id="fDate" type="date" value="'+today()+'"></div>';
@@ -175,29 +258,34 @@ function renderForm(){
   html += '<div class="fld"><label>Soil moisture</label><select id="fMoist"><option>Dry</option><option>Moderate</option><option selected>Good</option><option>Wet</option></select></div>';
   html += '<div class="fld"><label>Pest &amp; disease</label><input id="fPest" placeholder="e.g. Stink bug – low, or None"></div>';
   html += '<div class="fld"><label>Vigour</label><select id="fVigour"><option>Excellent</option><option selected>Good</option><option>Fair</option><option>Poor</option></select></div>';
-  html += '<div class="fld"><label>Photos</label><input id="fPhotos" type="number" min="0" value="0"> <input id="fPhotoFile" type="file" accept="image/*" multiple style="margin-top:6px;padding:7px;"></div>';
+  html += '</div>';
+  html += '<div class="grid g4">';
+  html += '<div class="fld"><label>Photos</label><input id="fPhotos" type="number" min="0" value="0"></div>';
+  html += '<div class="fld span2"><label>Attach photos</label><input id="fPhotoFile" type="file" accept="image/*" multiple style="padding:7px;"></div>';
   html += '</div>';
 
-  html += '<div class="fld"><label>Advisor note <button type="button" id="dictate" class="rec-btn" style="float:right;margin-top:-2px;">🎙 Voice note</button></label>'+
+  html += '<div class="fld"><div class="fld-head"><label for="fNote">Advisor note</label><button type="button" id="dictate" class="rec-btn">'+BB.icon('mic')+'Voice note</button></div>'+
     '<textarea id="fNote" rows="4" placeholder="What you saw, what to do next…"></textarea>'+
     '<div id="dictHint" class="faint" style="font-size:.72rem;margin-top:4px;"></div></div>';
 
-  html += '<button class="btn block" id="saveVisit">Save field check</button>';
-  html += '</div><div style="height:24px;"></div>';
+  html += '<div class="row" style="justify-content:flex-end;"><button class="btn" id="saveVisit">'+BB.icon('check')+'Save field check</button></div>';
+  html += '</div></div>';
   return html;
 }
 
 function paint(){
   var html;
+  chartJobs = [];
   if(state.view==='report') html=renderReport(state.open);
   else if(state.view==='form') html=renderForm();
   else html=renderList();
   document.querySelector('main.wrap').innerHTML=html;
+  chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
   wire();
 }
 
 function wire(){
-  Array.prototype.forEach.call(document.querySelectorAll('tr[data-open]'), function(tr){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function(tr){
     tr.onclick=function(){ state.view='report'; state.open=tr.getAttribute('data-open'); paint(); window.scrollTo(0,0); };
   });
   var nb=document.getElementById('newBtn'); if(nb) nb.onclick=function(){ state.view='form'; paint(); window.scrollTo(0,0); };
@@ -258,7 +346,7 @@ function wireDictation(){
       ta.value=(ta.value ? ta.value.trim()+' ' : '')+txt.trim();
     };
     rec.onerror=function(){ hint.textContent='Could not hear that — try again or type the note.'; };
-    rec.onend=function(){ listening=false; btn.classList.remove('live'); btn.textContent='🎙 Voice note'; };
+    rec.onend=function(){ listening=false; btn.classList.remove('live'); btn.innerHTML=BB.icon('mic')+'Voice note'; };
     try{ rec.start(); }catch(e){ hint.textContent='Voice capture is busy — try again.'; }
   };
 }

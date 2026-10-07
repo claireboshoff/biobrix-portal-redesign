@@ -7,9 +7,40 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Farms &amp; farmers · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
+<style>
+/* Farms register — page-scoped */
+.wa{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;border-radius:8px;background:#e9f9ef;color:#128C4A;border:1px solid #bfe8cf;white-space:nowrap;}
+.wa .ico{width:15px;height:15px;}
+.wa:hover{filter:brightness(.96);}
+table.bb td.farm .cell{display:block;font-size:.72rem;white-space:nowrap;}
+.wa.tel{background:#eef2e7;color:var(--muted);border-color:var(--line);font-weight:600;}
+.cropchip{display:inline-block;padding:2px 8px;border-radius:20px;background:#eef6dc;color:var(--green-mid);font-size:.68rem;font-weight:600;margin:1px 2px 1px 0;white-space:nowrap;}
+.repchip{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;white-space:nowrap;background:none !important;border:0;color:var(--ink) !important;}
+.repdot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+.tb-l{font-size:.68rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);}
+.tb-sep{width:1px;height:22px;background:var(--line);margin:0 4px;}
+.filterbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;}
+.filterbar .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.backline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 0;}
+.backline .btn .ico{transform:rotate(180deg);}
+table.bb td.farm{min-width:160px;}
+table.bb td.farm b{display:block;}
+table.bb td.crops{min-width:120px;}
+table.bb td.drive{min-width:170px;}
+table.bb th,table.bb td{padding-left:12px;padding-right:12px;}
+table.bb td.drive .badge{white-space:normal;line-height:1.35;}
+.scroll.tall{max-height:760px;}
+table.bb .bar-cell{justify-content:flex-end;min-width:110px;}
+table.bb .bar-cell .trk{max-width:44px;}
+table.bb .bar-cell{min-width:90px;}
+table.bb .bar-cell span:last-child{min-width:42px;text-align:right;}
+.over{color:var(--red);font-weight:700;}
+.empty .big .ico{width:30px;height:30px;color:var(--faint);}
+@media(max-width:560px){ .tb-sep{display:none;} }
+</style>
 </head>
 <body>
 <script>
@@ -18,17 +49,8 @@ BB.renderHeader({ active:'tech', back:'bioservices.html' });
 var d = BB.data, u = BB.user;
 var isAdvisor = u.roleKey==='advisor';
 
-var css=''+
-'.wa{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;background:#e9f9ef;color:#128C4A;border:1px solid #bfe8cf;}'+
-'.wa.tel{background:#eef2e7;color:var(--muted);border-color:var(--line);font-weight:600;}'+
-'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0;}'+
-'.cropchip{display:inline-block;padding:2px 8px;border-radius:20px;background:#eef6dc;color:var(--green-mid);font-size:.68rem;font-weight:600;margin:1px 2px 1px 0;}'+
-'.repchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;border:1px solid;}'+
-'.repdot{width:7px;height:7px;border-radius:50%;display:inline-block;}';
-document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
-
 var all = d.all('farmers');
-var regions = all.map(function(f){ return f.region; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).sort();
+var regions = all.map(function(f){ return f.region; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; }).sort();
 var reps = d.all('reps');
 
 // advisor defaults to their own farms; can flip to all
@@ -54,10 +76,15 @@ function statBar(rows){
   var active = rows.filter(function(f){ return f.status==='Active'; }).length;
   var prospect = rows.filter(function(f){ return f.status==='Prospect'; }).length;
   var ha = rows.reduce(function(s,f){ return s+(f.ha||0); },0);
-  var html='<div class="grid g3">';
+  var withHa = rows.filter(function(f){ return f.ha; }).length;
+  var owed = rows.reduce(function(s,f){ return s+Math.max(0, d.accountBalance(f.id)||0); },0);
+  var over = rows.filter(function(f){ return d.creditLimit(f.id)>0 && d.accountBalance(f.id) > d.creditLimit(f.id); }).length;
+  var callFirst = rows.filter(function(f){ var t=d.tripInsight(f.id); return t.sev==='bad' || t.sev==='warn'; }).length;
+  var html='<div class="grid g4" style="margin-top:12px;">';
   html += '<div class="stat"><div class="l">Farms shown</div><div class="v">'+rows.length+'</div><div class="s">'+active+' active · '+prospect+' prospect</div></div>';
-  html += '<div class="stat"><div class="l">Active clients</div><div class="v">'+active+'</div><div class="s">on programme</div></div>';
-  html += '<div class="stat"><div class="l">Hectares</div><div class="v">'+BB.num(ha)+'</div><div class="s">under management</div></div>';
+  html += '<div class="stat"><div class="l">Hectares</div><div class="v">'+BB.num(ha)+'</div><div class="s">'+(withHa? 'under management · '+withHa+' farm'+(withHa===1?'':'s')+' captured' : 'not captured yet')+'</div></div>';
+  html += '<div class="stat'+(over?' warn':'')+'"><div class="l">Outstanding</div><div class="v">'+BB.money(owed)+'</div><div class="s">'+over+' over their credit limit</div></div>';
+  html += '<div class="stat'+(callFirst?' warn':'')+'"><div class="l">Call before you drive</div><div class="v">'+callFirst+'</div><div class="s">overdue, over or near the limit</div></div>';
   html += '</div>';
   return html;
 }
@@ -76,10 +103,12 @@ function render(){
             .reduce(function(t,i){ return t+(i.amount||0); },0);
   }
   var html='';
-  if(show) html += '<div class="row" style="gap:8px;margin:14px 0 0;"><a class="btn ghost sm" href="farms.html">‹ All farms &amp; customers</a><span class="faint" style="font-size:.8rem;align-self:center;">'+(show==='overlimit'?'Showing accounts over their credit limit':'Showing customers from your accounting system')+' — '+rows.length+'</span></div>';
-  html += '<div class="page-head"><h1>Farms &amp; farmers</h1><p>'+
+  if(show) html += '<div class="backline"><a class="btn ghost sm" href="farms.html">'+BB.icon('chevron')+'All farms &amp; customers</a><span class="faint" style="font-size:.8rem;">'+(show==='overlimit'?'Showing accounts over their credit limit':'Showing customers from your accounting system')+' — '+rows.length+'</span></div>';
+  html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">BioServices · Register</div><h1>Farms &amp; farmers</h1><p>'+
     (isAdvisor?'Your farms — tap through to a farmer to see their blocks, soil, leaf and programmes.'
-              :'Every farm under management. Tap a farmer to open their record: blocks, diagnostics and programmes.')+'</p></div>';
+              :'Every farm under management. Tap a farmer to open their record: blocks, diagnostics and programmes.')+'</p></div>'+
+    '<div class="row" style="gap:8px;"><a class="btn ghost" href="bioservices.html">'+BB.icon('sprout')+'BioServices</a>'+
+    (BB.sageLive()?'<a class="btn ghost" href="farms.html?show=overlimit">'+BB.icon('alert')+'Over their limit</a>':'')+'</div></div>';
   // Say plainly which of these are the client's own records and which are ours.
   if(BB.sageLive()){
     html += '<div class="bb-sample"><span class="t">Read this first</span><div>The customer records here come straight from <b>your accounting system</b> — names, towns and account balances are yours and are refreshed three times a day. '+
@@ -89,68 +118,117 @@ function render(){
 
   html += statBar(rows);
 
-  // scope toggle for advisor
-  if(isAdvisor){
-    html += '<div class="chips" style="margin-top:12px;">'+
-      '<button class="chip'+(scope==='mine'?' on':'')+'" data-scope="mine">My farms</button>'+
-      '<button class="chip'+(scope==='all'?' on':'')+'" data-scope="all">All farms</button>'+
+  // The picture: who is using their credit, and where the farms are
+  var credRows = rows.map(function(f){ return { f:f, bal:d.accountBalance(f.id)||0, lim:d.creditLimit(f.id)||0 }; })
+    .filter(function(x){ return x.bal>0 || x.lim>0; })
+    .sort(function(a,b){ return b.bal-a.bal || b.lim-a.lim; }).slice(0,8);
+  var regCount = {};
+  rows.forEach(function(f){ var k=f.region||'Region not captured'; regCount[k]=(regCount[k]||0)+1; });
+  var regKeys = Object.keys(regCount).sort(function(a,b){ return regCount[b]-regCount[a]; });
+  var regRows = regKeys.slice(0,5).map(function(k){ return {label:k, value:regCount[k]}; });
+  if(regKeys.length>5) regRows.push({ label:'Other regions', value:regKeys.slice(5).reduce(function(t,k){ return t+regCount[k]; },0) });
+  var COLS = ['#3f6b28','#c77d17','#2f6f9e','#7d4f9a','#68a53e','#a3533f'];
+  regRows.forEach(function(r,i){ r.color=COLS[i%COLS.length]; });
+  // one region is not a breakdown — show the farms' hectares instead
+  var byRegion = regRows.length>=2;
+  var haRows = rows.filter(function(f){ return f.ha; }).sort(function(a,b){ return b.ha-a.ha; }).slice(0,8);
+
+  if(rows.length){
+    html += '<div class="split" style="margin-top:16px;">'+
+      '<div class="card"><div class="card-h"><div><h3>Balances against credit limit</h3><div class="sub">largest balances in view · what is owed, what is still open'+(credRows.length===8?' · top 8':'')+'</div></div>'+BB.liveChip()+'</div>'+
+        '<div class="card-p">'+(credRows.length?'<div id="chCredit"></div>':'<div class="empty" style="padding:20px;">No balances or credit limits on these accounts.</div>')+'</div></div>'+
+      (byRegion
+        ? '<div class="card"><div class="card-h"><div><h3>Farms by region</h3><div class="sub">'+rows.length+' in view</div></div></div><div class="card-p"><div id="chRegion"></div></div></div>'
+        : '<div class="card"><div class="card-h"><div><h3>Hectares by farm</h3><div class="sub">'+(haRows.length?'captured hectares · '+rows.length+' in view':'not captured yet')+'</div></div></div><div class="card-p">'+(haRows.length?'<div id="chRegion"></div>':'<div class="empty" style="padding:20px;">Hectares are captured on the farm record.</div>')+'</div></div>')+
     '</div>';
   }
 
-  // region chips
-  html += '<div class="chips">';
-  html += '<span class="faint" style="font-size:.72rem;align-self:center;">Region:</span>';
+  // filters
+  html += '<div class="toolbar"><div class="filterbar">';
+  if(isAdvisor){
+    html += '<div class="seg">'+
+      '<button class="'+(scope==='mine'?'on':'')+'" data-scope="mine">My farms</button>'+
+      '<button class="'+(scope==='all'?'on':'')+'" data-scope="all">All farms</button>'+
+    '</div>';
+  }
+  html += '<div class="grp"><span class="tb-l">Region</span>';
   ['All'].concat(regions).forEach(function(rg){
     html += '<button class="chip'+(regionFilter===rg?' on':'')+'" data-region="'+esc(rg)+'">'+esc(rg)+'</button>';
   });
   html += '</div>';
-
   // rep chips — directors filter by rep; advisor viewing all can too
   if(!isAdvisor || scope==='all'){
-    html += '<div class="chips">';
-    html += '<span class="faint" style="font-size:.72rem;align-self:center;">Rep:</span>';
+    html += '<span class="tb-sep"></span><div class="grp"><span class="tb-l">Rep</span>';
     html += '<button class="chip'+(repFilter==='All'?' on':'')+'" data-rep="All">All</button>';
     reps.forEach(function(r){
       html += '<button class="chip'+(repFilter===r.id?' on':'')+'" data-rep="'+esc(r.id)+'">'+esc(r.name)+'</button>';
     });
     html += '</div>';
   }
+  html += '</div></div>';
 
   // table
-  html += '<div class="card" style="margin-top:8px;"><div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Farm</th><th>Farmer</th><th>Town / region</th><th>Crops</th><th class="right">Ha</th><th class="right">Invoiced</th><th>Rep</th><th>Status</th><th>Before you drive</th></tr></thead><tbody>';
+  var maxHa = Math.max.apply(null, rows.map(function(f){ return f.ha||0; }).concat([1]));
+  // The 12-month invoiced figure only exists for customers out of the accounting system.
+  var hasLedger = rows.some(function(f){ return f.sageId!=null; });
+  var nCols = hasLedger ? 10 : 9;
+  var totHa = rows.reduce(function(s,f){ return s+(f.ha||0); },0);
+  html += '<div class="card"><div class="card-h"><div><h3>'+(show==='overlimit'?'Over their credit limit':show==='accounts'?'Customer accounts':'Farm register')+'</h3><div class="sub">tap a row to open the farm record</div></div><span class="badge b-grey">'+rows.length+' farm'+(rows.length===1?'':'s')+'</span></div>'+
+    '<div class="scroll tall"><table class="bb"><thead><tr>'+
+    '<th>Farm / farmer</th><th>Contact</th><th>Town / region</th><th>Crops</th><th class="num">Ha</th>'+(hasLedger?'<th class="num">Invoiced</th>':'')+'<th class="num">Balance</th><th>Rep</th><th>Status</th><th>Before you drive</th></tr></thead><tbody>';
 
   if(!rows.length){
     // An advisor with nothing allocated is the common case here, and "no match" would be a lie.
     var sgF = d.sage && d.sage(), noneAllocated = sgF && sgF.live && !(sgF.customers||[]).length && BB.user.roleKey==='advisor';
-    html += '<tr><td colspan="8"><div class="empty"><div class="big">🌾</div>'+
+    html += '<tr><td colspan="'+nCols+'"><div class="empty"><div class="big">'+BB.icon('farm')+'</div>'+
       (noneAllocated
-        ? '<b>No accounts are allocated to you yet.</b><br>Your accounting system is connected, but none of its customers are marked as yours. Whoever looks after the accounts can allocate them in <b>Sales \u2192 By customer</b>.'
+        ? '<b>No accounts are allocated to you yet.</b><br>Your accounting system is connected, but none of its customers are marked as yours. Whoever looks after the accounts can allocate them in <b>Sales → By customer</b>.'
         : 'No farms match these filters.')+'</div></td></tr>';
   }
 
   rows.forEach(function(f){
     var r=d.rep(f.rep);
     var crops=(f.crops||[]).map(function(c){ return '<span class="cropchip">'+esc(c)+'</span>'; }).join('');
+    var bal=d.accountBalance(f.id)||0, lim=d.creditLimit(f.id)||0, isOver = lim>0 && bal>lim;
     html += '<tr class="click" data-id="'+esc(f.id)+'">'+
-      '<td><b>'+esc(f.farm)+'</b>'+BB.sampleChip(f)+'</td>'+
-      '<td>'+esc(f.name)+'<div class="row" style="gap:6px;margin-top:3px;">'+(f.cell?'<a class="wa" href="https://wa.me/'+esc(String(f.cell).replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="WhatsApp '+esc(f.name)+'">WhatsApp</a><a class="wa tel" href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'" onclick="event.stopPropagation()">'+esc(f.cell)+'</a>':'')+'</div></td>'+
+      '<td class="farm"><b>'+esc(f.farm)+BB.sampleChip(f)+'</b><span class="faint" style="font-size:.78rem;">'+esc(f.name)+'</span>'+(f.cell?'<span class="faint cell">'+esc(f.cell)+'</span>':'')+'</td>'+
+      '<td><div class="row" style="gap:6px;flex-wrap:nowrap;">'+(f.cell?'<a class="wa" href="https://wa.me/'+esc(String(f.cell).replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="WhatsApp '+esc(f.name)+'" aria-label="WhatsApp '+esc(f.name)+'">'+BB.icon('message')+'</a><a class="wa tel" href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'" onclick="event.stopPropagation()" title="Call '+esc(f.cell)+'" aria-label="Call '+esc(f.name)+'">'+BB.icon('phone')+'</a>':'<span class="faint">no number</span>')+'</div></td>'+
       '<td>'+esc(f.town)+'<div class="faint" style="font-size:.72rem;">'+esc(f.region)+'</div></td>'+
-      '<td>'+(crops||(f.sageId? '<span class="faint">not captured</span>':'<span class="faint">—</span>'))+'</td>'+
-      '<td class="right">'+(f.ha? BB.num(f.ha) : '<span class="faint">—</span>')+'</td>'+
+      '<td class="crops">'+(crops||(f.sageId? '<span class="faint">not captured</span>':'<span class="faint">—</span>'))+'</td>'+
+      '<td class="num">'+(f.ha? '<div class="bar-cell"><span class="trk"><i style="width:'+Math.round(f.ha/maxHa*100)+'%"></i></span><span>'+BB.num(f.ha)+'</span></div>' : '<span class="faint">—</span>')+'</td>'+
       // for a customer out of the accounting system, what they are worth is the useful column
-      '<td class="right">'+(f.sageId!=null ? '<b>'+BB.money(invoiced12(f.id))+'</b><div class="faint" style="font-size:.7rem;">last 12 months</div>' : '<span class="faint">—</span>')+'</td>'+
-      '<td>'+repChip(r)+'</td>'+
+      (hasLedger? '<td class="num">'+(f.sageId!=null ? '<b>'+BB.money(invoiced12(f.id))+'</b><div class="faint" style="font-size:.7rem;">last 12 months</div>' : '<span class="faint">—</span>')+'</td>' : '')+
+      '<td class="num">'+(bal||lim ? '<span class="'+(isOver?'over':'')+'">'+BB.money(bal)+'</span>'+(lim?'<div class="faint" style="font-size:.7rem;">limit '+BB.money(lim)+'</div>':'') : '<span class="faint">—</span>')+'</td>'+
+      '<td>'+(f.rep? repChip(r) : '<span class="faint">not allocated</span>')+'</td>'+
       '<td>'+BB.statusBadge(f.status)+'</td>'+
-      (function(){ var t=d.tripInsight(f.id); return '<td><span class="badge b-'+t.sev+'" title="Balance '+BB.money(t.balance)+' · limit '+BB.money(t.limit)+'">'+esc(t.verdict)+'</span>'+(t.limit?'<div class="faint" style="font-size:.7rem;margin-top:3px;">'+BB.money(Math.max(0,t.available))+' credit open'+(t.openPipeline?' · '+BB.money(t.openPipeline)+' in pipeline':'')+'</div>':'')+'</td>'; })()+
+      (function(){ var t=d.tripInsight(f.id); return '<td class="drive"><span class="badge b-'+t.sev+'" title="Balance '+BB.money(t.balance)+' · limit '+BB.money(t.limit)+'">'+esc(t.verdict)+'</span>'+(t.limit?'<div class="faint" style="font-size:.7rem;margin-top:3px;">'+BB.money(Math.max(0,t.available))+' credit open'+(t.openPipeline?' · '+BB.money(t.openPipeline)+' in pipeline':'')+'</div>':'')+'</td>'; })()+
     '</tr>';
   });
 
-  html += '</tbody></table></div></div>';
+  html += '</tbody>';
+  if(rows.length>1) html += '<tfoot><tr><td colspan="4">'+rows.length+' farms</td><td class="num">'+(totHa?BB.num(totHa):'—')+'</td>'+(hasLedger?'<td></td>':'')+'<td class="num">'+BB.money(rows.reduce(function(s,f){ return s+Math.max(0,d.accountBalance(f.id)||0); },0))+'</td><td colspan="3"></td></tr></tfoot>';
+  html += '</table></div></div>';
   html += '<div style="height:20px;"></div>';
 
   document.getElementById('farmMain').innerHTML=html;
   bind();
+
+  // charts — balances and limits as the store reports them; counts by region
+  try{
+    if(credRows.length) BB.chart.hbar('#chCredit', { money:true,
+      rows: credRows.map(function(x){
+        var owedIn = x.lim? Math.min(x.bal, x.lim) : x.bal, overBy = x.lim? Math.max(0, x.bal-x.lim) : 0, open = x.lim? Math.max(0, x.lim-x.bal) : 0;
+        return { label:x.f.farm, sub:x.lim? 'limit '+BB.money(x.lim) : 'no limit set', href:'farm-detail.html?farmer='+encodeURIComponent(x.f.id),
+          display: BB.money(x.bal)+(overBy? ' · '+BB.money(overBy)+' over' : ''),
+          parts:[{name:'Owed', value:owedIn, color:'#3f6b28'},{name:'Over the limit', value:overBy, color:'#b8382a'},{name:'Credit still open', value:open, color:'#cfe0b8'}] };
+      }),
+      legend:[{name:'Owed', color:'#3f6b28'},{name:'Over the limit', color:'#b8382a'},{name:'Credit still open', color:'#cfe0b8'}] });
+  }catch(e){ console.warn('chart', e); }
+  try{
+    if(rows.length && byRegion) BB.chart.donut('#chRegion', { rows:regRows, centreLabel:'farms' });
+    else if(rows.length && haRows.length) BB.chart.hbar('#chRegion', { fmt:function(v){ return BB.num(v)+' ha'; },
+      rows: haRows.map(function(f){ return { label:f.farm, value:f.ha, color:'#68a53e', href:'farm-detail.html?farmer='+encodeURIComponent(f.id) }; }) });
+  }catch(e){ console.warn('chart', e); }
 }
 
 function bind(){

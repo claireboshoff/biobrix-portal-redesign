@@ -5,35 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Document · BioBrix</title>
-<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
-<script src="bb-data.js?v=live35"></script>
-<script src="bb-shell.js?v=live35"></script>
+<script src="bb-config.js?v=redesign1"></script><script src="guard.js?v=redesign1"></script>
+<script src="bb-data.js?v=redesign1"></script>
+<script src="bb-shell.js?v=redesign1"></script>
 <style>
-  body{background:#e9ede2;padding:0;}
-  .sheet{max-width:800px;margin:22px auto;background:#fff;box-shadow:0 8px 30px rgba(20,41,12,.15);border-radius:10px;overflow:hidden;}
-  .lh{background:linear-gradient(120deg,var(--green-darkest),var(--green-dark));color:#eaf4d8;padding:26px 34px;display:flex;justify-content:space-between;align-items:flex-start;}
-  .lh .wm{font-family:var(--display);font-weight:700;font-size:1.5rem;letter-spacing:1px;}
+  .sheet{background:#fff;border:1px solid var(--line);box-shadow:0 8px 30px -10px rgba(20,41,12,.22);border-radius:var(--radius);overflow:hidden;min-width:0;}
+  .lh{background:linear-gradient(120deg,var(--green-darkest),var(--green-dark));color:#eaf4d8;padding:24px 32px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .lh .wm{font-family:var(--display);font-weight:700;font-size:1.4rem;letter-spacing:1px;}
   .lh .wm .os{color:var(--lime);}
   .lh .tag{font-size:.62rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--lime);margin-top:4px;}
-  .lh .meta{text-align:right;font-size:.74rem;color:rgba(255,255,255,.7);}
-  .body{padding:30px 34px 38px;}
-  .dtitle{font-family:var(--display);font-size:1.5rem;color:var(--green-dark);font-weight:600;}
-  .drow{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-top:4px;}
-  .divider{height:2px;background:var(--lime);width:60px;margin:16px 0 20px;border-radius:2px;}
+  .lh .meta{text-align:right;font-size:.74rem;color:rgba(255,255,255,.72);line-height:1.6;}
+  .dbody{padding:28px 32px 32px;}
+  .dtitle{font-family:var(--display);font-size:1.45rem;color:var(--green-darkest);font-weight:600;line-height:1.25;}
+  .drow{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-top:4px;}
+  .rule{height:2px;background:var(--lime);width:60px;margin:16px 0 20px;border-radius:2px;}
   table.doc{width:100%;border-collapse:collapse;margin:10px 0;font-size:.9rem;}
-  table.doc th{text-align:left;background:var(--green-darkest);color:#eaf4d8;padding:9px 12px;font-weight:500;}
-  table.doc td{padding:9px 12px;border-bottom:1px solid var(--line-soft);}
-  .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;margin:14px 0;}
-  .kv .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}
-  .kv .v{font-family:var(--display);font-size:1.1rem;color:var(--ink);font-weight:600;}
-  .flag{background:#eef6dc;border-left:4px solid var(--green-bright);border-radius:6px;padding:13px 16px;margin:16px 0;font-size:.92rem;}
+  table.doc th{text-align:left;background:var(--panel-2);color:var(--faint);font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;padding:10px 12px;font-weight:600;border-bottom:1px solid var(--line);}
+  table.doc td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  table.doc td:nth-child(2){white-space:nowrap;}
+  table.doc .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  table.doc tr.tot td{font-weight:700;background:var(--panel-2);border-top:1px solid var(--line);border-bottom:0;}
+  .kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;margin:14px 0;}
+  .kv > div{padding:12px 14px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);margin:0 -1px -1px 0;}
+  .kv .k{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}
+  .kv .v{font-family:var(--display);font-size:1.05rem;color:var(--ink);font-weight:600;margin-top:2px;}
+  @media(max-width:640px){ .kv{grid-template-columns:repeat(2,minmax(0,1fr));} .dbody{padding:20px 18px 24px;} .lh{padding:20px 18px;} .lh .meta{text-align:left;} }
+  .flag{background:#f3f8ea;border-left:3px solid var(--green-bright);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:13px 16px;margin:16px 0;font-size:.92rem;}
   .flag b{color:var(--green-dark);}
-  .sec2{font-family:var(--display);font-weight:600;color:var(--green-dark);font-size:1.02rem;margin:22px 0 8px;}
+  .sec2{font-family:var(--display);font-weight:600;color:var(--green-darkest);font-size:1.02rem;margin:22px 0 8px;}
   ol.how{margin:6px 0 4px 20px;font-size:.92rem;line-height:1.6;} ol.how li{margin-bottom:6px;} ol.how b{color:var(--green-dark);}
   .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
-  .foot{border-top:1px solid var(--line);margin-top:24px;padding-top:14px;font-size:.72rem;color:var(--faint);text-align:center;}
-  .toolbar{max-width:800px;margin:0 auto;display:flex;gap:10px;justify-content:flex-end;padding:0 8px;}
-  @media print{ .bb-head,.bb-nav,.toolbar{display:none!important;} body{background:#fff;padding:0;} .sheet{box-shadow:none;margin:0;max-width:none;border-radius:0;} }
+  .dfoot{border-top:1px solid var(--line);margin-top:24px;padding-top:14px;font-size:.72rem;color:var(--faint);text-align:center;}
+  .facts{display:grid;gap:12px;}
+  .facts .k{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}
+  .facts .v{font-size:.9rem;color:var(--ink);margin-top:1px;}
+  .adv{display:flex;align-items:center;gap:12px;}
+  .adv .av{width:42px;height:42px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;color:#13260c;}
+  @media print{ #bbNav,.bb-top,.bb-nav,.bb-scope,.noprint{display:none!important;} body{background:#fff;padding:0!important;} .wrap{padding:0;max-width:none;} .split{display:block!important;} .sheet{box-shadow:none;border:0;border-radius:0;} }
 </style>
 </head>
 <body>
@@ -57,7 +65,7 @@ function nextSteps(intro){
     '<table class="doc"><thead><tr><th>Product</th><th>How much</th><th>When</th></tr></thead><tbody>'+
     (pr.lines||[]).map(function(ln){ var pd=d.product(ln.prod); return '<tr><td><b>'+BB.esc(pd.name)+'</b>'+(pd.sheet?'<div class="faint" style="font-size:.74rem;max-width:420px;">'+BB.esc(pd.sheet)+'</div>':'')+'</td><td>'+BB.esc(ln.rate||'')+'</td><td>'+BB.esc(ln.timing||'')+'</td></tr>'; }).join('')+
     '</tbody></table>'+
-    '<div class="acts"><a class="btn sm" href="client-portal.html#orders">＋ Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019ve read my '+kind.toLowerCase()+' report — can we talk about the next step?')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
+    '<div class="acts"><a class="btn sm" href="client-portal.html#orders">'+BB.icon('plus')+'Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019ve read my '+kind.toLowerCase()+' report — can we talk about the next step?')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
 }
 function waLink(msg){ return 'https://wa.me/'+String(advisor.cell||'').replace(/\D/g,'').replace(/^0/,'27')+'?text='+encodeURIComponent('Hi '+String(advisor.name||'').split(' ')[0]+', it\u2019s '+f.name+' from '+f.farm+'. '+msg); }
 var f = d.farmer(farmerId) || {name:'—',farm:'—'};
@@ -99,10 +107,10 @@ function block(kind){
         '<li><b>Measure, then adjust.</b> '+BB.esc(String(advisor.name||'Your advisor').split(' ')[0])+' re-samples during the season and updates this programme in your portal.</li>'+
       '</ol>'+
       '<div class="sec2">What to buy, how much, and when</div>'+
-      '<table class="doc"><thead><tr><th>Product</th><th>Rate</th><th>Timing</th><th style="text-align:right">Value</th></tr></thead><tbody>'+
-      (pr.lines||[]).map(function(ln){ var pd=d.product(ln.prod); return '<tr><td><b>'+BB.esc(pd.name)+'</b>'+(pd.sheet?'<div class="faint" style="font-size:.74rem;max-width:420px;">'+BB.esc(pd.sheet)+'</div>':'')+'</td><td>'+BB.esc(ln.rate||'')+'</td><td>'+BB.esc(ln.timing||'')+'</td><td style="text-align:right">'+BB.money(ln.cost||0)+'</td></tr>';}).join('')+
-      '<tr><td colspan="3" style="font-weight:600">Programme total</td><td style="text-align:right;font-weight:700;color:var(--green-dark)">'+BB.money(tot)+'</td></tr></tbody></table>'+
-      '<div class="acts"><a class="btn sm" href="client-portal.html#orders">＋ Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019m looking at my '+(pr.season||'')+' programme — quick question.')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
+      '<table class="doc"><thead><tr><th>Product</th><th>Rate</th><th>Timing</th><th class="num">Value</th></tr></thead><tbody>'+
+      (pr.lines||[]).map(function(ln){ var pd=d.product(ln.prod); return '<tr><td><b>'+BB.esc(pd.name)+'</b>'+(pd.sheet?'<div class="faint" style="font-size:.74rem;max-width:420px;">'+BB.esc(pd.sheet)+'</div>':'')+'</td><td>'+BB.esc(ln.rate||'')+'</td><td>'+BB.esc(ln.timing||'')+'</td><td class="num">'+BB.money(ln.cost||0)+'</td></tr>';}).join('')+
+      '<tr class="tot"><td colspan="3">Programme total</td><td class="num" style="color:var(--green-dark)">'+BB.money(tot)+'</td></tr></tbody></table>'+
+      '<div class="acts"><a class="btn sm" href="client-portal.html#orders">'+BB.icon('plus')+'Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019m looking at my '+(pr.season||'')+' programme — quick question.')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
   }
   if(kind==='Monitoring'){
     var w = pick('watch');
@@ -114,27 +122,50 @@ function block(kind){
     var o = d.where('orders',function(x){return x.farmer===farmerId;})[0];
     if(!o) return '<p class="muted">No orders on file yet.</p>';
     return '<div class="kv">'+kv('Order ref', o.ref)+kv('From depot', d.depot(o.depot).name)+kv('Deliver', BB.monthName(o.deliverMonth))+kv('Status', o.status)+'</div>'+
-      '<table class="doc"><thead><tr><th>Product</th><th style="text-align:right">Qty</th></tr></thead><tbody>'+
-      (o.lines||[]).map(function(ln){return '<tr><td>'+BB.esc(d.product(ln.prod).name)+'</td><td style="text-align:right">'+BB.num(ln.qty)+' '+BB.esc(d.product(ln.prod).unit||'')+'</td></tr>';}).join('')+'</tbody></table>';
+      '<table class="doc"><thead><tr><th>Product</th><th class="num">Qty</th></tr></thead><tbody>'+
+      (o.lines||[]).map(function(ln){return '<tr><td>'+BB.esc(d.product(ln.prod).name)+'</td><td class="num">'+BB.num(ln.qty)+' '+BB.esc(d.product(ln.prod).unit||'')+'</td></tr>';}).join('')+'</tbody></table>';
   }
   return '<p class="muted">'+BB.esc(name)+'</p>';
 }
 function kv(k,v){ return '<div><div class="k">'+BB.esc(k)+'</div><div class="v">'+BB.esc(v)+'</div></div>'; }
 function flag(l,t){ return '<div class="flag"><b>'+BB.esc(l)+':</b> '+BB.esc(t)+'</div>'; }
 
-var html='<div class="toolbar"><a class="btn ghost sm" href="client-portal.html">‹ Back to my farm</a><button class="btn sm" onclick="window.print()">🖨 Print / Save PDF</button></div>'+
-'<div class="sheet">'+
+var isFarmer = !!(BB.user && BB.user.roleKey==='farmer');
+var docType = kind==='Programme'?'RenewAg programme':kind==='Delivery'?'Delivery note':kind+' report';
+var KIND_IC = { Soil:'flask', Leaf:'leaf', Programme:'clipboard', Monitoring:'eye', Delivery:'truck' };
+var html='<div class="page-head row between" style="gap:16px;">'+
+  '<div><div class="eyebrow">Documents · '+BB.esc(docType)+'</div><h1>'+BB.esc(name)+'</h1><p>'+BB.esc(f.farm)+' · '+BB.esc(f.name)+'</p></div>'+
+  '<div class="row noprint"><a class="btn ghost" href="client-portal.html">'+(isFarmer?'Back to my farm':'Farmer view')+'</a>'+
+    '<button class="btn" onclick="window.print()">'+BB.icon('download')+'Print / Save PDF</button></div></div>';
+html += '<div class="split" style="margin-top:14px;align-items:start;">';
+html += '<div class="sheet">'+
   '<div class="lh"><div><div class="wm">BIOBRIX <span class="os">·</span></div><div class="tag">The Biological Way</div></div>'+
     '<div class="meta">Prepared '+today+'<br>'+BB.esc(advisor.name||'')+(advisor.cell?'<br>'+BB.esc(advisor.cell):'')+'</div></div>'+
-  '<div class="body">'+
+  '<div class="dbody">'+
     '<div class="dtitle">'+BB.esc(name)+'</div>'+
-    '<div class="drow"><span>'+BB.esc(f.farm)+' · '+BB.esc(f.name)+'</span><span>'+BB.esc(kind==='Programme'?'RenewAg programme':kind==='Delivery'?'Delivery note':kind+' report')+'</span></div>'+
-    '<div class="divider"></div>'+
+    '<div class="drow"><span>'+BB.esc(f.farm)+' · '+BB.esc(f.name)+'</span><span>'+BB.esc(docType)+'</span></div>'+
+    '<div class="rule"></div>'+
     block(kind)+
-    '<div class="foot">BioBrix (Pty) Ltd · The Biological Way · This report is prepared for '+BB.esc(f.name)+' and is confidential.</div>'+
+    '<div class="dfoot">BioBrix (Pty) Ltd · The Biological Way · This report is prepared for '+BB.esc(f.name)+' and is confidential.</div>'+
   '</div>'+
 '</div>';
-document.body.insertAdjacentHTML('beforeend','<main>'+html+'</main>');
+// side panel: what this document is, and who to talk to about it
+var aFirst = String(advisor.name||'').split(' ')[0];
+var tel = String(advisor.cell||'').replace(/\s/g,'');
+html += '<div class="noprint" style="display:grid;gap:16px;min-width:0;">';
+html += '<div class="card"><div class="card-h"><div><h3>About this document</h3><div class="sub">'+BB.esc(docType)+'</div></div><span class="badge b-lime">'+BB.icon(KIND_IC[kind]||'file')+BB.esc(kind)+'</span></div><div class="card-p"><div class="facts">'+
+  '<div><div class="k">Farm</div><div class="v">'+BB.esc(f.farm)+'</div></div>'+
+  '<div><div class="k">Prepared for</div><div class="v">'+BB.esc(f.name)+'</div></div>'+
+  '<div><div class="k">Prepared</div><div class="v">'+today+'</div></div>'+
+'</div></div></div>';
+if(advisor && advisor.name && advisor.name!=='—'){
+  html += '<div class="card"><div class="card-h"><div><h3>Questions about it?</h3><div class="sub">your BioBrix advisor</div></div></div><div class="card-p">'+
+    '<div class="adv"><div class="av" style="background:'+BB.esc(advisor.colour||'#68a53e')+';">'+BB.initials(advisor.name)+'</div><div style="min-width:0;"><b>'+BB.esc(advisor.name)+'</b><div class="faint" style="font-size:.8rem;">'+BB.esc(advisor.role||'Crop Advisor')+(advisor.cell?' · '+BB.esc(advisor.cell):'')+'</div></div></div>'+
+    (advisor.cell?'<div class="row" style="margin-top:14px;gap:8px;"><a class="btn ghost sm" href="tel:'+BB.esc(tel)+'">'+BB.icon('phone')+'Call '+BB.esc(aFirst)+'</a><a class="btn ghost sm" target="_blank" rel="noopener" href="'+waLink('I’m looking at my '+docType.toLowerCase()+' — quick question.')+'">'+BB.icon('message')+'WhatsApp</a></div>':'')+
+  '</div></div>';
+}
+html += '</div></div>';
+document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>
