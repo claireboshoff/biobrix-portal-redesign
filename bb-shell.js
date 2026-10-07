@@ -292,7 +292,6 @@
   .ask-sugs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 4px;}
   .ask-sugs::-webkit-scrollbar{display:none;}
   .ask-sugs:empty{display:none;}
-  .askdock.open .ask-sugs{display:none;}
   .ask-sug{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(183,217,122,.22);background:rgba(18,33,12,.9);backdrop-filter:blur(8px);
     color:rgba(234,244,216,.88);font:inherit;font-size:.76rem;font-weight:500;padding:6px 10px 6px 12px;border-radius:8px;cursor:pointer;transition:border-color .15s,color .15s;}
   .ask-sug:hover{border-color:var(--lime);color:#fff;}

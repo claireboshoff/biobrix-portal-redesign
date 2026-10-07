@@ -500,7 +500,7 @@
   function paint() {
     if (!dock) return;
     var sugs = document.getElementById('askSugs');
-    sugs.innerHTML = S.view.length ? '' : suggestions().map(function (q) { return '<button type="button" class="ask-sug" data-q="' + esc(q) + '">' + esc(q) + icon('plus') + '</button>'; }).join('');
+    sugs.innerHTML = suggestions().map(function (q) { return '<button type="button" class="ask-sug" data-q="' + esc(q) + '">' + esc(q) + icon('plus') + '</button>'; }).join('');
     document.getElementById('askHist').style.display = S.view.length ? '' : 'none';
     if (!dock.classList.contains('open')) return;
     var html = '';
