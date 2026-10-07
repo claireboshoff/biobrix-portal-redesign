@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Team feed · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'home', back:'index.html' });
+var d = BB.data, u = BB.user;
+var me = u.rep || u.id;
+
+var KINDS = ['Note','Order','Stock','Visit','Delivery'];
+var KBADGE = { Note:'b-grey', Order:'b-ok', Stock:'b-warn', Visit:'b-lime', Delivery:'b-blue' };
+
+function render(){
+  var feed = d.all('feed').slice().sort(function(a,b){ return (b.date+b.id).localeCompare(a.date+a.id); });
+  var html = '';
+  html += '<div class="page-head"><div class="eyebrow">One team, four provinces</div>'+
+    '<h1>Team feed</h1><p>Everyone sees the same thing at the same time — post an update, flag stock, hand a farmer over. No more waiting a week to hear what happened on the ground.</p></div>';
+
+  // composer
+  html += '<div class="card card-p" style="margin-bottom:16px;">'+
+    '<div class="fld"><label>Post an update</label><textarea id="txt" rows="2" placeholder="What just happened? e.g. Signed Kobus on citrus programme — 140 L LeafSap for September."></textarea></div>'+
+    '<div class="row" style="gap:8px;">'+
+      '<div class="fld" style="flex:1;min-width:120px;margin:0;"><label>Type</label><select id="kind">'+KINDS.map(function(k){return '<option>'+k+'</option>';}).join('')+'</select></div>'+
+      '<div class="fld" style="flex:1;min-width:150px;margin:0;"><label>Farmer (optional)</label><select id="farmer"><option value="">— none —</option>'+
+        d.all('farmers').map(function(f){return '<option value="'+f.id+'">'+BB.esc(f.name+' · '+f.farm)+'</option>';}).join('')+'</select></div>'+
+      '<div style="align-self:flex-end;"><button class="btn" id="post">Post</button></div>'+
+    '</div></div>';
+
+  // feed
+  html += '<div class="sec"><h2>Latest</h2><span class="ln"></span><span class="cnt">'+feed.length+' updates</span></div>';
+  if(!feed.length){ html += '<div class="empty"><div class="big">📣</div>No updates yet — be the first.</div>'; }
+  feed.forEach(function(p){
+    var who = d.person(p.from);
+    var far = p.farmer ? d.farmer(p.farmer) : null;
+    html += '<div class="card card-p" style="margin-bottom:10px;">'+
+      '<div class="row between" style="align-items:flex-start;">'+
+        '<div class="row" style="gap:9px;align-items:center;">'+
+          '<span class="bb-av" style="background:'+who.colour+';color:#fff;border:none;">'+BB.initials(who.name)+'</span>'+
+          '<div><div style="font-weight:600;font-size:.9rem;">'+BB.esc(who.name)+'</div>'+
+          '<div class="faint" style="font-size:.72rem;">'+BB.esc(who.role||'')+' · '+BB.date(p.date)+'</div></div>'+
+        '</div>'+
+        '<span class="badge '+(KBADGE[p.kind]||'b-grey')+'">'+BB.esc(p.kind)+'</span>'+
+      '</div>'+
+      '<p style="margin:10px 0 0;font-size:.92rem;line-height:1.5;">'+BB.esc(p.text)+'</p>'+
+      (far||p.ref ? '<div class="row" style="gap:8px;margin-top:9px;">'+
+        (far?'<a class="chip" href="farm-detail.html?farmer='+p.farmer+'">🌾 '+BB.esc(far.farm)+'</a>':'')+
+        (p.ref?'<a class="chip" href="orders.html">'+BB.esc(p.ref)+'</a>':'')+
+      '</div>' : '')+
+    '</div>';
+  });
+
+  document.querySelector('main')? (document.querySelector('main').innerHTML=html) :
+    document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+
+  document.getElementById('post').onclick = function(){
+    var txt = document.getElementById('txt').value.trim();
+    if(!txt){ BB.toast('Type an update first'); return; }
+    d.add('feed', { from: me, date: new Date().toISOString().slice(0,10),
+      kind: document.getElementById('kind').value, farmer: document.getElementById('farmer').value||null,
+      ref:null, text: txt });
+    BB.toast('Posted — the whole team sees it');
+    render();
+  };
+}
+render();
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

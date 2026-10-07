@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Sales forecast · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'sales', back:'index.html' });
+
+var d = BB.data, u = BB.user;
+var isAdvisor = u.roleKey==='advisor';
+
+var css=''+
+'.bar-row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;margin-bottom:9px;}'+
+'.bar-row .mn{font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}'+
+'.bar-track{background:#eef2e7;border-radius:8px;height:26px;overflow:hidden;display:flex;}'+
+'.bar-seg{height:100%;}'+
+'.bar-val{font-size:.78rem;font-weight:600;color:var(--green-dark);white-space:nowrap;}'+
+'.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin-bottom:14px;}'+
+'.legend span{display:inline-flex;align-items:center;gap:6px;}'+
+'.sw{width:12px;height:12px;border-radius:3px;display:inline-block;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+// scope orders to role
+var orders = d.all('orders');
+if(isAdvisor){ orders = orders.filter(function(o){ return o.rep===u.rep; }); }
+
+function isPipeline(o){ return o.status==='Forecast'||o.status==='Pending'; }
+function isConfirmed(o){ return o.status==='Confirmed'||o.status==='Delivered'; }
+
+var pipelineVal = orders.filter(isPipeline).reduce(function(s,o){ return s+d.orderValue(o); },0);
+var confirmedVal = orders.filter(isConfirmed).reduce(function(s,o){ return s+d.orderValue(o); },0);
+var totalVal = orders.reduce(function(s,o){ return s+d.orderValue(o); },0);
+
+// group by deliverMonth
+var byMonth=[];
+for(var i=0;i<12;i++) byMonth.push({ i:i, orders:0, forecast:0, confirmed:0 });
+orders.forEach(function(o){
+  var m=byMonth[o.deliverMonth]; if(!m) return;
+  m.orders++;
+  var v=d.orderValue(o);
+  if(isConfirmed(o)) m.confirmed+=v; else m.forecast+=v;
+});
+var activeMonths = byMonth.filter(function(m){ return m.orders>0; });
+var maxMonth = Math.max.apply(null, byMonth.map(function(m){ return m.forecast+m.confirmed; }).concat([1]));
+
+var html='';
+html += '<div class="page-head"><h1>Sales forecast</h1><p>'+
+  (isAdvisor?'Your pipeline by delivery month — live as you capture, not a week behind.'
+            :'Every rep, live by delivery month. Captured in the field, on your screen the same moment.')+'</p></div>';
+
+// stat tiles
+html += '<div class="grid g3">';
+html += '<div class="stat"><div class="l">Pipeline value</div><div class="v">'+BB.money(pipelineVal)+'</div><div class="s">forecast + pending</div></div>';
+html += '<div class="stat"><div class="l">Confirmed value</div><div class="v">'+BB.money(confirmedVal)+'</div><div class="s">confirmed + delivered</div></div>';
+html += '<div class="stat"><div class="l">Total booked</div><div class="v">'+BB.money(totalVal)+'</div><div class="s">'+orders.length+' orders this season</div></div>';
+html += '</div>';
+
+// bar chart
+html += '<div class="sec"><h2>Month by month</h2><span class="ln"></span><span class="cnt">by delivery month</span></div>';
+html += '<div class="card card-p">';
+html += '<div class="legend"><span><span class="sw" style="background:var(--green-mid);"></span>Confirmed</span>'+
+        '<span><span class="sw" style="background:var(--lime);"></span>Forecast / pending</span></div>';
+if(!activeMonths.length){
+  html += '<div class="empty"><div class="big">▲</div>No orders yet. Capture one and it lands here instantly.</div>';
+} else {
+  activeMonths.forEach(function(m){
+    var tot=m.forecast+m.confirmed;
+    var cw = Math.round(m.confirmed/maxMonth*100);
+    var fw = Math.round(m.forecast/maxMonth*100);
+    html += '<div class="bar-row">'+
+      '<div class="mn">'+BB.monthName(m.i)+'</div>'+
+      '<div class="bar-track">'+
+        (cw>0?'<div class="bar-seg" style="width:'+cw+'%;background:var(--green-mid);"></div>':'')+
+        (fw>0?'<div class="bar-seg" style="width:'+fw+'%;background:var(--lime);"></div>':'')+
+      '</div>'+
+      '<div class="bar-val">'+BB.money(tot)+'</div>'+
+    '</div>';
+  });
+}
+html += '</div>';
+
+// per-rep breakdown (director only)
+if(!isAdvisor){
+  var reps = d.all('reps');
+  var repRows = reps.map(function(r){
+    var ro = orders.filter(function(o){ return o.rep===r.id; });
+    return {
+      rep:r,
+      count:ro.length,
+      pipeline: ro.filter(isPipeline).reduce(function(s,o){ return s+d.orderValue(o); },0),
+      confirmed: ro.filter(isConfirmed).reduce(function(s,o){ return s+d.orderValue(o); },0),
+      total: ro.reduce(function(s,o){ return s+d.orderValue(o); },0)
+    };
+  }).filter(function(x){ return x.count>0; }).sort(function(a,b){ return b.total-a.total; });
+
+  html += '<div class="sec"><h2>By rep</h2><span class="ln"></span><span class="cnt">'+repRows.length+' active</span></div>';
+  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Rep</th><th class="right">Orders</th><th class="right">Pipeline</th><th class="right">Confirmed</th><th class="right">Total</th></tr></thead><tbody>';
+  repRows.forEach(function(x){
+    html += '<tr><td><span class="chip" style="background:'+x.rep.colour+'22;border-color:'+x.rep.colour+';color:'+x.rep.colour+';">'+
+      '<span style="width:8px;height:8px;border-radius:50%;background:'+x.rep.colour+';display:inline-block;"></span>'+BB.esc(x.rep.name)+'</span></td>'+
+      '<td class="right">'+x.count+'</td>'+
+      '<td class="right">'+BB.money(x.pipeline)+'</td>'+
+      '<td class="right">'+BB.money(x.confirmed)+'</td>'+
+      '<td class="right"><b>'+BB.money(x.total)+'</b></td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+}
+
+// ---- the pivot Rudie asked for: per product · per rep · per area · per month ----
+html += '<div class="sec" id="pivot"><h2>By product · rep · area · month</h2><span class="ln"></span><span class="cnt">every line of every order, live</span></div>';
+html += '<div class="card"><div class="map-tools" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line-soft);">'+
+  '<span class="lbl" style="font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);">Rows</span>'+
+  '<span class="chip tog on" data-dim="product" style="cursor:pointer;">Product</span>'+(isAdvisor?'':'<span class="chip tog" data-dim="rep" style="cursor:pointer;">Rep</span>')+'<span class="chip tog" data-dim="area" style="cursor:pointer;">Area</span><span class="chip tog" data-dim="farmer" style="cursor:pointer;">Farmer</span>'+
+  '<span style="flex:1;"></span>'+
+  '<span class="lbl" style="font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);">Show</span>'+
+  '<span class="chip tog on" data-measure="value" style="cursor:pointer;">Rand</span><span class="chip tog" data-measure="qty" style="cursor:pointer;">Litres / kg</span>'+
+  '<span class="chip tog" data-conf="all" style="cursor:pointer;" title="Toggle: all orders vs confirmed only">All orders</span>'+
+'</div><div class="scroll" id="pivotBody"></div></div>';
+
+// month detail table
+html += '<div class="sec"><h2>Detail</h2><span class="ln"></span></div>';
+html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Month</th><th class="right">Orders</th><th class="right">Forecast value</th><th class="right">Confirmed value</th></tr></thead><tbody>';
+if(!activeMonths.length){
+  html += '<tr><td colspan="4" class="center faint">No orders yet.</td></tr>';
+} else {
+  activeMonths.forEach(function(m){
+    html += '<tr><td><b>'+BB.monthName(m.i)+'</b></td><td class="right">'+m.orders+'</td>'+
+      '<td class="right">'+BB.money(m.forecast)+'</td><td class="right">'+BB.money(m.confirmed)+'</td></tr>';
+  });
+}
+html += '</tbody></table></div></div>';
+
+html += '<div class="divider"></div><div class="row" style="padding-bottom:18px;"><a class="btn" href="voice-order.html">Capture an order</a><a class="btn ghost" href="orders.html">Full pipeline</a></div>';
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+
+// ---- pivot engine ----
+var pv = { dim:'product', measure:'value', confOnly:false };
+function pivotRows(){
+  var rows={}, months={};
+  orders.forEach(function(o){
+    if(pv.confOnly && !isConfirmed(o)) return;
+    var f=d.farmer(o.farmer), r=d.rep(o.rep);
+    (o.lines||[]).forEach(function(l){
+      var p=d.product(l.prod);
+      var key = pv.dim==='product'? p.name : pv.dim==='rep'? r.name : pv.dim==='area'? (f.region||'—') : (f.farm||f.name);
+      var sub = pv.dim==='product'? (p.unit||'') : pv.dim==='rep'? r.region : pv.dim==='area'? '' : f.name;
+      var val = pv.measure==='value' ? (p.price||0)*(l.qty||0)*(d.quoteStatus(o)?(1+d.quotePct(o)/100):1) : (l.qty||0);
+      rows[key]=rows[key]||{key:key, sub:sub, months:{}, total:0, unit:p.unit||''};
+      rows[key].months[o.deliverMonth]=(rows[key].months[o.deliverMonth]||0)+val; rows[key].total+=val; months[o.deliverMonth]=1;
+    });
+  });
+  var ms=Object.keys(months).map(Number).sort(function(a,b){return a-b;});
+  var list=Object.keys(rows).map(function(k){return rows[k];}).sort(function(a,b){return b.total-a.total;});
+  return {rows:list, months:ms};
+}
+function fmt(v, unit){ return pv.measure==='value' ? BB.money(Math.round(v)) : (BB.num(Math.round(v))+(unit?' '+unit:'')); }
+function renderPivot(){
+  var P=pivotRows(); var el=document.getElementById('pivotBody'); if(!el) return;
+  if(!P.rows.length){ el.innerHTML='<div class="empty">No orders in this view yet.</div>'; return; }
+  var colTot={}; var grand=0;
+  var h='<table class="bb"><thead><tr><th>'+({product:'Product',rep:'Rep',area:'Area',farmer:'Farmer'})[pv.dim]+'</th>'+P.months.map(function(m){return '<th class="right">'+BB.monthName(m)+'</th>';}).join('')+'<th class="right">Total</th></tr></thead><tbody>';
+  P.rows.forEach(function(r){
+    h+='<tr><td><b>'+BB.esc(r.key)+'</b>'+(r.sub?'<div class="faint" style="font-size:.72rem;">'+BB.esc(r.sub)+'</div>':'')+'</td>';
+    P.months.forEach(function(m){ var v=r.months[m]||0; colTot[m]=(colTot[m]||0)+v; h+='<td class="right">'+(v?fmt(v, pv.dim==='product'?r.unit:''):'<span class="faint">·</span>')+'</td>'; });
+    grand+=r.total; h+='<td class="right"><b>'+fmt(r.total, pv.dim==='product'?r.unit:'')+'</b></td></tr>';
+  });
+  h+='<tr><td><b>Total</b></td>'+P.months.map(function(m){return '<td class="right"><b>'+fmt(colTot[m]||0,'')+'</b></td>';}).join('')+'<td class="right"><b>'+fmt(grand,'')+'</b></td></tr>';
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+document.querySelectorAll('.chip.tog[data-dim]').forEach(function(c){ c.onclick=function(){ document.querySelectorAll('.chip.tog[data-dim]').forEach(function(x){x.classList.remove('on');}); c.classList.add('on'); pv.dim=c.dataset.dim; renderPivot(); }; });
+document.querySelectorAll('.chip.tog[data-measure]').forEach(function(c){ c.onclick=function(){ document.querySelectorAll('.chip.tog[data-measure]').forEach(function(x){x.classList.remove('on');}); c.classList.add('on'); pv.measure=c.dataset.measure; renderPivot(); }; });
+var confChip=document.querySelector('.chip.tog[data-conf]'); if(confChip) confChip.onclick=function(){ pv.confOnly=!pv.confOnly; confChip.classList.toggle('on', pv.confOnly); confChip.textContent=pv.confOnly?'Confirmed only':'All orders'; renderPivot(); };
+renderPivot();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

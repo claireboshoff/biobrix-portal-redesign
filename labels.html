@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Labels · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<style>
+.lbl{border:2px solid var(--green-dark);border-radius:12px;padding:14px 16px;background:#fff;width:320px;max-width:100%;}
+.lbl .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid var(--line);padding-bottom:8px;margin-bottom:8px;}
+.lbl .bw{font-family:var(--display);font-weight:700;font-size:1.1rem;color:var(--green-dark);letter-spacing:.5px;}
+.lbl .bw .os{color:var(--green-bright);}
+.lbl h4{font-family:var(--display);font-size:1.15rem;color:var(--ink);margin:2px 0;}
+.lbl .rowl{display:flex;justify-content:space-between;font-size:.82rem;padding:2px 0;}
+.lbl .rowl b{color:var(--green-dark);}
+.lbl .code{font-family:ui-monospace,monospace;font-size:.9rem;letter-spacing:1px;background:#12210c;color:#b7d97a;padding:3px 8px;border-radius:6px;}
+.bars{height:34px;background:repeating-linear-gradient(90deg,#12210c 0 2px,#fff 2px 4px,#12210c 4px 7px,#fff 7px 9px,#12210c 9px 11px,#fff 11px 14px);margin-top:10px;border-radius:3px;}
+@media print{ .bb-head,.bb-nav,.noprint{display:none!important;} body{padding:0;background:#fff;} .lbl{page-break-inside:avoid;} }
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+var d = BB.data;
+
+function render(mode){
+  mode = mode || 'product';
+  var html = '';
+  html += '<div class="page-head noprint"><div class="eyebrow">Warehouse &amp; field</div>'+
+    '<h1>Labels</h1><p>The labels reps and depots always ask for — product, blend batches and delivery — generated from live data and ready to print. No re-typing.</p></div>';
+
+  html += '<div class="row noprint" style="gap:8px;margin-bottom:14px;">'+
+    ['product','blend','delivery'].map(function(m){
+      var t={product:'Product labels',blend:'Blend batch labels',delivery:'Delivery labels'}[m];
+      return '<button class="chip'+(m===mode?' on':'')+'" data-m="'+m+'">'+t+'</button>';
+    }).join('')+
+    '<button class="btn ghost sm" id="print" style="margin-left:auto;">🖨 Print sheet</button></div>';
+
+  var cards = '';
+  if(mode==='product'){
+    d.all('products').forEach(function(p){
+      var sup = d.supplier(p.supplier);
+      cards += label(p.name, [
+        ['Code', '<span class="code">'+BB.esc(p.code)+'</span>'],
+        ['Pack', BB.esc(p.pack)],
+        ['Lever', BB.esc(p.lever)],
+        ['Supplier', BB.esc(sup.name)],
+        ['Batch', 'BX-'+p.code.replace(/[^A-Z0-9]/g,'')+'-2607']
+      ], true);
+    });
+  } else if(mode==='blend'){
+    d.all('blending').forEach(function(b){
+      var far = d.farmer(b['for']); var dep = d.depot(b.depot);
+      cards += label(b.recipe, [
+        ['Batch size', BB.esc(b.batch)],
+        ['For', BB.esc(far.farm)],
+        ['Depot', BB.esc(dep.name)],
+        ['Mixed', BB.date(b.due)],
+        ['Batch no', 'BL-'+b.id.toUpperCase()+'-2607']
+      ], true);
+    });
+  } else {
+    d.all('orders').forEach(function(o){
+      var far = d.farmer(o.farmer); var dep = d.depot(o.depot);
+      var items = (o.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+l.qty; }).join(', ');
+      cards += label('Delivery · '+o.ref, [
+        ['Farmer', BB.esc(far.name)],
+        ['Farm', BB.esc(far.farm)],
+        ['From', BB.esc(dep.name)],
+        ['Items', BB.esc(items||'—')],
+        ['Deliver', BB.monthName(o.deliverMonth)]
+      ], true);
+    });
+  }
+  html += '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+cards+'</div>';
+
+  var main = document.querySelector('main');
+  if(main) main.innerHTML = html; else document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+
+  document.querySelectorAll('.chip[data-m]').forEach(function(c){ c.onclick=function(){ render(c.getAttribute('data-m')); }; });
+  document.getElementById('print').onclick = function(){ window.print(); };
+}
+
+function label(title, rows, bars){
+  return '<div class="lbl">'+
+    '<div class="top"><div class="bw">BIOBRIX <span class="os">·</span></div><div class="faint" style="font-size:.66rem;text-transform:uppercase;letter-spacing:1.5px;">The Biological Way</div></div>'+
+    '<h4>'+BB.esc(title)+'</h4>'+
+    rows.map(function(r){ return '<div class="rowl"><span class="faint">'+BB.esc(r[0])+'</span><b>'+r[1]+'</b></div>'; }).join('')+
+    (bars?'<div class="bars"></div>':'')+
+  '</div>';
+}
+
+render('product');
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

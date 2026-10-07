@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Sign in · BioBrix OS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:linear-gradient(120deg,#12210c,#22431a 60%,#3f6b28);color:#16240f;position:relative;overflow:hidden;}
+.bgfield{position:absolute;inset:0;background:url('assets/hero-field.webp') center/cover;opacity:.16;filter:saturate(1.1);}
+.shell{position:relative;width:100%;max-width:440px;background:#fff;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden;}
+.head{padding:30px 32px 18px;text-align:center;background:linear-gradient(120deg,#12210c,#22431a);color:#eaf4d8;}
+.mark{width:56px;height:56px;border-radius:15px;margin:0 auto 12px;background:linear-gradient(140deg,#68a53e,#b7d97a);
+  display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:1.7rem;color:#13260c;}
+.brand{font-family:'Space Grotesk';font-weight:700;font-size:1.5rem;letter-spacing:.5px;}
+.brand .os{color:#b7d97a;font-weight:500;}
+.sub{font-size:.64rem;letter-spacing:3px;text-transform:uppercase;opacity:.72;margin-top:5px;}
+.body{padding:24px 32px 28px;}
+.body h1{font-family:'Space Grotesk';color:#22431a;font-size:1.25rem;font-weight:600;margin-bottom:4px;}
+.body .lead{font-size:.9rem;color:#5d6b52;margin-bottom:18px;}
+label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#5d6b52;margin-bottom:6px;}
+input{width:100%;padding:13px 15px;font-family:inherit;font-size:1rem;border:1.5px solid #e2e8d8;border-radius:11px;outline:none;transition:.15s;margin-bottom:14px;}
+input:focus{border-color:#68a53e;}
+button.go{width:100%;padding:14px;background:#3f6b28;color:#fff;border:none;border-radius:11px;font-family:inherit;font-weight:600;font-size:1rem;cursor:pointer;transition:.15s;}
+button.go:hover{background:#22431a;}
+.msg{margin-top:12px;font-size:.86rem;padding:10px 13px;border-radius:9px;display:none;}
+.msg.err{display:block;background:#fcebe9;color:#c0392b;border-left:3px solid #c0392b;}
+.divider{display:flex;align-items:center;gap:12px;margin:22px 0 14px;color:#8a9880;font-size:.7rem;text-transform:uppercase;letter-spacing:1px;}
+.divider .ln{flex:1;height:1px;background:#e2e8d8;}
+.personas{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.persona{border:1.5px solid #e2e8d8;border-radius:11px;padding:11px 12px;cursor:pointer;transition:.15s;background:#fbfdf7;text-align:left;}
+.persona:hover{border-color:#68a53e;background:#f3f9e9;}
+.persona .n{font-weight:600;font-size:.86rem;color:#22431a;}
+.persona .r{font-size:.7rem;color:#5d6b52;margin-top:1px;}
+.hint{margin-top:16px;font-size:.72rem;color:#8a9880;text-align:center;line-height:1.5;}
+.hint code{background:#eef2e7;padding:1px 6px;border-radius:5px;color:#3f6b28;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="bgfield"></div>
+<div class="shell">
+  <div class="head">
+    <div class="mark">B</div>
+    <div class="brand">BIOBRIX <span class="os">OS</span></div>
+    <div class="sub">The Biological Way</div>
+  </div>
+  <div class="body">
+    <h1>Sign in</h1>
+    <p class="lead">Your operations, sales &amp; BioServices — in one place. Works offline in the field.</p>
+    <form id="f">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="you@biobrix.co.za" autocomplete="username">
+      <label id="pinLabel">Password</label>
+      <input id="pin" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="go" type="submit" id="go">Sign in</button>
+      <div class="msg" id="msg"></div>
+    </form>
+
+    <div id="demoBits" style="display:none;">
+      <div class="divider"><span class="ln"></span>Or explore a seat<span class="ln"></span></div>
+      <div class="personas" id="personas"></div>
+      <div class="hint">Demo access code: <code>biobrix</code> · Every seat sees only what its role needs.</div>
+    </div>
+    <div class="hint" id="liveHint">Your own sign-in. Every seat sees only what its role needs. Forgotten your password? Ask the team on <a href="mailto:info@freedomhub.io" style="color:#3f6b28;">info@freedomhub.io</a> and it is reset the same day.</div>
+  </div>
+</div>
+
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var ret = params.get('return') || 'index.html';
+  // never bounce to another site or back to the login page
+  if(/^(https?:)?\/\//.test(ret) || /login\.html/.test(ret)) ret='index.html';
+  var live = BB.auth.live;
+
+  if(!live){
+    // demo: shared code + tap-a-seat
+    document.getElementById('demoBits').style.display='';
+    document.getElementById('liveHint').style.display='none';
+    document.getElementById('pinLabel').textContent='Access code';
+    document.getElementById('pin').placeholder='Access code';
+    document.getElementById('email').value='rudie@biobrix.co.za';
+    var box = document.getElementById('personas');
+    BB.auth.users.forEach(function(u){
+      var b=document.createElement('button'); b.type='button'; b.className='persona';
+      b.innerHTML='<div class="n">'+u.name+'</div><div class="r">'+u.role+' · '+u.region+'</div>';
+      b.onclick=function(){ BB.auth.persona(u.id); location.replace(ret); };
+      box.appendChild(b);
+    });
+  }
+
+  document.getElementById('f').addEventListener('submit', function(e){
+    e.preventDefault();
+    var msg=document.getElementById('msg'), go=document.getElementById('go');
+    msg.className='msg'; msg.textContent='';
+    var r = BB.auth.login(document.getElementById('email').value, document.getElementById('pin').value);
+    if(r && typeof r.then==='function'){
+      go.disabled=true; go.textContent='Signing in…';
+      r.then(function(res){
+        go.disabled=false; go.textContent='Sign in';
+        if(!res.ok){ msg.className='msg err'; msg.textContent=res.err; return; }
+        location.replace(ret);
+      });
+      return;
+    }
+    if(!r.ok){ msg.className='msg err'; msg.textContent=r.err; return; }
+    location.replace(ret);
+  });
+})();
+</script>
+</body>
+</html>

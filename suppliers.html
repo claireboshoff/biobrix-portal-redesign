@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Suppliers · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+
+var d = BB.data;
+var suppliers = d.all('suppliers');
+var products = d.all('products');
+var inventory = d.all('inventory');
+var selected = null;
+
+var FLAG = { ZA:'🇿🇦', US:'🇺🇸', DE:'🇩🇪', AU:'🇦🇺' };
+function flag(c){ return FLAG[c] || '🏳'; }
+function isLocal(c){ return c==='ZA'; }
+
+function prodCount(supId){ return products.filter(function(p){ return p.supplier===supId; }).length; }
+
+function renderProducts(supId){
+  var list = products.filter(function(p){ return p.supplier===supId; });
+  var sup = d.supplier(supId);
+  var html = '<div class="card card-p" style="margin-top:8px;border-top:3px solid var(--green-bright);">';
+  html += '<div class="eyebrow">'+flag(sup.country)+' Sourced from</div>';
+  html += '<b style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+BB.esc(sup.name)+'</b>';
+  html += '<p class="muted" style="font-size:.82rem;margin:2px 0 4px;">'+BB.esc(sup.note)+' · lead time '+sup.lead+' days</p>';
+  if(!list.length){
+    html += '<div class="empty">No products currently sourced from this supplier.</div>';
+  } else {
+    html += '<div class="scroll" style="margin-top:12px;"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Pack</th><th>Lever</th><th class="right">Price</th></tr></thead><tbody>';
+    list.forEach(function(p){
+      html += '<tr>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b></td>'+
+        '<td class="muted">'+BB.esc(p.code)+'</td>'+
+        '<td class="muted">'+BB.esc(p.pack)+'</td>'+
+        '<td>'+BB.statusBadge(p.lever)+'</td>'+
+        '<td class="right"><b>'+BB.money(p.price)+'</b><span class="faint" style="font-size:.72rem;">/'+BB.esc(p.unit)+'</span></td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function render(){
+  var localCount = suppliers.filter(function(s){ return isLocal(s.country); }).length;
+  var imported = suppliers.length - localCount;
+  var avgLead = Math.round(suppliers.reduce(function(s,x){ return s+x.lead; }, 0) / (suppliers.length||1));
+
+  var html = '';
+  html += '<section class="page-head">'+
+    '<div class="eyebrow">Operations · Suppliers</div>'+
+    '<h1>Our supply network</h1>'+
+    '<p>BioBrix sources across many suppliers, not one — local blends alongside imported biologicals. This is who each product comes from, and what needs ordering right now.</p>'+
+  '</section>';
+
+  html += '<div class="grid g3">'+
+    '<div class="stat"><div class="l">Suppliers</div><div class="v">'+suppliers.length+'</div><div class="s">across the network</div></div>'+
+    '<div class="stat"><div class="l">Local · imported</div><div class="v">'+localCount+' · '+imported+'</div><div class="s">ZA vs overseas</div></div>'+
+    '<div class="stat"><div class="l">Avg lead time</div><div class="v">'+avgLead+' <span style="font-size:.9rem;">days</span></div><div class="s">order to arrival</div></div>'+
+  '</div>';
+
+  // supplier table
+  html += '<div class="sec"><h2>Suppliers</h2><span class="ln"></span><span class="cnt">tap for products</span></div>';
+  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Supplier</th><th>Country</th><th>Lead</th><th>Note</th><th class="right">Products</th></tr></thead><tbody>';
+  suppliers.forEach(function(s){
+    var on = selected===s.id;
+    html += '<tr class="click sup-row" data-sup="'+s.id+'"'+(on?' style="background:#f5f9ee;"':'')+'>'+
+      '<td><b style="color:var(--green-dark);">'+BB.esc(s.name)+'</b></td>'+
+      '<td>'+flag(s.country)+' <span class="muted" style="font-size:.78rem;">'+BB.esc(s.country)+'</span></td>'+
+      '<td class="muted" style="white-space:nowrap;">'+s.lead+' days</td>'+
+      '<td class="faint" style="font-size:.78rem;">'+BB.esc(s.note)+'</td>'+
+      '<td class="right"><b>'+prodCount(s.id)+'</b></td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  // selected supplier products
+  html += '<div id="supdetail">'+(selected?renderProducts(selected):'')+'</div>';
+
+  // reorder radar
+  var low = inventory.filter(function(i){ return i.qty<i.reorder; });
+  // sort by longest lead first — that is what to order soonest
+  var radar = low.map(function(i){
+    var p = d.product(i.prod);
+    var sup = d.supplier(p.supplier);
+    return { i:i, p:p, sup:sup };
+  }).sort(function(a,b){ return b.sup.lead-a.sup.lead; });
+
+  html += '<div class="sec"><h2>Reorder radar</h2><span class="ln"></span><span class="cnt">'+radar.length+' below reorder</span></div>';
+  html += '<div class="card">';
+  if(!radar.length){
+    html += '<div class="empty"><div class="big">✓</div>Every line is above its reorder level.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Depot</th><th>On hand</th><th>Supplier</th><th>Lead</th><th class="right"></th></tr></thead><tbody>';
+    radar.forEach(function(r){
+      html += '<tr'+(r.i.qty<=0?' style="background:var(--red-bg);"':' style="background:var(--amber-bg);"')+'>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(r.p.name)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(r.p.code)+'</span></td>'+
+        '<td class="muted">'+BB.esc(d.depot(r.i.depot).name)+'</td>'+
+        '<td>'+BB.num(r.i.qty)+' / '+BB.num(r.i.reorder)+'</td>'+
+        '<td>'+flag(r.sup.country)+' '+BB.esc(r.sup.name)+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+r.sup.lead+' days</td>'+
+        '<td class="right"><button class="btn ghost sm" data-order="'+r.p.id+'" data-depot="'+r.i.depot+'" data-qty="'+Math.max(r.i.reorder, r.i.reorder*2-r.i.qty)+'">Raise PO</button></td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  // open purchase orders (the ops "order from the States" flow — real records, not just a prompt)
+  var pos = d.all('purchaseOrders');
+  html += '<div class="sec"><h2>Purchase orders</h2><span class="ln"></span><span class="cnt">'+pos.length+' with suppliers</span></div>';
+  html += '<div class="card">';
+  if(!pos.length){ html += '<div class="empty"><div class="big">📦</div>No open purchase orders.</div>'; }
+  else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Raised</th><th>Supplier</th><th>Items</th><th>To depot</th><th>ETA</th><th>Status</th></tr></thead><tbody>';
+    pos.slice().sort(function(a,b){return (b.date).localeCompare(a.date);}).forEach(function(po){
+      var items = (po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
+      html += '<tr><td class="muted">'+BB.date(po.date)+'</td>'+
+        '<td>'+flag(d.supplier(po.supplier).country)+' '+BB.esc(d.supplier(po.supplier).name)+'</td>'+
+        '<td>'+BB.esc(items)+'</td><td class="muted">'+BB.esc(d.depot(po.depot).name)+'</td>'+
+        '<td class="muted">'+BB.date(po.eta)+'</td><td>'+BB.statusBadge(po.status)+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  html += '<div style="height:24px;"></div>';
+
+  var main = document.querySelector('main.wrap');
+  main.innerHTML = html;
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('.sup-row[data-sup]'), function(tr){
+    tr.onclick = function(){
+      var id = tr.getAttribute('data-sup');
+      selected = (selected===id) ? null : id;
+      render();
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('button[data-order]'), function(btn){
+    btn.onclick = function(e){
+      e.stopPropagation();
+      var p = d.product(btn.getAttribute('data-order'));
+      var sup = d.supplier(p.supplier);
+      d.add('purchaseOrders', {
+        supplier: p.supplier, depot: btn.getAttribute('data-depot'),
+        date: new Date().toISOString().slice(0,10),
+        eta: new Date(Date.now()+ (sup.lead||10)*86400000).toISOString().slice(0,10),
+        status: 'Ordered', by: (BB.user.rep||BB.user.id),
+        lines: [{ prod: p.id, qty: Number(btn.getAttribute('data-qty'))||0 }]
+      });
+      BB.toast('PO raised with '+sup.name+' — ETA '+ (sup.lead||10)+' days');
+      render();
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap"></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

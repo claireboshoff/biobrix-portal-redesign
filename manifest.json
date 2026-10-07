@@ -1,0 +1,14 @@
+{
+  "name": "BioBrix OS — The Biological Way",
+  "short_name": "BioBrix OS",
+  "description": "BioBrix operating system: sales, operations and BioServices (RenewAg). Works offline in the field.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#12210c",
+  "theme_color": "#22431a",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

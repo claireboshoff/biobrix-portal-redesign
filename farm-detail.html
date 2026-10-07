@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Farm record · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'farms.html' });
+
+var d = BB.data, u = BB.user;
+function esc(s){ return BB.esc(s); }
+
+var id = new URLSearchParams(location.search).get('farmer');
+var f = id ? d.by('farmers', id) : null;
+
+var css=''+
+'.cropchip{display:inline-block;padding:2px 8px;border-radius:20px;background:#eef6dc;color:var(--green-mid);font-size:.68rem;font-weight:600;margin:1px 2px 1px 0;}'+
+'.kv{display:flex;gap:6px;font-size:.82rem;}'+
+'.kv .k{color:var(--faint);min-width:96px;font-size:.72rem;text-transform:uppercase;letter-spacing:.4px;font-weight:700;padding-top:1px;}'+
+'.blockcard{padding:15px;}'+
+'.blockcard h3{font-family:var(--display);font-weight:600;font-size:.98rem;color:var(--green-dark);}'+
+'.blockcard .bmeta{font-size:.76rem;color:var(--muted);margin-top:2px;}'+
+'.blinks{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;}'+
+'.repchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;border:1px solid;}'+
+'.repdot{width:7px;height:7px;border-radius:50%;display:inline-block;}'+
+'.flagline{font-size:.76rem;margin-top:9px;padding:7px 9px;border-radius:9px;background:var(--amber-bg);color:var(--amber);}'+
+'.flagline.ok{background:var(--ok-bg);color:var(--ok);}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+var html='';
+
+if(!f){
+  html += '<div class="page-head"><h1>Farm not found</h1><p>We could not open that farmer record.</p></div>'+
+    '<div class="empty"><div class="big">🌾</div>No farmer for that link.<div style="margin-top:14px;"><a class="btn ghost" href="farms.html">‹ Back to farms</a></div></div>';
+  document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+} else {
+  var r = d.rep(f.rep);
+  var blocks = d.where('blocks', function(b){ return b.farmer===id; });
+  var programs = d.where('programs', function(p){ return p.farmer===id; });
+  var orders = d.where('orders', function(o){ return o.farmer===id; })
+    .sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  var files = d.where('files', function(x){ return x.farmer===id; })
+    .sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  var soil = d.where('soil', function(s){ return s.farmer===id; });
+  var leaf = d.where('leaf', function(l){ return l.farmer===id; });
+
+  function crops(){ return (f.crops||[]).map(function(c){ return '<span class="cropchip">'+esc(c)+'</span>'; }).join(''); }
+  function repChip(rp){
+    return '<span class="repchip" style="background:'+rp.colour+'18;border-color:'+rp.colour+';color:'+rp.colour+';">'+
+      '<span class="repdot" style="background:'+rp.colour+';"></span>'+esc(rp.name)+'</span>';
+  }
+
+  // header
+  // A customer straight from the accounting system has a name and a town and nothing else yet —
+  // show that honestly instead of a trailing comma and a row of zeros.
+  var place = [f.town, f.region].filter(function(x){ return x && String(x).trim(); }).join(', ');
+  var sub = [f.name, place].filter(Boolean).join(' · ');
+  html += '<div class="page-head"><h1>'+esc(f.farm)+'</h1><p>'+esc(sub)+'</p></div>';
+
+  html += '<div class="card card-p">';
+  html += '<div class="row between" style="align-items:flex-start;">'+
+    '<div style="display:grid;gap:8px;">'+
+      '<div class="kv"><span class="k">Crops</span><span>'+(crops()||'<span class="faint">not captured yet</span>')+'</span></div>'+
+      '<div class="kv"><span class="k">Hectares</span><span>'+(f.ha? BB.num(f.ha)+' ha' : '<span class="faint">not captured yet</span>')+'</span></div>'+
+      '<div class="kv"><span class="k">Contact</span><span>'+(f.cell? esc(f.cell) : '<span class="faint">no number on the account</span>')+'</span></div>'+
+      '<div class="kv"><span class="k">Assigned rep</span><span>'+(f.rep? repChip(r) : '<span class="faint">not allocated</span>')+'</span></div>'+
+    '</div>'+
+    '<div>'+BB.statusBadge(f.status)+'</div>'+
+  '</div></div>';
+
+  // before you drive — the financial insight + the right questions for this crop
+  var ti=d.tripInsight(f.id);
+  html += '<div class="sec"><h2>Before you drive</h2><span class="ln"></span><span class="cnt">is the trip worth it, and what to ask</span></div>';
+  html += '<div class="grid g2">';
+  html += '<div class="card card-p" style="border-left:3px solid var(--'+(ti.sev==='ok'?'green-bright':ti.sev==='warn'?'amber':ti.sev==='bad'?'red':'faint')+');">'+
+    '<div class="eyebrow">Account insight</div><div style="font-family:var(--display);font-weight:600;font-size:1.1rem;color:var(--green-dark);margin:2px 0 8px;">'+esc(ti.verdict)+'</div>'+
+    '<div style="display:grid;gap:6px;font-size:.86rem;">'+
+      '<div class="kv"><span class="k">Credit limit</span><span>'+(ti.limit?BB.money(ti.limit):'not set')+'</span></div>'+
+      '<div class="kv"><span class="k">Outstanding</span><span'+(ti.overdue?' style="color:var(--red);font-weight:700;"':'')+'>'+BB.money(ti.balance)+(ti.overdue?' · overdue':'')+'</span></div>'+
+      '<div class="kv"><span class="k">Credit open</span><span>'+(ti.limit?BB.money(Math.max(0,ti.available)):'—')+'</span></div>'+
+      '<div class="kv"><span class="k">In the pipeline</span><span>'+BB.money(ti.openPipeline)+'</span></div>'+
+    '</div>'+
+    '<div class="row" style="gap:8px;margin-top:12px;">'+(f.cell?'<a class="btn ghost sm" href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'">Call first</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+esc(String(f.cell).replace(/\D/g,'').replace(/^0/,'27'))+'">WhatsApp</a>':'')+'<a class="btn sm" href="voice-order.html">Capture order</a></div>'+
+  '</div>';
+  var prep=(f.crops||[]).map(function(c){return d.cropPrep(c);}).filter(Boolean)[0];
+  if(prep){
+    html += '<div class="card card-p"><div class="eyebrow">Ask the right questions · '+esc(prep.crop)+' in '+esc(f.region)+'</div>'+
+      '<div class="faint" style="font-size:.76rem;margin:2px 0 8px;">What this crop battles with in this area, and what to ask before you recommend anything.</div>'+
+      '<div style="font-size:.8rem;"><b style="color:var(--green-dark);">Watch for</b><div class="row" style="gap:6px;margin:4px 0 10px;">'+prep.problems.map(function(x){return '<span class="chip">'+esc(x)+'</span>';}).join('')+'</div>'+
+      '<b style="color:var(--green-dark);">Ask</b><ol style="margin:4px 0 10px 18px;line-height:1.55;">'+prep.questions.map(function(q){return '<li>'+esc(q)+'</li>';}).join('')+'</ol>'+
+      '<b style="color:var(--green-dark);">BioBrix answer</b><div class="row" style="gap:6px;margin-top:4px;">'+prep.products.map(function(pid){var pd=d.product(pid);return '<span class="chip" style="background:#eef6dc;">'+esc(pd.name)+'</span>';}).join('')+'</div></div></div>';
+  } else {
+    html += '<div class="card card-p"><div class="eyebrow">Ask the right questions</div><div class="muted" style="font-size:.86rem;margin-top:4px;">Crop prep notes land here once BioBrix\u2019s crop data sets are loaded.</div></div>';
+  }
+  html += '</div>';
+
+  // blocks
+  html += '<div class="sec"><h2>Blocks</h2><span class="ln"></span><span class="cnt">'+blocks.length+'</span></div>';
+  if(!blocks.length){
+    html += '<div class="empty">No blocks recorded for this farm yet.</div>';
+  } else {
+    html += '<div class="grid g2">';
+    blocks.forEach(function(b){
+      var bSoil = soil.filter(function(s){ return s.block===b.id; })
+        .sort(function(x,y){ return String(y.date).localeCompare(String(x.date)); })[0];
+      var bLeaf = leaf.filter(function(l){ return l.block===b.id; })
+        .sort(function(x,y){ return String(y.date).localeCompare(String(x.date)); })[0];
+      html += '<div class="card blockcard">'+
+        '<h3>'+esc(b.name)+'</h3>'+
+        '<div class="bmeta">'+esc(b.crop)+' · '+BB.num(b.ha)+' ha · planted '+esc(b.planted)+'</div>'+
+        '<div class="blinks">'+
+          '<a class="btn ghost sm" href="bioanalyze-soil.html?block='+encodeURIComponent(b.id)+'">Soil</a>'+
+          '<a class="btn ghost sm" href="bioanalyze-leaf.html?block='+encodeURIComponent(b.id)+'">Leaf</a>'+
+          '<a class="btn ghost sm" href="biowatch.html?block='+encodeURIComponent(b.id)+'">Monitor</a>'+
+        '</div>';
+      if(bSoil && bSoil.status==='Interpreted' && bSoil.flag){
+        var soilOk = /improv|maintain|balanced|good|hold/i.test(bSoil.flag);
+        html += '<div class="flagline'+(soilOk?' ok':'')+'"><b>Soil:</b> '+esc(bSoil.flag)+'</div>';
+      }
+      if(bLeaf && bLeaf.status==='Interpreted' && bLeaf.flag){
+        var leafOk = /balanced|hold|good/i.test(bLeaf.flag);
+        html += '<div class="flagline'+(leafOk?' ok':'')+'"><b>Leaf:</b> '+esc(bLeaf.flag)+'</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // BioConsult programmes
+  html += '<div class="sec"><h2>BioConsult programmes</h2><span class="ln"></span>'+
+    '<a class="btn ghost sm" href="bioconsult.html?farmer='+encodeURIComponent(id)+'">Open BioConsult ›</a></div>';
+  if(!programs.length){
+    html += '<div class="empty">No programme built yet — start one from a soil or leaf result.</div>';
+  } else {
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+      '<th>Crop</th><th>Goal</th><th>Season</th><th>Status</th></tr></thead><tbody>';
+    programs.forEach(function(p){
+      html += '<tr class="click" data-prog="'+encodeURIComponent(id)+'">'+
+        '<td><b>'+esc(p.crop)+'</b></td>'+
+        '<td>'+esc(p.goal)+'</td>'+
+        '<td>'+esc(p.season)+'</td>'+
+        '<td>'+BB.statusBadge(p.status)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // orders
+  html += '<div class="sec"><h2>Recent orders</h2><span class="ln"></span>'+
+    '<a class="btn ghost sm" href="orders.html">All orders ›</a></div>';
+  if(!orders.length){
+    html += '<div class="empty">No orders captured for this farm yet.</div>';
+  } else {
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+      '<th>Ref</th><th>Date</th><th>Delivery</th><th class="right">Value</th><th>Status</th></tr></thead><tbody>';
+    orders.slice(0,6).forEach(function(o){
+      html += '<tr class="click" data-order="1">'+
+        '<td><b>'+esc(o.ref)+'</b></td>'+
+        '<td>'+BB.date(o.date)+'</td>'+
+        '<td>'+BB.monthName(o.deliverMonth)+'</td>'+
+        '<td class="right">'+BB.money(d.orderValue(o))+'</td>'+
+        '<td>'+BB.statusBadge(o.status)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // files
+  html += '<div class="sec"><h2>Farm files</h2><span class="ln"></span>'+
+    '<a class="btn ghost sm" href="farm-files.html?farmer='+encodeURIComponent(id)+'">All files ›</a></div>';
+  if(!files.length){
+    html += '<div class="empty">No files stored for this farm yet.</div>';
+  } else {
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+      '<th>Document</th><th>Kind</th><th>Date</th><th class="right">Size</th></tr></thead><tbody>';
+    files.forEach(function(x){
+      html += '<tr class="click" data-file="1">'+
+        '<td>'+esc(x.name)+'</td>'+
+        '<td><span class="badge b-grey">'+esc(x.kind)+'</span></td>'+
+        '<td>'+BB.date(x.date)+'</td>'+
+        '<td class="right faint">'+esc(x.size)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  html += '<div class="divider"></div><div class="row" style="padding-bottom:20px;">'+
+    '<a class="btn ghost" href="farms.html">‹ Back to farms</a>'+
+    '<a class="btn" href="voice-order.html">Capture an order</a>'+
+  '</div>';
+
+  document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+
+  // link rows
+  var farmerId = id;
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-prog]'), function(row){
+    row.onclick=function(){ location.href='bioconsult.html?farmer='+encodeURIComponent(farmerId); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-order]'), function(row){
+    row.onclick=function(){ location.href='orders.html'; };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-file]'), function(row){
+    row.onclick=function(){ location.href='farm-files.html?farmer='+encodeURIComponent(farmerId); };
+  });
+}
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

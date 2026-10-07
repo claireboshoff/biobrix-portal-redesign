@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Capture an order · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'voice', back:'index.html' });
+
+var d = BB.data, u = BB.user;
+
+// ----- page-local styles (mic + capture) -----
+var css = ''+
+'.mic-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px;}'+
+'.mic-btn{width:126px;height:126px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(140deg,var(--green-bright),var(--green-mid));'+
+'color:#fff;font-size:2.9rem;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 26px rgba(63,107,40,.34);transition:.18s;position:relative;}'+
+'.mic-btn:active{transform:scale(.96);}'+
+'.mic-btn.live{background:linear-gradient(140deg,var(--amber),#e0902a);box-shadow:0 0 0 0 rgba(199,125,23,.5);animation:micpulse 1.3s infinite;}'+
+'@keyframes micpulse{0%{box-shadow:0 0 0 0 rgba(199,125,23,.45);}70%{box-shadow:0 0 0 22px rgba(199,125,23,0);}100%{box-shadow:0 0 0 0 rgba(199,125,23,0);}}'+
+'.mic-hint{font-size:.86rem;color:var(--muted);margin-top:13px;max-width:420px;}'+
+'.mic-eg{font-size:.78rem;color:var(--faint);margin-top:6px;font-style:italic;}'+
+'.transcript{margin-top:14px;background:#f7faf1;border:1px dashed var(--line);border-radius:12px;padding:13px 15px;font-size:.95rem;min-height:52px;color:var(--ink);text-align:left;}'+
+'.transcript .interim{color:var(--faint);}'+
+'.line-row{display:grid;grid-template-columns:1fr 92px 34px;gap:8px;align-items:end;margin-bottom:9px;}'+
+'.line-row .fld{margin-bottom:0;}'+
+'.line-del{height:44px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--red);cursor:pointer;font-size:1rem;}'+
+'.tot-band{display:flex;align-items:center;justify-content:space-between;background:var(--green-darkest);color:#eaf4d8;border-radius:12px;padding:14px 18px;margin-top:6px;}'+
+'.tot-band .v{font-family:var(--display);font-size:1.5rem;font-weight:600;}'+
+'.chk{display:flex;align-items:flex-start;gap:11px;padding:11px 0;}'+
+'.chk .tk{width:26px;height:26px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;}'+
+'.acct{border-radius:12px;padding:12px 15px;margin-top:12px;font-size:.86rem;line-height:1.5;border:1px solid var(--line);}'+
+'.acct.ok{background:var(--ok-bg);border-color:#cfe6d3;color:var(--ok);}'+
+'.acct.warn{background:var(--amber-bg);border-color:#f0dcb0;color:var(--amber);}'+
+'.acct.bad{background:var(--red-bg);border-color:#f2cfca;color:var(--red);}'+
+'.acct b{font-weight:700;}';
+document.head.insertAdjacentHTML('beforeend', '<style>'+css+'</style>');
+
+var farmers = d.all('farmers');
+var products = d.all('products');
+var MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+// speech support
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var speechOK = !!SR && navigator.onLine;
+var rec = null, listening = false;
+
+// ---- number-word parsing (best effort) ----
+var SMALL = {zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,
+  thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,
+  fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+var MAG = {hundred:100,thousand:1000,'k':1000,million:1000000};
+
+function wordsToNumber(tokens){
+  // tokens: array of lowercase words that should form one number
+  var total=0, cur=0, got=false;
+  for(var i=0;i<tokens.length;i++){
+    var w=tokens[i];
+    if(/^\d+$/.test(w)){ cur += parseInt(w,10); got=true; continue; }
+    if(SMALL[w]!=null){ cur += SMALL[w]; got=true; continue; }
+    if(w==='hundred'){ cur = (cur||1)*100; got=true; continue; }
+    if(w==='thousand'||w==='k'){ total += (cur||1)*1000; cur=0; got=true; continue; }
+    if(w==='million'){ total += (cur||1)*1000000; cur=0; got=true; continue; }
+    if(w==='and'){ continue; }
+  }
+  if(!got) return null;
+  return total+cur;
+}
+
+function extractQty(text){
+  // prefer a plain digit group
+  var m = text.match(/(\d[\d,\.]*)\s*(l|litre|litres|liter|liters|kg|kilo|kilos|kilogram|kilograms|unit|units|pack|packs)?/i);
+  if(m && /\d/.test(m[1])){ return parseInt(m[1].replace(/[,\.]/g,''),10); }
+  // otherwise scan word-numbers
+  var words = text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  var run=[], best=null;
+  for(var i=0;i<words.length;i++){
+    var w=words[i];
+    if(SMALL[w]!=null||MAG[w]!=null||w==='and'||/^\d+$/.test(w)){ run.push(w); }
+    else { if(run.length){ var n=wordsToNumber(run); if(n!=null) best=n; run=[]; } }
+  }
+  if(run.length){ var n2=wordsToNumber(run); if(n2!=null) best=n2; }
+  return best;
+}
+
+function fuzzyFarmer(text){
+  var t = text.toLowerCase();
+  var best=null, bestScore=0;
+  farmers.forEach(function(f){
+    var parts = (f.name+' '+f.farm).toLowerCase().split(/\s+/);
+    var score=0;
+    parts.forEach(function(p){ if(p.length>2 && t.indexOf(p)>=0) score += p.length; });
+    // full name contained is strongest
+    if(t.indexOf(f.name.toLowerCase())>=0) score += 40;
+    if(score>bestScore){ bestScore=score; best=f; }
+  });
+  return bestScore>=3 ? best : null;
+}
+
+function fuzzyProducts(text){
+  var t = text.toLowerCase();
+  var hits=[];
+  products.forEach(function(p){
+    var nm = p.name.toLowerCase();
+    var bare = nm.replace(/renewag/g,'').trim();       // e.g. "soilprime"
+    var code = (p.code||'').toLowerCase();
+    var found = t.indexOf(nm)>=0 || (bare.length>2 && t.indexOf(bare)>=0) || (code && t.indexOf(code)>=0);
+    // also try the last word of the bare name (soilprime -> also "soil prime" spoken)
+    if(!found){
+      var spaced = bare.replace(/([a-z])([A-Z])/g,'$1 $2');
+      if(spaced!==bare && t.indexOf(spaced.toLowerCase())>=0) found=true;
+    }
+    if(found) hits.push(p);
+  });
+  return hits;
+}
+
+function extractMonth(text){
+  var t = text.toLowerCase();
+  for(var i=0;i<MONTHS.length;i++){ if(t.indexOf(MONTHS[i])>=0) return i; }
+  return null;
+}
+
+// ---- parse whole transcript into a draft ----
+function parseTranscript(text){
+  var draft = { farmer:'', month:'', lines:[] };
+  var f = fuzzyFarmer(text); if(f) draft.farmer = f.id;
+  var m = extractMonth(text); if(m!=null) draft.month = m;
+  var qty = extractQty(text);
+  var prods = fuzzyProducts(text);
+  if(prods.length){
+    prods.forEach(function(p,idx){ draft.lines.push({ prod:p.id, qty:(idx===0 && qty)?qty:'' }); });
+  }
+  return draft;
+}
+
+// ---- state ----
+var draft = { farmer:'', month:'', lines:[{prod:'',qty:''}] };
+
+function depotForFarmer(fid){
+  var f = d.farmer(fid); if(!f) return '';
+  var reg = f.region;
+  var dep = d.all('depots').find(function(x){ return x.region===reg; });
+  if(dep) return dep.id;
+  // fall back by broad match
+  var map = {'Limpopo':'dep_tzaneen','KwaZulu-Natal':'dep_ballito','Southern Cape':'dep_george','Free State':'dep_ballito'};
+  return map[reg] || 'dep_tzaneen';
+}
+
+function draftTotal(){
+  return draft.lines.reduce(function(s,l){
+    if(!l.prod||!l.qty) return s;
+    return s + (d.product(l.prod).price||0)*Number(l.qty||0);
+  },0);
+}
+
+// ---- live account-status strip (credit limit / overdue hold) ----
+// Only meaningful once a farmer is picked; refreshes as products/qty change.
+function accountStripHTML(){
+  if(!draft.farmer) return '';
+  var fid = draft.farmer;
+  var f = d.farmer(fid);
+  var farm = f.farm || f.name || 'this farm';
+  var total = draftTotal();
+  if(d.isOverdue(fid)){
+    return '<div class="acct bad">⚠ <b>Account overdue</b> — delivery on hold until settled. '+
+      'Order can be captured but will be flagged for finance.</div>';
+  }
+  if(d.overLimit(fid, total)){
+    return '<div class="acct warn">⚠ This order takes <b>'+BB.esc(farm)+'</b> over their credit limit ('+
+      BB.money(d.creditLimit(fid))+'). Needs approval. Available credit: '+BB.money(d.availableCredit(fid))+'.</div>';
+  }
+  return '<div class="acct ok">✓ Account in good standing · available credit '+
+    BB.money(d.availableCredit(fid))+'.</div>';
+}
+
+function refreshAccountStrip(){
+  var el = document.getElementById('acctStrip');
+  if(el) el.innerHTML = accountStripHTML();
+}
+
+// ---- render capture screen ----
+function renderCapture(){
+  var html = '';
+  html += '<div class="page-head"><h1>Capture an order</h1>'+
+    '<p>Standing with the farmer? Tap the mic and say it plainly. It fills the order in, then flows straight to Operations.</p></div>';
+
+  // mic card
+  html += '<div class="card card-p" id="micCard">';
+  html += '<div class="mic-wrap">'+
+    '<button class="mic-btn" id="mic" aria-label="Push to talk">'+(speechOK?'🎙':'⌨')+'</button>'+
+    '<div class="mic-hint" id="micHint">'+(speechOK?'Tap to speak the order':'Voice needs signal — you can type it below and it still saves offline.')+'</div>'+
+    (speechOK?'<div class="mic-eg">e.g. "One thousand litres of SoilPrime for Gideon Joubert, deliver in October"</div>':'')+
+    '<div class="transcript" id="tr" style="display:none;"></div>'+
+    '</div>';
+  html += '</div>';
+
+  // the form (always present; voice prepopulates it)
+  html += '<div class="card card-p" style="margin-top:14px;">';
+  html += '<div class="eyebrow" style="margin-bottom:10px;">The order</div>';
+
+  // farmer
+  html += '<div class="fld"><label>Farmer</label><select id="fFarmer"><option value="">Select farmer…</option>'+
+    farmers.map(function(f){ return '<option value="'+f.id+'"'+(draft.farmer===f.id?' selected':'')+'>'+BB.esc(f.name)+' — '+BB.esc(f.farm)+'</option>'; }).join('')+
+    '</select></div>';
+
+  // lines
+  html += '<label style="display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px;">Products</label>';
+  html += '<div id="lines"></div>';
+  html += '<button class="btn ghost sm" id="addLine" style="margin-bottom:14px;">+ Add another product</button>';
+
+  // month
+  html += '<div class="fld"><label>Delivery month</label><select id="fMonth"><option value="">Select month…</option>'+
+    MONTHS.map(function(m,i){ return '<option value="'+i+'"'+(draft.month===i?' selected':'')+'>'+BB.monthName(i)+'</option>'; }).join('')+
+    '</select></div>';
+
+  // depot readout
+  html += '<div class="fld"><label>Depot (auto from farmer region)</label>'+
+    '<input id="fDepot" readonly value="'+BB.esc(draft.farmer?d.depot(depotForFarmer(draft.farmer)).name:'—')+'"></div>';
+
+  // total
+  html += '<div class="tot-band"><div><div style="font-size:.66rem;letter-spacing:.7px;text-transform:uppercase;opacity:.8;">Order total</div>'+
+    '<div class="v" id="totVal">'+BB.money(draftTotal())+'</div></div>'+
+    '<div style="font-size:.76rem;opacity:.85;text-align:right;">Priced at current<br>RenewAg rates</div></div>';
+
+  // live account-status strip (credit limit / overdue) — updates as the order changes
+  html += '<div id="acctStrip">'+accountStripHTML()+'</div>';
+
+  html += '<button class="btn block" id="confirm" style="margin-top:16px;">Confirm & send to Operations</button>';
+  html += '<p class="faint center" style="font-size:.76rem;margin-top:10px;">Saved on this device — syncs to Operations the moment you have signal.</p>';
+  html += '</div>';
+
+  document.getElementById('capMain').innerHTML = html;
+  bindForm();
+  renderLines();
+}
+
+function renderLines(){
+  var wrap = document.getElementById('lines');
+  if(!draft.lines.length) draft.lines=[{prod:'',qty:''}];
+  wrap.innerHTML = draft.lines.map(function(l,i){
+    return '<div class="line-row">'+
+      '<div class="fld"><select data-li="'+i+'" class="lProd"><option value="">Product…</option>'+
+        products.map(function(p){ return '<option value="'+p.id+'"'+(l.prod===p.id?' selected':'')+'>'+BB.esc(p.name)+' ('+BB.esc(p.pack)+')</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="fld"><input type="number" min="0" data-li="'+i+'" class="lQty" placeholder="Qty" value="'+(l.qty!==''&&l.qty!=null?l.qty:'')+'"></div>'+
+      '<button class="line-del" data-li="'+i+'" title="Remove">✕</button>'+
+    '</div>';
+  }).join('');
+  Array.prototype.forEach.call(wrap.querySelectorAll('.lProd'), function(sel){
+    sel.onchange=function(){ draft.lines[+this.dataset.li].prod=this.value; refreshTotal(); };
+  });
+  Array.prototype.forEach.call(wrap.querySelectorAll('.lQty'), function(inp){
+    inp.oninput=function(){ draft.lines[+this.dataset.li].qty=this.value===''?'':Number(this.value); refreshTotal(); };
+  });
+  Array.prototype.forEach.call(wrap.querySelectorAll('.line-del'), function(b){
+    b.onclick=function(){ draft.lines.splice(+this.dataset.li,1); if(!draft.lines.length) draft.lines=[{prod:'',qty:''}]; renderLines(); refreshTotal(); };
+  });
+}
+
+function refreshTotal(){ var el=document.getElementById('totVal'); if(el) el.textContent=BB.money(draftTotal()); refreshAccountStrip(); }
+
+function bindForm(){
+  document.getElementById('fFarmer').onchange=function(){
+    draft.farmer=this.value;
+    document.getElementById('fDepot').value = this.value?d.depot(depotForFarmer(this.value)).name:'—';
+    refreshAccountStrip();
+  };
+  document.getElementById('fMonth').onchange=function(){ draft.month=this.value===''?'':Number(this.value); };
+  document.getElementById('addLine').onclick=function(){ draft.lines.push({prod:'',qty:''}); renderLines(); };
+  document.getElementById('confirm').onclick=confirmOrder;
+
+  var mic=document.getElementById('mic');
+  if(mic) mic.onclick=toggleMic;
+}
+
+// ---- apply a parsed draft into the form ----
+function applyParsed(text){
+  var p = parseTranscript(text);
+  if(p.farmer) draft.farmer = p.farmer;
+  if(p.month!=='' && p.month!=null) draft.month = p.month;
+  if(p.lines.length) draft.lines = p.lines.map(function(l){ return {prod:l.prod, qty:l.qty}; });
+  if(!draft.lines.length) draft.lines=[{prod:'',qty:''}];
+  renderCapture();
+  var bits=[];
+  if(p.farmer) bits.push(d.farmer(p.farmer).name);
+  if(p.lines.length) bits.push(p.lines.length+' product'+(p.lines.length===1?'':'s'));
+  if(p.month!=null&&p.month!=='') bits.push('deliver '+BB.monthName(p.month));
+  BB.toast(bits.length?('Heard: '+bits.join(' · ')):'Filled what I could — top up the rest');
+}
+
+// ---- speech ----
+function toggleMic(){
+  if(!speechOK){ BB.toast('Voice needs signal — type it below'); return; }
+  if(listening){ stopMic(); return; }
+  startMic();
+}
+function startMic(){
+  try{
+    rec = new SR();
+    rec.lang='en-ZA'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
+    var finalText='';
+    var mic=document.getElementById('mic'), hint=document.getElementById('micHint'), tr=document.getElementById('tr');
+    tr.style.display='block'; tr.innerHTML='<span class="interim">Listening…</span>';
+    mic.classList.add('live'); mic.textContent='■'; hint.textContent='Listening — tap again to stop'; listening=true;
+    rec.onresult=function(e){
+      var interim='';
+      for(var i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) finalText += e.results[i][0].transcript+' ';
+        else interim += e.results[i][0].transcript;
+      }
+      tr.innerHTML = BB.esc(finalText) + '<span class="interim">'+BB.esc(interim)+'</span>';
+    };
+    rec.onerror=function(){ stopMic(); BB.toast('Could not hear clearly — try again or type it'); };
+    rec.onend=function(){
+      var said=finalText.trim();
+      stopMic();
+      if(said){ document.getElementById('tr').textContent=said; applyParsed(said); }
+    };
+    rec.start();
+    // watchdog — if the browser never returns (mic prompt hidden behind a screen-share, no mic), free the button
+    setTimeout(function(){ if(listening && !finalText.trim()){ stopMic(); BB.toast('Didn\u2019t catch anything — tap the mic again or type it below'); } }, 12000);
+  }catch(err){ listening=false; BB.toast('Voice unavailable — type it below'); }
+}
+function stopMic(){
+  listening=false;
+  try{ if(rec) rec.stop(); }catch(e){}
+  var mic=document.getElementById('mic'), hint=document.getElementById('micHint');
+  if(mic){ mic.classList.remove('live'); mic.textContent=speechOK?'🎙':'⌨'; }
+  if(hint) hint.textContent=speechOK?'Tap to speak the order':'Voice needs signal — type it below.';
+}
+
+// ---- confirm ----
+function nextRef(){
+  var orders=d.all('orders');
+  var max=1045;
+  orders.forEach(function(o){ var n=parseInt(String(o.ref||'').replace(/[^0-9]/g,''),10); if(!isNaN(n)&&n>max) max=n; });
+  return 'BB-'+(max+1);
+}
+
+function confirmOrder(){
+  if(!draft.farmer){ BB.toast('Pick a farmer first'); return; }
+  var lines=draft.lines.filter(function(l){ return l.prod && Number(l.qty)>0; });
+  if(!lines.length){ BB.toast('Add at least one product with a quantity'); return; }
+  var f=d.farmer(draft.farmer);
+  var month = (draft.month===''||draft.month==null)? new Date().getMonth() : Number(draft.month);
+  var depot = depotForFarmer(draft.farmer);
+  var rec = d.add('orders', {
+    ref: nextRef(),
+    farmer: draft.farmer,
+    rep: (u.rep || f.rep),
+    date: new Date().toISOString().slice(0,10),
+    deliverMonth: month,
+    status: 'Pending',
+    depot: depot,
+    source: 'Voice',
+    lines: lines.map(function(l){ return { prod:l.prod, qty:Number(l.qty) }; })
+  });
+  BB.toast('Order captured — Operations notified');
+  renderConfirmed(rec);
+}
+
+function renderConfirmed(o){
+  var f=d.farmer(o.farmer);
+  var html='';
+  html += '<div class="page-head"><h1>Order captured</h1><p>It is on the Operations board now — no week-long wait, no re-typing.</p></div>';
+  html += '<div class="hero-band" style="margin-top:4px;">'+
+    '<div class="eyebrow" style="color:var(--lime);">'+BB.esc(o.ref)+' · '+BB.monthName(o.deliverMonth)+' delivery</div>'+
+    '<div style="font-family:var(--display);font-size:1.5rem;font-weight:600;margin:4px 0;">'+BB.money(d.orderValue(o))+'</div>'+
+    '<div style="opacity:.9;font-size:.9rem;">'+BB.esc(f.name)+' — '+BB.esc(f.farm)+'</div></div>';
+
+  html += '<div class="card card-p" style="margin-top:14px;">';
+  html += '<div class="eyebrow" style="margin-bottom:8px;">What just happened</div>';
+  [
+    ['Order logged against '+f.name, 'Priced and stamped '+BB.date(o.date)+'.'],
+    ['Routed to '+d.depot(o.depot).name, 'The right depot picks and blends it — no phone tag.'],
+    ['Operations sees it live', 'It shows in their pipeline this second, not a week from now.']
+  ].forEach(function(r){
+    html += '<div class="chk"><div class="tk">✓</div><div><div style="font-weight:600;font-size:.92rem;">'+BB.esc(r[0])+'</div>'+
+      '<div class="faint" style="font-size:.82rem;">'+BB.esc(r[1])+'</div></div></div>';
+  });
+  html += '<div class="divider"></div>';
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Pack</th><th class="right">Qty</th><th class="right">Line value</th></tr></thead><tbody>'+
+    o.lines.map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="right">'+BB.num(l.qty)+'</td><td class="right">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
+    '</tbody></table></div>';
+  html += '</div>';
+
+  html += '<div class="row" style="margin-top:16px;padding-bottom:16px;">'+
+    '<button class="btn" id="again">Capture another</button>'+
+    '<a class="btn ghost" href="orders.html">View order pipeline</a>'+
+    '<a class="btn ghost" href="forecast.html">See the forecast</a></div>';
+
+  document.getElementById('capMain').innerHTML=html;
+  document.getElementById('again').onclick=function(){
+    draft={ farmer:'', month:'', lines:[{prod:'',qty:''}] };
+    renderCapture();
+    window.scrollTo(0,0);
+  };
+}
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap"><div id="capMain"></div></main>');
+renderCapture();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

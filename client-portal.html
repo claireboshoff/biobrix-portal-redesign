@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>My Farm · BioBrix</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+var isFarmerSeat = !!(BB.user && BB.user.roleKey==='farmer');
+BB.renderHeader({ active:(location.hash==='#orders'?'orders':location.hash==='#account'?'account':location.hash==='#docs'?'docs':'home'), back: isFarmerSeat ? null : 'index.html' });
+
+var d = BB.data;
+
+// ---- persisted "Viewing as" farmer (demo device switch) ----------
+var VKEY = 'bb_portal_farmer_v1';
+function currentFarmerId(){
+  if(isFarmerSeat) return BB.user.farmer; // a farmer only ever sees their own farm
+  var saved = null;
+  try{ saved = localStorage.getItem(VKEY); }catch(e){}
+  if(saved && d.by('farmers', saved)) return saved;
+  return 'f_joubert'; // Gideon Joubert — the default demo farmer
+}
+function setFarmerId(id){ try{ localStorage.setItem(VKEY, id); }catch(e){} }
+
+// ---- page-specific styling (built on the shell tokens) -----------
+var css=''+
+'.fp-preview{display:inline-flex;align-items:center;gap:6px;font-size:.62rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;'+
+  'padding:4px 10px;border-radius:20px;background:#eef6dc;color:var(--green-mid);border:1px solid var(--line);}'+
+'.fp-preview .dot{width:7px;height:7px;border-radius:50%;background:var(--green-bright);}'+
+'.fp-hero{background:linear-gradient(120deg,var(--green-darkest),var(--green-dark) 58%,var(--green-mid));color:#eaf4d8;'+
+  'border-radius:var(--radius);padding:24px 24px 22px;box-shadow:var(--shadow-lg);margin-top:14px;position:relative;overflow:hidden;}'+
+'.fp-hero .eyebrow{color:var(--lime);}'+
+'.fp-hero h1{font-family:var(--display);font-size:1.7rem;font-weight:600;margin:4px 0 2px;line-height:1.1;letter-spacing:-.3px;}'+
+'.fp-hero .farm{font-size:.98rem;opacity:.9;}'+
+'.fp-hero .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}'+
+'.fp-pill{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;padding:6px 12px;border-radius:20px;'+
+  'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);}'+
+'.fp-advisor{margin-top:16px;padding-top:15px;border-top:1px solid rgba(255,255,255,.16);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}'+
+'.fp-av{width:44px;height:44px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;'+
+  'font-family:var(--display);font-weight:700;font-size:1rem;color:#13260c;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.25);}'+
+'.fp-advisor .who .r{font-size:.66rem;letter-spacing:1.4px;text-transform:uppercase;opacity:.7;}'+
+'.fp-advisor .who .n{font-family:var(--display);font-weight:600;font-size:1rem;}'+
+'.fp-advisor .who .c{font-size:.82rem;opacity:.9;}'+
+'.fp-advisor .call{margin-left:auto;}'+
+'.readline{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:var(--radius-sm);'+
+  'padding:14px 16px;box-shadow:var(--shadow);font-size:.92rem;color:var(--ink);line-height:1.55;}'+
+'.readline b{color:var(--green-dark);}'+
+'.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;min-width:0;max-width:100%;}'+
+'.selbar select{flex:1 1 220px;min-width:0;max-width:100%;}'+
+'@media(max-width:480px){.selbar select{flex:1 1 100%;}}'+
+'.selbar select{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;}'+
+'.pline{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);}'+
+'.fcard{display:flex;align-items:center;gap:12px;padding:14px 16px;}'+
+'.fic{width:40px;height:40px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-size:1.15rem;'+
+  'background:var(--green-darkest);color:var(--lime);}'+
+'.foot{margin:22px 0 26px;padding:18px;border-radius:var(--radius);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);}'+
+'.foot .brand{font-family:var(--display);font-weight:600;color:var(--green-dark);}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+// ---- small helpers -----------------------------------------------
+function statusFlagBadge(flag){
+  // paraphrase interpretation flag into a calm tone class
+  var f = String(flag||'').toLowerCase();
+  if(/pending|collected|sampled|at lab|upload/.test(f)) return 'b-grey';
+  if(/low|acidic|correct|high|watch|monitor/.test(f)) return 'b-warn';
+  if(/improving|balanced|maintain|hold|good|even|strong/.test(f)) return 'b-ok';
+  return 'b-lime';
+}
+
+// build a plain-language read of the farm from soil/leaf/watch data
+function farmReadLines(id){
+  var soil = d.where('soil', function(s){ return s.farmer===id; });
+  var leaf = d.where('leaf', function(l){ return l.farmer===id; });
+  var watch = d.where('watch', function(w){ return w.farmer===id; });
+  var progs = d.where('programs', function(p){ return p.farmer===id; });
+  var lines = [];
+  // lead with the freshest interpreted soil read tied to a programme, in plain words
+  var interpreted = soil.filter(function(s){ return s.status==='Interpreted'; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  interpreted.slice(0,2).forEach(function(s){
+    var blk = d.by('blocks', s.block) || { name:'a block', crop:'' };
+    var prog = progs.find(function(p){ return p.block===s.block; });
+    var w = watch.filter(function(x){ return x.block===s.block; })
+      .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];
+    var msg = 'Your <b>'+BB.esc(blk.name)+'</b> ';
+    var flagTxt = String(s.flag||'').toLowerCase();
+    if(prog) msg += 'is following the '+BB.esc(prog.goal)+' programme';
+    else msg += 'is being watched by your advisor';
+    if(/acidic|low biology|inoculant/.test(flagTxt)) msg += ' — rebuilding biology, pH being corrected';
+    else if(/improving|maintain/.test(flagTxt)) msg += ' — soil life is improving, hold the course';
+    else if(/high|correct/.test(flagTxt)) msg += ' — nutrient balance being corrected';
+    if(w && /stink bug|eldana|aphid|monitor/i.test(w.pest||'')) msg += '; watch '+BB.esc(String(w.pest).split(/\s*[–-]/)[0].trim().toLowerCase());
+    msg += '.';
+    lines.push(msg);
+  });
+  // if there is fresh leaf guidance, add a short line
+  var freshLeaf = leaf.filter(function(l){ return l.status==='Interpreted'; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0];
+  if(freshLeaf && /low|foliar/.test(String(freshLeaf.flag||'').toLowerCase())){
+    var lblk = d.by('blocks', freshLeaf.block) || { name:'a block' };
+    lines.push('Latest leaf-sap on <b>'+BB.esc(lblk.name)+'</b>: '+BB.esc(freshLeaf.flag)+'.');
+  }
+  if(!lines.length) lines.push('Your farm is on the BioBrix programme. Your advisor will share the first readings as soil and leaf results come back from the lab.');
+  return lines;
+}
+
+function progValue(p){
+  return (p.lines||[]).reduce(function(s,l){ return s + (l.cost||0); }, 0);
+}
+
+// =================================================================
+function render(){
+  var id = currentFarmerId();
+  var f = d.farmer(id);
+  var rep = d.rep(f.rep);
+  var first = String(f.name||'').split(' ')[0];
+
+  var blocks = d.where('blocks', function(b){ return b.farmer===id; });
+  var soil = d.where('soil', function(s){ return s.farmer===id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var leaf = d.where('leaf', function(l){ return l.farmer===id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var watch = d.where('watch', function(w){ return w.farmer===id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var progs = d.where('programs', function(p){ return p.farmer===id; });
+  var orders = d.where('orders', function(o){ return o.farmer===id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var files = d.where('files', function(x){ return x.farmer===id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var latestSoil = soil.find(function(s){ return s.status==='Interpreted'; }) || soil[0];
+  var activeProg = progs.find(function(p){ return p.status==='Active'; });
+  var latestVigour = (watch[0] && watch[0].vigour) || '—';
+
+  var html='';
+
+  // ---- viewing-as selector (staff demo only — never shown to a farmer) ----
+  if(!isFarmerSeat) html += '<div class="row between" style="margin-top:14px;gap:10px;">'+
+    '<span class="fp-preview"><span class="dot"></span>Farmer preview</span>'+
+    '<div class="selbar"><span class="faint" style="font-size:.76rem;">Viewing as</span>'+
+      '<select id="whoSel">'+
+        d.all('farmers').map(function(fm){
+          return '<option value="'+fm.id+'"'+(fm.id===id?' selected':'')+'>'+BB.esc(fm.name)+' — '+BB.esc(fm.farm)+'</option>';
+        }).join('')+
+      '</select>'+
+    '</div></div>';
+
+  // ---- hero band ----
+  var crops = (f.crops||[]).join(' · ');
+  var editOpen = window.__editFarm===true;
+  html += '<section class="fp-hero">'+
+    '<div class="eyebrow">The Biological Way</div>'+
+    '<h1>Welcome back, '+BB.esc(first)+'.</h1>'+
+    '<div class="farm">'+BB.esc(f.farm)+(crops?' · '+BB.esc(crops):'')+'</div>'+
+    '<div class="meta">'+
+      '<span class="fp-pill">📍 '+BB.esc(f.town)+', '+BB.esc(f.region)+'</span>'+
+      '<span class="fp-pill">🌾 '+BB.num(f.ha)+' ha under management</span>'+
+      '<span class="fp-pill">🌱 '+blocks.length+' block'+(blocks.length===1?'':'s')+'</span>'+
+    '</div>'+
+    '<div class="fp-advisor">'+
+      '<div class="fp-av" style="background:'+(rep.colour||'#68a53e')+';">'+BB.initials(rep.name)+'</div>'+
+      '<div class="who"><div class="r">Your BioBrix advisor · your regenerative partner</div>'+
+        '<div class="n">'+BB.esc(rep.name)+'</div>'+
+        '<div class="c">'+BB.esc(rep.role||'Crop Advisor')+(rep.cell?' · '+BB.esc(rep.cell):'')+'</div></div>'+
+      (rep.cell? '<div class="call" style="display:flex;gap:8px;flex-wrap:wrap;">'+
+          '<a class="btn lime" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">Call '+BB.esc(String(rep.name).split(' ')[0])+'</a>'+
+          '<a class="btn" style="background:#25D366;color:#0a2417;" target="_blank" href="https://wa.me/'+BB.esc(String(rep.cell).replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', it\'s '+f.name+' from '+f.farm+' — ')+'">WhatsApp</a>'+
+        '</div>' : '')+
+    '</div>'+
+  '</section>';
+  html += '<div class="row between" style="margin-top:8px;"><span class="faint" style="font-size:.76rem;">Something changed on the farm? Keep '+BB.esc(String(rep.name).split(' ')[0])+' up to date.</span><button class="btn ghost sm" id="editFarm">'+(editOpen?'Close':'✎ Update my farm details')+'</button></div>';
+  if(editOpen){
+    html += '<div class="card card-p" style="margin-top:8px;"><div class="grid g3">'+
+      '<div class="fld"><label>Hectares under management</label><input id="efHa" type="number" min="0" value="'+BB.esc(f.ha||0)+'"></div>'+
+      '<div class="fld"><label>Crops (comma separated)</label><input id="efCrops" value="'+BB.esc((f.crops||[]).join(', '))+'"></div>'+
+      '<div class="fld"><label>% of hectares on the BioBrix programme</label><input id="efPct" type="number" min="0" max="100" value="'+BB.esc(f.programmePct!=null?f.programmePct:'')+'" placeholder="e.g. 40"></div>'+
+      '<div class="fld"><label>Cell</label><input id="efCell" value="'+BB.esc(f.cell||'')+'"></div>'+
+      '<div class="fld"><label>Town</label><input id="efTown" value="'+BB.esc(f.town||'')+'"></div>'+
+    '</div><button class="btn" id="saveFarm">Save</button></div>';
+  }
+
+  // ---- farm health summary ----
+  html += '<div class="sec"><h2>Your farm at a glance</h2><span class="ln"></span></div>';
+  html += '<div class="grid g4">';
+  html += '<div class="stat"><div class="l">Blocks</div><div class="v">'+blocks.length+'</div><div class="s">'+BB.num(f.ha)+' ha total</div></div>';
+  html += '<div class="stat"><div class="l">Latest soil read</div><div class="v" style="font-size:1.05rem;">'+
+    BB.esc(latestSoil? latestSoil.status : 'Awaiting')+'</div><div class="s">'+
+    BB.esc(latestSoil? (d.by('blocks', latestSoil.block)||{name:'—'}).name : 'no report yet')+'</div></div>';
+  html += '<div class="stat'+(activeProg?'':' warn')+'"><div class="l">Active programme</div><div class="v" style="font-size:1.05rem;">'+
+    BB.esc(activeProg? activeProg.season : 'None yet')+'</div><div class="s">'+
+    BB.esc(activeProg? activeProg.goal : 'advisor building yours')+'</div></div>';
+  html += '<div class="stat"><div class="l">Latest field vigour</div><div class="v" style="font-size:1.05rem;">'+
+    BB.esc(latestVigour)+'</div><div class="s">'+BB.esc(watch[0]? 'seen '+BB.date(watch[0].date) : 'no visit logged')+'</div></div>';
+  html += '</div>';
+
+  // plain-language read
+  html += '<div style="margin-top:14px;display:grid;gap:10px;">';
+  farmReadLines(id).forEach(function(ln){
+    html += '<div class="readline">'+ln+'</div>';
+  });
+  html += '</div>';
+
+  // ---- coming up on your farm (programme timing → dated reminder + weather window) ----
+  var ups = d.where('followups', function(x){ return x.farmer===id && x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); });
+  if(ups.length){
+    html += '<div class="sec" id="comingup" style="scroll-margin-top:110px;"><h2>Coming up on your farm</h2><span class="ln"></span><span class="cnt">reminders come by email &amp; WhatsApp, 3 days before</span></div>';
+    html += '<div class="card card-p">';
+    ups.slice(0,3).forEach(function(fu, i){
+      var pd=d.product(fu.prod), blk=d.by('blocks',fu.block)||{name:''};
+      var days=Math.round((new Date(fu.due)-new Date(new Date().toISOString().slice(0,10)))/86400000);
+      html += '<div class="row between" style="align-items:flex-start;gap:14px;'+(i?'border-top:1px solid var(--line-soft);margin-top:12px;padding-top:12px;':'')+'">'+
+        '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><b style="color:var(--green-dark);">'+BB.date(fu.due)+' · '+BB.esc(fu.what)+'</b></div>'+
+          '<div class="faint" style="font-size:.8rem;margin-top:3px;">'+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+(pd.sheet?' · '+BB.esc(pd.sheet):'')+'</div>'+
+          (i===0?'<div id="wxLine" class="faint" style="font-size:.8rem;margin-top:6px;">Checking the 7-day weather for '+BB.esc(f.town)+'…</div>':'')+
+        '</div>'+
+        '<a class="btn ghost sm" style="flex:none;" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&name='+encodeURIComponent('RenewAg programme')+'">How to apply ›</a>'+
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- my reports (soil + leaf) ----
+  html += '<div class="sec" id="reports" style="scroll-margin-top:110px;"><h2>My reports</h2><span class="ln"></span><span class="cnt">tap Open — works without signal</span></div>';
+  if(!soil.length && !leaf.length){
+    html += '<div class="card card-p"><div class="empty"><div class="big">🧪</div>No lab reports yet. Your advisor will load these as samples come back.</div></div>';
+  } else {
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+      '<th>Type</th><th>Block</th><th>Date</th><th>Status</th><th>What it means</th><th></th></tr></thead><tbody>';
+    soil.forEach(function(s){
+      var blk = d.by('blocks', s.block) || { name:'—' };
+      html += '<tr><td><span class="badge b-lime">Soil</span></td>'+
+        '<td>'+BB.esc(blk.name)+'</td>'+
+        '<td>'+BB.date(s.date)+'</td>'+
+        '<td>'+BB.statusBadge(s.status)+'</td>'+
+        '<td><span class="badge '+statusFlagBadge(s.flag)+'">'+BB.esc(s.flag)+'</span></td>'+
+        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Soil&id='+encodeURIComponent(s.id)+'&name='+encodeURIComponent('Soil report — '+blk.name)+'">Open</a></td></tr>';
+    });
+    leaf.forEach(function(l){
+      var blk = d.by('blocks', l.block) || { name:'—' };
+      html += '<tr><td><span class="badge b-blue">Leaf</span></td>'+
+        '<td>'+BB.esc(blk.name)+'</td>'+
+        '<td>'+BB.date(l.date)+'</td>'+
+        '<td>'+BB.statusBadge(l.status)+'</td>'+
+        '<td><span class="badge '+statusFlagBadge(l.flag)+'">'+BB.esc(l.flag)+'</span></td>'+
+        '<td class="right"><a class="btn ghost sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Leaf&id='+encodeURIComponent(l.id)+'&name='+encodeURIComponent('Leaf-sap report — '+blk.name)+'">Open</a></td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+    html += '<div class="pline" style="margin-top:8px;">🧪 Every report opens as a full page with <b style="color:var(--green-mid);">what it means</b> and <b style="color:var(--green-mid);">what to do next</b> — saved on this phone, so it opens in the orchard too.</div>';
+  }
+
+  // ---- my RenewAg programme ----
+  html += '<div class="sec" id="programme" style="scroll-margin-top:110px;"><h2>My RenewAg programme</h2><span class="ln"></span><span class="cnt">what to buy, how much, when</span></div>';
+  var activePrograms = progs.filter(function(p){ return p.status==='Active'; });
+  var showPrograms = activePrograms.length ? activePrograms : progs;
+  if(!showPrograms.length){
+    html += '<div class="card card-p"><div class="empty"><div class="big">📑</div>Your season programme is being prepared by '+BB.esc(rep.name)+'.</div></div>';
+  } else {
+    showPrograms.forEach(function(p){
+      var blk = d.by('blocks', p.block) || { name:'—' };
+      html += '<div class="card card-p" style="margin-bottom:14px;">'+
+        '<div class="row between" style="align-items:flex-start;">'+
+          '<div><div class="eyebrow">RenewAg · '+BB.esc(p.crop)+' · '+BB.esc(p.season)+'</div>'+
+            '<div style="font-family:var(--display);font-weight:600;font-size:1.05rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(p.goal)+'</div>'+
+            '<div class="faint" style="font-size:.8rem;">'+BB.esc(blk.name)+' · guided by '+BB.esc(d.rep(p.advisor).name)+'</div></div>'+
+          '<div class="row" style="gap:8px;flex:none;">'+BB.statusBadge(p.status)+'<a class="btn sm" href="document.html?farmer='+encodeURIComponent(id)+'&kind=Programme&id='+encodeURIComponent(p.id)+'&name='+encodeURIComponent('RenewAg programme — '+p.season+' '+p.crop)+'">Open programme</a></div>'+
+        '</div>';
+      html += '<div class="scroll" style="margin-top:12px;"><table class="bb"><thead><tr>'+
+        '<th>Product</th><th>Rate</th><th>Timing</th><th class="right">Value</th></tr></thead><tbody>';
+      (p.lines||[]).forEach(function(ln){
+        var prod = d.product(ln.prod);
+        html += '<tr><td>'+BB.esc(prod.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(prod.lever||'')+'</div></td>'+
+          '<td>'+BB.esc(ln.rate)+'</td>'+
+          '<td>'+BB.esc(ln.timing)+'</td>'+
+          '<td class="right">'+BB.money(ln.cost)+'</td></tr>';
+      });
+      html += '<tr><td colspan="3" class="right"><b>Programme total</b></td>'+
+        '<td class="right"><b>'+BB.money(progValue(p))+'</b></td></tr>';
+      html += '</tbody></table></div></div>';
+    });
+  }
+
+  // ---- my orders & deliveries ----
+  var lastOrder = orders[0] || null;
+  html += '<div class="sec" id="orders" style="scroll-margin-top:110px;"><h2>My orders &amp; deliveries</h2><span class="ln"></span>'+
+    (lastOrder ? '<button class="btn sm" data-reorder="'+BB.esc(lastOrder.id)+'" title="Order again — '+BB.esc(rep.name)+' confirms quantities with you">＋ Place an order</button>'
+               : '<a class="btn sm" href="https://wa.me/'+BB.esc(String(rep.cell||'').replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', I\'d like to place an order — ')+'" target="_blank" rel="noopener">＋ Place an order</a>')+
+    '</div>';
+  // ---- quotes waiting for the farmer's approval ----
+  orders.filter(function(o){ return d.quoteStatus(o)==='Sent to farmer'; }).forEach(function(o){
+    html += '<div class="card card-p" style="margin-bottom:12px;border-left:3px solid var(--amber);background:#fffdf7;">'+
+      '<div class="row between" style="align-items:flex-start;gap:14px;">'+
+        '<div><div class="eyebrow" style="color:var(--amber);">Quote for your approval · '+BB.esc(o.ref)+'</div>'+
+          '<div style="font-family:var(--display);font-weight:600;font-size:1.05rem;color:var(--green-dark);margin-top:2px;">'+BB.money(d.quoteTotal(o))+' · deliver '+BB.monthName(o.deliverMonth)+'</div>'+
+          '<div class="faint" style="font-size:.8rem;">Prepared by '+BB.esc(rep.name)+' · approved by BioBrix</div></div>'+
+        '<div class="row" style="gap:8px;flex:none;"><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+BB.esc(String(rep.cell||'').replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(rep.name).split(' ')[0]+', quick question on quote '+o.ref+' — ')+'">Ask '+BB.esc(String(rep.name).split(' ')[0])+'</a>'+
+          '<button class="btn" data-qok="'+o.id+'">✓ Approve quote</button></div>'+
+      '</div>'+
+      '<div class="scroll" style="margin-top:10px;"><table class="bb"><thead><tr><th>Product</th><th class="right">Qty</th><th class="right">Value</th></tr></thead><tbody>'+
+      (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack)+'</div></td><td class="right">'+BB.num(l.qty)+' '+BB.esc(p.unit||'')+'</td><td class="right">'+BB.money(Math.round((p.price||0)*l.qty*(1+d.quotePct(o)/100)))+'</td></tr>'; }).join('')+
+      '<tr><td colspan="2" class="right"><b>Quote total</b></td><td class="right"><b>'+BB.money(d.quoteTotal(o))+'</b></td></tr></tbody></table></div>'+
+      '<div class="pline" style="margin-top:8px;">Approve here and '+BB.esc(String(rep.name).split(' ')[0])+' invoices and books the delivery. Nothing is charged until you approve.</div>'+
+    '</div>';
+  });
+  if(!orders.length){
+    html += '<div class="card card-p"><div class="empty"><div class="big">📦</div>No orders yet. When you approve your programme, your orders appear here.</div></div>';
+  } else {
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+      '<th>Ref</th><th>Delivery</th><th class="right">Value</th><th>Status</th><th>Delivery ETA</th><th></th></tr></thead><tbody>';
+    orders.forEach(function(o){
+      var del = d.where('deliveries', function(x){ return x.order===o.id; })[0];
+      var etaTxt = del ? (BB.date(del.eta)+' · '+BB.esc(del.status)) : '—';
+      html += '<tr><td><b>'+BB.esc(o.ref)+'</b></td>'+
+        '<td>'+BB.monthName(o.deliverMonth)+'</td>'+
+        '<td class="right">'+BB.money(d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o))+'</td>'+
+        '<td>'+(d.quoteStatus(o)==='Sent to farmer'?'<span class="badge b-warn">Quote — approve above</span>':(d.quoteStatus(o)==='Awaiting approval'||d.quoteStatus(o)==='Approved')?'<span class="badge b-grey">Quote being prepared</span>':BB.statusBadge(o.status))+'</td>'+
+        '<td>'+etaTxt+'</td>'+
+        '<td class="right">'+
+          (o.status==='Delivered'? '<button class="btn ghost sm" data-reorder="'+o.id+'">Reorder</button>' : '')+
+        '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+    html += '<div class="pline" style="margin-top:8px;">🔁 Delivered an order before? Tap <b style="color:var(--green-mid);">Reorder</b> and your advisor confirms the rest.</div>';
+  }
+
+  // ---- my account (billing) ----
+  var invs = d.where('invoices', function(x){ return x.farmer===id; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var billed = invs.reduce(function(s,i){ return s+(i.amount||0); }, 0);
+  var paid = invs.filter(function(i){ return i.status==='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
+  var owing = invs.filter(function(i){ return i.status!=='Paid'; }).reduce(function(s,i){ return s+(i.amount||0); }, 0);
+  var overdue = invs.filter(function(i){ return i.status==='Overdue'; });
+  html += '<div class="sec" id="account" style="scroll-margin-top:110px;"><h2>My account</h2><span class="ln"></span><span class="cnt">invoices, statement &amp; payments</span></div>';
+  // overdue notice (warm but clear) — shown before the statement so it can't be missed
+  if(d.isOverdue(id)){
+    html += '<div class="card card-p" style="border-color:#f2cfca;background:var(--red-bg);margin-bottom:12px;">'+
+      '<div class="pline" style="color:var(--red);font-size:.9rem;">⚠ <b style="color:var(--red);">Your account is overdue</b> — please settle to release pending deliveries.</div></div>';
+  }
+  // statement summary
+  var creditLimit = d.creditLimit(id);
+  html += '<div class="grid g4">'+
+    '<div class="stat"><div class="l">Invoiced to date</div><div class="v">'+BB.money(billed)+'</div><div class="s">'+invs.length+' invoices</div></div>'+
+    '<div class="stat"><div class="l">Paid</div><div class="v" style="color:var(--ok)">'+BB.money(paid)+'</div><div class="s">thank you</div></div>'+
+    '<div class="stat'+(owing>0?' warn':'')+'"><div class="l">Outstanding balance</div><div class="v">'+BB.money(owing)+'</div><div class="s">'+(overdue.length?overdue.length+' overdue':'up to date')+'</div></div>'+
+    '<div class="stat"><div class="l">Credit limit</div><div class="v">'+BB.money(creditLimit)+'</div><div class="s">'+(creditLimit>0?'available '+BB.money(d.availableCredit(id)):'no credit terms set')+'</div></div>'+
+  '</div>';
+  if(!invs.length){
+    html += '<div class="card card-p"><div class="empty"><div class="big">🧾</div>No invoices yet.</div></div>';
+  } else {
+    // outstanding / overdue first with Pay
+    var open = invs.filter(function(i){ return i.status!=='Paid'; });
+    if(open.length){
+      html += '<div class="card" style="margin-top:12px;"><div class="scroll"><table class="bb"><thead><tr><th>Invoice</th><th>For</th><th>Due</th><th>Amount</th><th></th><th class="right">Pay</th></tr></thead><tbody>';
+      open.forEach(function(iv){
+        html += '<tr'+(iv.status==='Overdue'?' style="background:var(--red-bg);"':'')+'>'+
+          '<td><b>'+BB.esc(iv.ref)+'</b></td>'+
+          '<td class="muted">'+BB.esc(iv.description)+'</td>'+
+          '<td>'+BB.date(iv.dueDate)+'</td>'+
+          '<td><b>'+BB.money(iv.amount)+'</b></td>'+
+          '<td>'+BB.statusBadge(iv.status)+'</td>'+
+          '<td class="right"><button class="btn sm" data-pay="'+iv.id+'">Pay now</button></td>'+
+        '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+    }
+    // paid history
+    var done = invs.filter(function(i){ return i.status==='Paid'; });
+    if(done.length){
+      html += '<div style="margin-top:14px;"><div class="faint" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Paid invoices</div>'+
+        '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Invoice</th><th>For</th><th>Paid</th><th class="right">Amount</th></tr></thead><tbody>';
+      done.forEach(function(iv){
+        html += '<tr><td><b>'+BB.esc(iv.ref)+'</b></td><td class="muted">'+BB.esc(iv.description)+'</td><td class="muted">'+BB.date(iv.paidDate)+'</td><td class="right">'+BB.money(iv.amount)+'</td></tr>';
+      });
+      html += '</tbody></table></div></div></div>';
+    }
+    // transaction history (ledger from invoices)
+    var ledger = [];
+    invs.forEach(function(iv){
+      ledger.push({ date:iv.date, txt:'Invoice '+iv.ref+' issued — '+iv.description, amt:iv.amount, dir:'debit' });
+      if(iv.status==='Paid' && iv.paidDate) ledger.push({ date:iv.paidDate, txt:'Payment received — '+iv.ref, amt:iv.amount, dir:'credit' });
+    });
+    ledger.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    html += '<div style="margin-top:14px;"><div class="faint" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Transaction history</div>'+
+      '<div class="card card-p">';
+    ledger.forEach(function(t){
+      html += '<div class="row between" style="padding:8px 2px;border-bottom:1px solid var(--line-soft);">'+
+        '<span style="font-size:.86rem;"><span class="faint">'+BB.shortDate(t.date)+'</span> &nbsp; '+BB.esc(t.txt)+'</span>'+
+        '<span style="font-weight:600;color:'+(t.dir==='credit'?'var(--ok)':'var(--muted)')+';white-space:nowrap;">'+(t.dir==='credit'?'− ':'+ ')+BB.money(t.amt)+'</span>'+
+      '</div>';
+    });
+    html += '<div class="row between" style="padding:10px 2px 2px;"><b>Balance outstanding</b><b style="color:'+(owing>0?'var(--amber)':'var(--ok)')+'">'+BB.money(owing)+'</b></div>';
+    html += '</div></div>';
+    html += '<div class="pline" style="margin-top:8px;">🧾 Invoices &amp; statements sync from BioBrix\'s accounts — pay by card/EFT here and it reflects straight away.</div>';
+  }
+
+  // ---- my documents ----
+  html += '<div class="sec" id="docs" style="scroll-margin-top:110px;"><h2>My documents</h2><span class="ln"></span><span class="cnt">one place for every file</span></div>';
+  if(!files.length){
+    html += '<div class="card card-p"><div class="empty"><div class="big">🗂</div>No documents shared yet.</div></div>';
+  } else {
+    html += '<div class="grid g2">';
+    files.forEach(function(fl){
+      html += '<div class="card"><div class="fcard">'+
+        '<div class="fic">🗂</div>'+
+        '<div style="min-width:0;flex:1;"><div style="font-weight:600;color:var(--green-dark);">'+BB.esc(fl.name)+'</div>'+
+          '<div class="faint" style="font-size:.76rem;">'+BB.esc(fl.kind)+' · '+BB.date(fl.date)+' · '+BB.esc(fl.size||'')+'</div></div>'+
+        '<button class="btn ghost sm" data-open="'+BB.esc(fl.name)+'" data-fk="'+BB.esc(fl.kind)+'">Open</button>'+
+      '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- footer ----
+  html += '<div class="foot">'+
+    '<div class="row between" style="align-items:flex-start;gap:14px;">'+
+      '<div><div class="brand">BioBrix · The Biological Way</div>'+
+        '<div class="faint" style="font-size:.82rem;margin-top:3px;max-width:420px;">Your regenerative partner across Southern Africa. '+
+          'Questions about your programme or an order? Speak to '+BB.esc(rep.name)+', your advisor.</div></div>'+
+      '<div style="text-align:right;">'+
+        (rep.cell? '<a class="btn ghost sm" href="tel:'+BB.esc(String(rep.cell).replace(/\s/g,''))+'">'+BB.esc(rep.cell)+'</a><br>' : '')+
+        '<a class="pline" style="justify-content:flex-end;margin-top:8px;font-size:.8rem;" href="https://claireboshoff.github.io/biobrix-website/" target="_blank" rel="noopener">Visit biobrix.co.za ›</a>'+
+        '<a class="pline" style="justify-content:flex-end;margin-top:6px;font-size:.8rem;" href="login.html">Sign out · switch seat ›</a>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  document.getElementById('portalMain').innerHTML = html;
+  bind();
+  if(location.hash){ var tgt=document.querySelector(location.hash); if(tgt) setTimeout(function(){ tgt.scrollIntoView({behavior:'smooth',block:'start'}); },60); }
+}
+window.addEventListener('hashchange', function(){ var tgt=location.hash&&document.querySelector(location.hash); if(tgt) tgt.scrollIntoView({behavior:'smooth',block:'start'}); });
+
+function bind(){
+  var main = document.getElementById('portalMain');
+  var ef=document.getElementById('editFarm'); if(ef) ef.onclick=function(){ window.__editFarm=!window.__editFarm; render(); };
+  var sf=document.getElementById('saveFarm'); if(sf) sf.onclick=function(){
+    var fid=currentFarmerId();
+    d.update('farmers', fid, { ha:Number(document.getElementById('efHa').value)||0, crops:document.getElementById('efCrops').value.split(',').map(function(x){return x.trim();}).filter(Boolean), programmePct:Number(document.getElementById('efPct').value)||null, cell:document.getElementById('efCell').value.trim(), town:document.getElementById('efTown').value.trim() });
+    window.__editFarm=false; BB.toast('Saved — '+String(d.rep(d.farmer(fid).rep).name).split(' ')[0]+' sees the update'); render();
+  };
+
+  // farmer approves a quote → order confirmed, advisor can invoice
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-qok]'), function(btn){
+    btn.onclick=function(){
+      var o=d.by('orders', this.dataset.qok); if(!o||!o.quote) return;
+      var q=Object.assign({}, o.quote, { status:'Farmer approved', farmerApprovedAt:new Date().toISOString().slice(0,10) });
+      d.update('orders', o.id, { quote:q, status:(o.status==='Forecast'||o.status==='Pending')?'Confirmed':o.status });
+      var rp=d.rep(o.rep);
+      d.add('feed', { from:'u_farmer', date:new Date().toISOString().slice(0,10), kind:'Order', farmer:o.farmer, ref:o.ref, text:d.farmer(o.farmer).name+' approved quote '+o.ref+' ('+BB.money(d.quoteTotal(o))+') in the farmer portal.' });
+      BB.toast('Approved — '+String(rp.name).split(' ')[0]+' will invoice and book the delivery');
+      render(); var t=document.getElementById('orders'); if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+  });
+  // live 7-day weather → best application window
+  var wx=document.getElementById('wxLine');
+  if(wx){
+    var fm=d.farmer(currentFarmerId());
+    d.forecast7(fm.town).then(function(fc){
+      if(!fc){ wx.innerHTML='Weather needs signal — your reminder will include the 7-day window.'; return; }
+      var strip=fc.days.map(function(dy){ var dt=new Date(dy.date); return '<span title="'+dy.rain+'% rain · '+Math.round(dy.wind)+' km/h wind" style="display:inline-flex;flex-direction:column;align-items:center;min-width:34px;font-size:.7rem;">'+d.wxIcon(dy.code)+'<span>'+['Su','Mo','Tu','We','Th','Fr','Sa'][dt.getDay()]+'</span><span class="faint">'+Math.round(dy.tmax)+'°</span></span>'; }).join('');
+      var b=fc.best; var bd=b?new Date(b.date):null;
+      wx.innerHTML='<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;">'+strip+'</div>'+
+        (b?'<div style="margin-top:6px;color:var(--green-mid);font-weight:600;">Good window to apply: '+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][bd.getDay()]+' '+BB.date(b.date)+' — '+b.rain+'% rain chance, wind '+Math.round(b.wind)+' km/h.</div>':'');
+    });
+  }
+
+  var sel = main.querySelector('#whoSel');
+  if(sel) sel.onchange = function(){ setFarmerId(this.value); render(); window.scrollTo(0,0); };
+
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-reorder]'), function(btn){
+    btn.onclick = function(){
+      var oid = this.dataset.reorder;
+      var o = d.by('orders', oid);
+      if(!o) return;
+      // financial controls — the farmer sees it here, not after a phone call
+      var rp0=d.rep(o.rep);
+      if(d.isOverdue(o.farmer)){
+        BB.toast('We can\u2019t take this order yet — your account has an overdue invoice. Please make a payment or contact '+String(rp0.name).split(' ')[0]+' and we\u2019ll gladly place it.');
+        var acc=document.getElementById('account'); if(acc) acc.scrollIntoView({behavior:'smooth',block:'start'}); return;
+      }
+      if(d.overLimit(o.farmer, d.orderValue(o))){
+        BB.toast('This order takes your account over its credit limit of '+BB.money(d.creditLimit(o.farmer))+'. '+String(rp0.name).split(' ')[0]+' will call you to arrange it.'); return;
+      }
+      d.add('orders', {
+        ref:'BB-'+Math.floor(1050 + Math.random()*900),
+        farmer:o.farmer, rep:o.rep, date:new Date().toISOString().slice(0,10),
+        deliverMonth:o.deliverMonth, status:'Pending', depot:o.depot, source:'Portal',
+        lines:(o.lines||[]).map(function(l){ return { prod:l.prod, qty:l.qty }; })
+      });
+      BB.toast('Order placed — your advisor will confirm');
+      render();
+    };
+  });
+
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-open]'), function(btn){
+    btn.onclick = function(){
+      location.href='document.html?farmer='+encodeURIComponent(currentFarmerId())+'&kind='+encodeURIComponent(this.dataset.fk||'Document')+'&name='+encodeURIComponent(this.dataset.open);
+    };
+  });
+
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-pay]'), function(btn){
+    btn.onclick = function(){
+      var iv = d.by('invoices', this.dataset.pay); if(!iv) return;
+      var td=this.closest('td'); if(!td) return;
+      td.innerHTML='<div style="display:grid;gap:6px;min-width:220px;text-align:left;">'+
+        '<button class="btn sm" data-paycard="'+iv.id+'">💳 Pay by card (Yoco)</button>'+
+        '<button class="btn ghost sm" data-payeft="'+iv.id+'">🏦 EFT — bank details &amp; proof</button>'+
+      '</div>';
+      td.querySelector('button[data-paycard]').onclick=function(){ d.update('invoices', iv.id, { status:'Paid', paidDate:new Date().toISOString().slice(0,10), method:'Card' }); BB.toast('Paid — thank you. Your statement is updated.'); render(); };
+      td.querySelector('button[data-payeft]').onclick=function(){
+        td.innerHTML='<div style="text-align:left;font-size:.78rem;line-height:1.5;min-width:240px;"><b>BioBrix (Pty) Ltd</b><br>FNB · Acc 62 000 000 000 · Branch 250655<br>Ref: <b>'+BB.esc(iv.ref)+'</b>'+
+          '<div style="margin-top:8px;"><label class="btn ghost sm" style="cursor:pointer;">📎 Upload proof of payment<input type="file" accept="image/*,.pdf" style="display:none;" data-pop="'+iv.id+'"></label></div></div>';
+        td.querySelector('input[data-pop]').onchange=function(){ d.update('invoices', iv.id, { status:'Proof received', proofAt:new Date().toISOString().slice(0,10), method:'EFT' }); BB.toast('Proof received — we\u2019ll mark it paid as soon as the funds land.'); render(); };
+      };
+    };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-pay-OLD]'), function(btn){
+    btn.onclick = function(){
+      var iv = d.by('invoices', this.dataset.pay);
+      if(!iv) return;
+      d.update('invoices', iv.id, { status:'Paid', paidDate:new Date().toISOString().slice(0,10) });
+      BB.toast('Payment received — thank you');
+      render();
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="portalMain"></div></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

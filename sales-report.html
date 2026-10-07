@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales — weekly &amp; monthly · BioBrix OS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<style>
+  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px;}
+  .bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;}
+  .bar > i{display:block;height:100%;border-radius:5px;}
+  td.num,th.num{text-align:right;white-space:nowrap;}
+  .wk{font-variant-numeric:tabular-nums;}
+  .mini{font-size:.72rem;color:var(--faint);}
+  .pick{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;}
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ back:'index.html' });
+var d = BB.data, u = BB.user;
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="main"></div></main>');
+
+// ---------------------------------------------------------------------------
+// Everything on this page is built from the accounting ledger — the same figures
+// finance sees in Sage. Nothing here is a demonstration number.
+// ---------------------------------------------------------------------------
+function monday(dt){ var x=new Date(dt); var day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x.toISOString().slice(0,10); }
+function money(v){ return BB.money(Math.round(v)); }
+function ym(dateStr){ return (dateStr||'').slice(0,7); }
+function monthLabel(k){ var p=k.split('-'); return BB.monthName(parseInt(p[1],10)-1)+' '+p[0]; }
+
+function render(){
+  var sg = d.sage && d.sage();
+  var host = document.getElementById('main');
+  if(!(sg && sg.live)){
+    host.innerHTML = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1></div>'+
+      '<div class="card card-p"><div class="empty">This report is built from your accounting system. It will fill in as soon as the connection has run.</div></div>';
+    return;
+  }
+  // A seat scoped to its own accounts, with none allocated yet, must be told exactly that — not
+  // left staring at an empty report wondering whether the connection is broken.
+  if(!(sg.customers||[]).length && BB.user.roleKey==='advisor'){
+    host.innerHTML = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1></div>'+
+      '<div class="card card-p"><div class="empty"><b>No accounts are allocated to you yet.</b><br>'+
+      'Your accounting system is connected and read three times a day, but none of its customers '+
+      'are marked as yours, so there is nothing to report here.<br><br>'+
+      'Whoever looks after the accounts can allocate them in <b>Sales \u2192 By customer</b>, and this '+
+      'page fills in straight away.</div></div>';
+    return;
+  }
+  var pl = d.plan();
+  var invoices = (sg.invoices||[]).filter(function(i){ return i.kind!=='opening'; });   // a brought-forward balance is not a sale
+  var customers = sg.customers||[];
+  var byId = {}; customers.forEach(function(c){ byId[c.id]=c; });
+  var reps = (sg.reps||[]);
+  var repName = {}; reps.forEach(function(r){ repName[r.id]=r.name; });
+
+  // agent for a customer: what BioBrix set in the portal, else the rep carried in the ledger
+  function agentOf(c){
+    var set = pl.agents && pl.agents['sage_'+c.id];
+    if(set) return set;
+    return c.sageRep ? ('sage_rep_'+c.sageRep) : null;
+  }
+  function agentLabel(key){
+    if(!key) return 'Not allocated';
+    if(key.indexOf('sage_rep_')===0) return repName[parseInt(key.slice(9),10)] || ('Rep '+key.slice(9));
+    var r = d.rep(key); return (r&&r.name) || key;
+  }
+
+  var tab = (new URLSearchParams(location.search).get('view')||'weekly').toLowerCase();
+  var html = '<div class="page-head"><h1>Sales — weekly &amp; monthly</h1>'+
+    '<p>Every sale invoiced, by week and by month, per agent and per customer — straight from your accounting system, so it matches what finance sees. No spreadsheet to build.</p></div>';
+  html += BB.staleNote();
+
+  html += '<div class="tabs">'+
+    ['weekly|By week','monthly|By month vs budget','agent|By agent','customer|By customer'].map(function(o){
+      var k=o.split('|')[0], t=o.split('|')[1];
+      return '<a class="btn sm'+(tab===k?'':' ghost')+'" href="sales-report.html?view='+k+'">'+t+'</a>';
+    }).join('')+'</div>';
+
+  // ---------------- by week ----------------
+  if(tab==='weekly'){
+    var weeks = {};
+    invoices.forEach(function(i){
+      if(!i.date) return;
+      var w = monday(i.date);
+      var a = agentOf(byId[i.customer]||{}) ;
+      weeks[w] = weeks[w] || { total:0, n:0, byAgent:{} };
+      weeks[w].total += (i.amount||0); weeks[w].n++;
+      var ak = a||'none';
+      weeks[w].byAgent[ak] = (weeks[w].byAgent[ak]||0) + (i.amount||0);
+    });
+    var wk = Object.keys(weeks).sort().reverse().slice(0,12);
+    var max = Math.max.apply(null, wk.map(function(w){ return weeks[w].total; }).concat([1]));
+    html += '<div class="sec"><h2>The last 12 weeks</h2><span class="ln"></span><span class="cnt">week starts Monday</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Week</th><th class="num">Invoiced</th><th class="num">Invoices</th><th>Split by agent</th></tr></thead><tbody>';
+    wk.forEach(function(w){
+      var x = weeks[w];
+      var parts = Object.keys(x.byAgent).sort(function(a,b){ return x.byAgent[b]-x.byAgent[a]; }).slice(0,3)
+        .map(function(k){ return BB.esc(agentLabel(k==='none'?null:k))+' '+money(x.byAgent[k]); }).join(' · ');
+      html += '<tr><td class="wk"><b>'+BB.date(w)+'</b><div class="mini">week of</div></td>'+
+        '<td class="num"><b>'+money(x.total)+'</b><div class="bar" style="margin-top:5px;width:120px;"><i style="width:'+Math.round(x.total/max*100)+'%;background:var(--green-mid);"></i></div></td>'+
+        '<td class="num">'+x.n+'</td><td class="mini">'+(parts||'—')+'</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // ---------------- by month vs budget ----------------
+  if(tab==='monthly'){
+    var months = {};
+    invoices.forEach(function(i){ var k=ym(i.date); if(!k) return; months[k]=(months[k]||0)+(i.amount||0); });
+    var keys = Object.keys(months).sort().reverse().slice(0,14);
+    var canEdit = BB.auth.can('finance') || u.roleKey==='director';
+    html += '<div class="sec"><h2>Month by month, against budget</h2><span class="ln"></span><span class="cnt">'+(canEdit?'type a budget to set it':'budget set by finance')+'</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Month</th><th class="num">Invoiced</th><th class="num">Budget</th><th class="num">Against budget</th><th>Progress</th></tr></thead><tbody>';
+    keys.forEach(function(k){
+      var actual = months[k], budget = (pl.budgets||{})[k] || 0;
+      var pct = budget? Math.round(actual/budget*100) : null;
+      var diff = budget? actual-budget : null;
+      html += '<tr><td><b>'+monthLabel(k)+'</b></td>'+
+        '<td class="num"><b>'+money(actual)+'</b></td>'+
+        '<td class="num">'+(canEdit
+            ? '<input class="pick" style="width:130px;text-align:right;" inputmode="numeric" data-budget="'+k+'" value="'+(budget||'')+'" placeholder="set budget">'
+            : (budget? money(budget) : '<span class="faint">—</span>'))+'</td>'+
+        '<td class="num">'+(diff===null?'<span class="faint">—</span>':'<b style="color:'+(diff>=0?'var(--ok)':'var(--red)')+';">'+(diff>=0?'+':'')+money(diff)+'</b>')+'</td>'+
+        '<td>'+(pct===null?'<span class="faint">no budget set</span>':'<div class="bar" style="width:150px;"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of budget</div>')+'</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // ---------------- by agent ----------------
+  if(tab==='agent'){
+    var since = new Date(); since.setMonth(since.getMonth()-2);
+    var cut = since.toISOString().slice(0,10);
+    var agents = {};
+    invoices.forEach(function(i){
+      if((i.date||'') < cut) return;
+      var c = byId[i.customer]||{}; var a = agentOf(c)||'none';
+      agents[a] = agents[a] || { total:0, n:0, customers:{} };
+      agents[a].total += (i.amount||0); agents[a].n++; agents[a].customers[c.id]=1;
+    });
+    var ak = Object.keys(agents).sort(function(a,b){ return agents[b].total-agents[a].total; });
+    var maxA = Math.max.apply(null, ak.map(function(k){ return agents[k].total; }).concat([1]));
+    var comm = pl.commission||{};
+    html += '<div class="sec"><h2>By agent — last three months</h2><span class="ln"></span><span class="cnt">commission shown where a rate is set</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Agent</th><th class="num">Invoiced</th><th class="num">Invoices</th><th class="num">Customers</th><th class="num">Commission</th><th></th></tr></thead><tbody>';
+    ak.forEach(function(k){
+      var x=agents[k];
+      var rate = k==='none' ? 0 : ((comm.byAgent&&comm.byAgent[k]!=null) ? comm.byAgent[k] : (comm.default||0));
+      html += '<tr><td><b>'+BB.esc(agentLabel(k==='none'?null:k))+'</b>'+(k==='none'?'<div class="mini">these accounts carry no agent</div>':'')+'</td>'+
+        '<td class="num"><b>'+money(x.total)+'</b><div class="bar" style="margin-top:5px;width:110px;"><i style="width:'+Math.round(x.total/maxA*100)+'%;background:var(--green-mid);"></i></div></td>'+
+        '<td class="num">'+x.n+'</td><td class="num">'+Object.keys(x.customers).length+'</td>'+
+        '<td class="num">'+(rate? money(x.total*rate/100)+'<div class="mini">at '+rate+'%</div>' : '<span class="faint">no rate set</span>')+'</td>'+
+        '<td class="num">'+(k==='none'?'<a class="btn ghost sm" href="sales-report.html?view=customer">Allocate ›</a>':'')+'</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Commission is worked out on what was invoiced. Rates live under <a href="commission.html" style="color:var(--green-dark);">Commission</a>. Per-product rates switch on as soon as the line detail is pulled from your accounting system.</div>';
+  }
+
+  // ---------------- by customer (and agent allocation) ----------------
+  if(tab==='customer'){
+    var since2 = new Date(); since2.setMonth(since2.getMonth()-12);
+    var cut2 = since2.toISOString().slice(0,10);
+    var rows = customers.map(function(c){
+      var inv = invoices.filter(function(i){ return i.customer===c.id && (i.date||'')>=cut2; });
+      return { c:c, total:inv.reduce(function(t,i){ return t+(i.amount||0); },0), n:inv.length, agent:agentOf(c) };
+    }).filter(function(r){ return r.n>0; }).sort(function(a,b){ return b.total-a.total; });
+    var canEdit2 = BB.auth.can('finance') || u.roleKey==='director';
+    var agentOptions = [{k:'',t:'— not allocated —'}]
+      .concat(d.allUnscoped('reps').map(function(r){ return {k:r.id,t:r.name}; }))
+      .concat(reps.map(function(r){ return {k:'sage_rep_'+r.id, t:r.name+' (from your accounts)'}; }));
+    html += '<div class="sec"><h2>By customer — last 12 months</h2><span class="ln"></span><span class="cnt">'+rows.length+' customers with sales'+(canEdit2?' · set the agent here':'')+'</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Customer</th><th class="num">Invoiced</th><th class="num">Invoices</th><th>Agent</th></tr></thead><tbody>';
+    rows.slice(0,150).forEach(function(r){
+      html += '<tr><td><b>'+BB.esc(r.c.name)+'</b><div class="mini">'+BB.esc(r.c.town||'')+'</div></td>'+
+        '<td class="num"><b>'+money(r.total)+'</b></td><td class="num">'+r.n+'</td>'+
+        '<td>'+(canEdit2
+          ? '<select class="pick" data-agent="sage_'+r.c.id+'">'+agentOptions.map(function(o){
+              return '<option value="'+o.k+'"'+(r.agent===o.k?' selected':'')+'>'+BB.esc(o.t)+'</option>'; }).join('')+'</select>'
+          : BB.esc(agentLabel(r.agent)))+'</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+    if(rows.length>150) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Showing the 150 largest. The rest are in Farms &amp; farmers.</div>';
+  }
+
+  host.innerHTML = html;
+
+  // ---- saving: budget per month, agent per customer ----
+  host.querySelectorAll('input[data-budget]').forEach(function(el){
+    el.addEventListener('change', function(){
+      var v = parseFloat(String(el.value).replace(/[^0-9.]/g,'')) || 0;
+      var patch = {}; patch[el.getAttribute('data-budget')] = v;
+      d.savePlan({ budgets: patch }).then(function(){ BB.toast('Budget saved — everyone sees it'); render(); })
+        .catch(function(){ render(); });   // savePlan has already said what went wrong
+    });
+  });
+  host.querySelectorAll('select[data-agent]').forEach(function(el){
+    el.addEventListener('change', function(){
+      var patch = {}; patch[el.getAttribute('data-agent')] = el.value || null;
+      d.savePlan({ agents: patch }).then(function(){ BB.toast('Agent set — sales and commission follow it from now on'); })
+        .catch(function(){});
+    });
+  });
+}
+
+render();
+window.addEventListener('bb:sage', function(){ render(); });
+window.addEventListener('bb:plan', function(){ render(); });
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

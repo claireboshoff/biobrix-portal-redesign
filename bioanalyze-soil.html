@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>BioAnalyze — Soil · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'bioservices.html' });
+
+var d = BB.data, u = BB.user;
+var isAdvisor = u.roleKey==='advisor';
+function esc(s){ return BB.esc(s); }
+
+var blockParam = new URLSearchParams(location.search).get('block');
+
+var css=''+
+'.detail{background:#f7faf1;border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:6px;}'+
+'.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:12px 0;}'+
+'.reading{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}'+
+'.reading .rl{font-size:.64rem;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;}'+
+'.reading .rv{font-family:var(--display);font-size:1.15rem;font-weight:600;color:var(--green-dark);margin-top:2px;}'+
+'.interp{margin-top:8px;padding:11px 13px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.86rem;}'+
+'.interp.ok{background:var(--ok-bg);color:var(--ok);}'+
+'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+// advisor sees their own samples; a block filter narrows further
+function baseRows(){
+  var rows = d.all('soil');
+  if(isAdvisor) rows = rows.filter(function(s){ return s.advisor===u.rep; });
+  if(blockParam) rows = rows.filter(function(s){ return s.block===blockParam; });
+  return rows.sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+}
+
+// blocks available for the log form (advisor -> their farms' blocks)
+function formBlocks(){
+  var blocks = d.all('blocks');
+  if(isAdvisor){
+    var myFarms = d.where('farmers', function(f){ return f.rep===u.rep; }).map(function(f){ return f.id; });
+    blocks = blocks.filter(function(b){ return myFarms.indexOf(b.farmer)>=0; });
+  }
+  return blocks;
+}
+
+var filter = 'All';
+var openId = null;
+var blockCtx = blockParam ? d.by('blocks', blockParam) : null;
+
+function statBar(rows){
+  var awaiting = rows.filter(function(s){ return s.status==='New'||s.status==='Awaiting lab'; }).length;
+  var interp = rows.filter(function(s){ return s.status==='Interpreted'; }).length;
+  var html='<div class="grid g3">';
+  html += '<div class="stat"><div class="l">Samples</div><div class="v">'+rows.length+'</div><div class="s">'+(blockCtx?'on this block':'in view')+'</div></div>';
+  html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting interpretation</div><div class="v">'+awaiting+'</div><div class="s">new + at lab</div></div>';
+  html += '<div class="stat"><div class="l">Interpreted</div><div class="v">'+interp+'</div><div class="s">this season</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function detailPanel(s){
+  var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'}, adv=d.rep(s.advisor);
+  var html='<div class="detail">';
+  html += '<div class="row between"><div><b>'+esc(f.name)+'</b> · '+esc(b.name)+'<div class="faint" style="font-size:.76rem;">Sampled '+BB.date(s.date)+' · advisor '+esc(adv.name)+'</div></div>'+BB.statusBadge(s.status)+'</div>';
+  if(s.status==='Interpreted'){
+    html += '<div class="readings">'+
+      '<div class="reading"><div class="rl">pH</div><div class="rv">'+esc(s.ph)+'</div></div>'+
+      '<div class="reading"><div class="rl">Organic matter</div><div class="rv">'+esc(s.om)+'</div></div>'+
+      '<div class="reading"><div class="rl">Ca:Mg</div><div class="rv">'+esc(s.ca_mg)+'</div></div>'+
+      '<div class="reading"><div class="rl">Microbial</div><div class="rv">'+esc(s.microbial)+'</div></div>'+
+      '<div class="reading"><div class="rl">Phosphorus</div><div class="rv">'+esc(s.p)+'</div></div>'+
+    '</div>';
+    var ok = /improv|maintain|balanced|good|hold/i.test(s.flag||'');
+    html += '<div class="interp'+(ok?' ok':'')+'"><b>Interpretation:</b> '+esc(s.flag)+'</div>';
+    html += '<div class="row" style="margin-top:12px;">'+
+      '<a class="btn" href="bioconsult.html?farmer='+encodeURIComponent(s.farmer)+'&block='+encodeURIComponent(s.block)+'">Create BioConsult recommendation</a>'+
+      '<a class="btn ghost" href="biowatch.html?block='+encodeURIComponent(s.block)+'">Monitor this block</a>'+
+    '</div>';
+  } else {
+    html += '<div class="interp"><b>Status:</b> '+esc(s.flag||'Awaiting laboratory results — readings appear once interpreted.')+'</div>';
+    if(u.roleKey==='director'||u.roleKey==='advisor'){
+      html += '<div class="row" style="margin-top:12px;"><button class="btn ghost sm" data-interp="'+esc(s.id)+'">Mark as interpreted</button></div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function logForm(){
+  var blocks = formBlocks();
+  var opts = blocks.map(function(b){
+    var f=d.farmer(b.farmer);
+    return '<option value="'+esc(b.id)+'"'+(blockParam===b.id?' selected':'')+'>'+esc(f.name)+' — '+esc(b.name)+'</option>';
+  }).join('');
+  var html='<div class="card card-p" style="margin-top:18px;">';
+  html += '<div class="sec" style="margin:0 0 12px;"><h2 style="font-size:1rem;">Log a soil sample</h2><span class="ln"></span></div>';
+  html += '<div class="grid g3">';
+  html += '<div class="fld"><label>Block</label><select id="fBlock">'+opts+'</select></div>';
+  html += '<div class="fld"><label>Date sampled</label><input id="fDate" type="date" value="2026-07-28"></div>';
+  html += '<div class="fld"><label>Status</label><select id="fStatus"><option>New</option><option>Awaiting lab</option></select></div>';
+  html += '</div>';
+  html += '<div class="fld"><label>Field note (optional)</label><input id="fNote" type="text" placeholder="e.g. Collected top 20cm, wet block"></div>';
+  html += '<button class="btn" id="fSave">Save sample</button>';
+  html += '<p class="faint" style="font-size:.74rem;margin-top:8px;">Saves on this device and syncs when you have signal.</p>';
+  html += '</div>';
+  return html;
+}
+
+function render(){
+  var rows = baseRows();
+  var shown = filter==='All' ? rows : rows.filter(function(s){ return s.status===filter; });
+
+  var html='';
+  html += '<div class="page-head"><h1>BioAnalyze — Soil</h1><p>'+
+    (blockCtx?'Soil results for '+esc(blockCtx.name)+'. ':'')+
+    'Soil read as a living system — pH, organic matter, Ca:Mg balance, microbial life and phosphorus.</p></div>';
+
+  if(blockCtx){
+    html += '<div class="chips"><a class="chip" href="bioanalyze-soil.html">‹ All blocks</a>'+
+      '<span class="chip on">'+esc(d.farmer(blockCtx.farmer).name)+' — '+esc(blockCtx.name)+'</span></div>';
+  }
+
+  html += statBar(rows);
+
+  html += '<div class="chips" style="margin-top:12px;">';
+  ['All','New','Awaiting lab','Interpreted'].forEach(function(st){
+    var n = st==='All'?rows.length:rows.filter(function(s){ return s.status===st; }).length;
+    html += '<button class="chip'+(filter===st?' on':'')+'" data-f="'+esc(st)+'">'+esc(st)+' <span style="opacity:.7;">'+n+'</span></button>';
+  });
+  html += '</div>';
+
+  html += '<div class="card" style="margin-top:6px;"><div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Date</th><th>Farmer / block</th><th>pH</th><th>Ca:Mg</th><th>Microbial</th><th>Status</th></tr></thead><tbody>';
+
+  if(!shown.length){
+    html += '<tr><td colspan="6"><div class="empty"><div class="big">🧪</div>No soil samples here yet.</div></td></tr>';
+  }
+
+  shown.forEach(function(s){
+    var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'};
+    var isInterp = s.status==='Interpreted';
+    html += '<tr class="click" data-id="'+esc(s.id)+'">'+
+      '<td>'+BB.date(s.date)+'</td>'+
+      '<td><b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div></td>'+
+      '<td>'+(isInterp?esc(s.ph):'<span class="faint">—</span>')+'</td>'+
+      '<td>'+(isInterp?esc(s.ca_mg):'<span class="faint">—</span>')+'</td>'+
+      '<td>'+(isInterp?esc(s.microbial):'<span class="faint">—</span>')+'</td>'+
+      '<td>'+BB.statusBadge(s.status)+'</td>'+
+    '</tr>';
+    if(openId===s.id){
+      html += '<tr><td colspan="6" style="padding:0 12px 12px;">'+detailPanel(s)+'</td></tr>';
+    }
+  });
+
+  html += '</tbody></table></div></div>';
+
+  html += logForm();
+  html += '<div style="height:20px;"></div>';
+
+  document.getElementById('soilMain').innerHTML=html;
+  bind();
+}
+
+function bind(){
+  var main=document.getElementById('soilMain');
+  Array.prototype.forEach.call(main.querySelectorAll('.chip[data-f]'), function(c){
+    c.onclick=function(){ filter=this.dataset.f; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('tr.click[data-id]'), function(row){
+    row.onclick=function(){ var rid=this.dataset.id; openId = openId===rid ? null : rid; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('[data-interp]'), function(btn){
+    btn.onclick=function(e){
+      e.stopPropagation();
+      d.update('soil', this.dataset.interp, { status:'Interpreted' });
+      BB.toast('Marked as interpreted');
+      render();
+    };
+  });
+  var save=document.getElementById('fSave');
+  if(save){
+    save.onclick=function(){
+      var blockId=document.getElementById('fBlock').value;
+      var block=d.by('blocks',blockId);
+      if(!block){ BB.toast('Choose a block first'); return; }
+      var rec={
+        block:blockId, farmer:block.farmer, date:document.getElementById('fDate').value||'2026-07-28',
+        status:document.getElementById('fStatus').value, ph:null, om:null, ca_mg:null, microbial:null, p:null,
+        flag:document.getElementById('fNote').value||'Sampled — pending interpretation', advisor:(u.rep||block.rep||null)
+      };
+      d.add('soil', rec);
+      BB.toast('Soil sample saved');
+      openId=null; filter='All'; render();
+    };
+  }
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="soilMain"></div></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

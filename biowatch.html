@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>BioWatch · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'bioservices.html' });
+
+var d = BB.data, u = BB.user;
+var params = new URLSearchParams(location.search);
+var blockFilter = params.get('block') || '';
+
+var css=''+
+'.report{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--green-bright);border-radius:16px;padding:22px;box-shadow:var(--shadow);}'+
+'.report .rh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}'+
+'.rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;}'+
+'@media(max-width:560px){.rgrid{grid-template-columns:1fr;}}'+
+'.rgrid .cell{padding:12px 14px;border-bottom:1px solid var(--line-soft);}'+
+'.rgrid .cell:nth-child(odd){border-right:1px solid var(--line-soft);}'+
+'.rgrid .cell .k{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}'+
+'.rgrid .cell .val{font-size:.95rem;color:var(--ink);margin-top:2px;}'+
+'.rec-btn{background:transparent;border:1.5px solid var(--line);border-radius:9px;padding:7px 12px;font-family:inherit;font-weight:600;font-size:.8rem;color:var(--green-dark);cursor:pointer;}'+
+'.rec-btn.live{background:var(--red-bg);border-color:var(--red);color:var(--red);}'+
+'@media print{.bb-head,.bb-nav,.noprint{display:none!important;}body{padding:0;}}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+function vigourBadge(v){
+  var m={ 'Excellent':'b-ok','Good':'b-lime','Fair':'b-warn','Poor':'b-bad' };
+  return '<span class="badge '+(m[v]||'b-grey')+'">'+BB.esc(v)+'</span>';
+}
+function today(){ return new Date().toISOString().slice(0,10); }
+function inMyScope(w){
+  if(u.roleKey==='director' || !u.rep) return true;
+  return w.advisor===u.rep;
+}
+function blockLabel(id){
+  var b=d.by('blocks',id); if(!b) return '—';
+  var f=d.farmer(b.farmer);
+  return { block:b, farmer:f };
+}
+
+var state = { view:'list', open:null };
+
+function visits(){
+  var list = d.all('watch').filter(inMyScope);
+  if(blockFilter) list = list.filter(function(w){ return w.block===blockFilter; });
+  return list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+}
+
+function statRow(){
+  var list = d.all('watch').filter(inMyScope);
+  var farms = list.map(function(w){ return w.farmer; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
+  var now = new Date(); var weekAgo = new Date(now.getTime()-7*864e5).toISOString().slice(0,10);
+  var thisWeek = list.filter(function(w){ return (w.date||'') >= weekAgo; }).length;
+  return '<div class="grid g3">'+
+    '<div class="stat"><div class="l">Visits logged</div><div class="v">'+list.length+'</div><div class="s">field checks captured</div></div>'+
+    '<div class="stat"><div class="l">Farms monitored</div><div class="v">'+farms+'</div><div class="s">under your watch</div></div>'+
+    '<div class="stat"><div class="l">Checks this week</div><div class="v">'+thisWeek+'</div><div class="s">last 7 days</div></div>'+
+  '</div>';
+}
+
+function renderList(){
+  var list = visits();
+  var html='';
+  html += '<div class="page-head"><h1>BioWatch — seasonal monitoring</h1>'+
+    '<p>Every orchard walk captured in the field: growth stage, weather, soil, pest pressure and vigour — then turned into a report you can send the farmer.</p></div>';
+
+  if(blockFilter){
+    var bl=blockLabel(blockFilter);
+    if(bl && bl.block){
+      html += '<div class="card card-p" style="border-left:3px solid var(--green-bright);margin-bottom:8px;">'+
+        '<div class="eyebrow">Filtered to one block</div>'+
+        '<b style="color:var(--green-dark);">'+BB.esc(bl.block.name)+'</b> · '+BB.esc(bl.farmer.farm)+
+        ' <a href="biowatch.html" style="color:var(--green-mid);font-weight:600;font-size:.82rem;">show all ›</a></div>';
+    }
+  }
+
+  html += statRow();
+
+  html += '<div class="row between" style="margin:24px 0 14px;"><div class="sec" style="margin:0;flex:1;"><h2>Monitoring visits</h2><span class="ln"></span><span class="cnt">'+list.length+'</span></div>'+
+    '<button class="btn sm" id="newBtn" style="margin-left:12px;">＋ New field check</button></div>';
+
+  html += '<div class="card">';
+  if(!list.length){
+    html += '<div class="empty"><div class="big">🌱</div>No monitoring visits yet. Log the first field check.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Date</th><th>Farm · block</th><th>Stage</th><th>Vigour</th><th>Pest</th><th class="right">Photos</th></tr></thead><tbody>';
+    list.forEach(function(w){
+      var b=d.by('blocks',w.block)||{name:'—'};
+      var f=d.farmer(w.farmer);
+      html += '<tr class="click" data-open="'+w.id+'">'+
+        '<td class="muted" style="white-space:nowrap;">'+BB.shortDate(w.date)+'</td>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(b.name)+'</div></td>'+
+        '<td class="muted">'+BB.esc(w.stage||'—')+'</td>'+
+        '<td>'+vigourBadge(w.vigour)+'</td>'+
+        '<td class="faint" style="font-size:.78rem;">'+BB.esc(w.pest||'—')+'</td>'+
+        '<td class="right muted">'+(w.photos||0)+' 📷</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  html += '<div style="height:24px;"></div>';
+  return html;
+}
+
+function renderReport(id){
+  var w=d.by('watch',id); if(!w) return renderList();
+  var b=d.by('blocks',w.block)||{name:'—',crop:'—'};
+  var f=d.farmer(w.farmer);
+  var adv=d.rep(w.advisor);
+
+  var html='';
+  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm noprint" id="backList">‹ All visits</button></div>';
+  html += '<div class="report" id="reportCard">';
+  html += '<div class="rh">'+
+    '<div><div class="eyebrow">BioWatch field report</div>'+
+      '<h1 style="font-family:var(--display);font-size:1.35rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(f.farm)+'</h1>'+
+      '<div class="muted" style="font-size:.85rem;">'+BB.esc(f.name)+' · '+BB.esc(b.name)+' · '+BB.esc(b.crop||'')+'</div></div>'+
+    '<div style="text-align:right;"><div class="faint" style="font-size:.72rem;">'+BB.date(w.date)+'</div>'+vigourBadge(w.vigour)+'</div>'+
+  '</div>';
+
+  html += '<div class="rgrid">'+
+    cell('Growth stage', w.stage)+
+    cell('Weather', w.weather)+
+    cell('Soil moisture', w.soilMoist)+
+    cell('Pest &amp; disease', w.pest)+
+    cell('Vigour', w.vigour)+
+    cell('Photos on file', (w.photos||0)+' image'+((w.photos||0)===1?'':'s'))+
+  '</div>';
+
+  html += '<div style="margin-top:16px;"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);">Advisor note</div>'+
+    '<p style="font-size:.95rem;line-height:1.6;margin-top:4px;">'+BB.esc(w.note||'—')+'</p></div>';
+
+  html += '<div class="divider"></div>'+
+    '<div class="row between"><div class="faint" style="font-size:.76rem;">Reported by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</div>'+
+    '<div class="faint" style="font-size:.76rem;">BioBrix · The Biological Way</div></div>';
+  html += '</div>';
+
+  html += '<div class="row noprint" style="margin-top:14px;">'+
+    '<button class="btn" id="genReport">Generate report</button>'+
+    '<a class="btn ghost" href="bioconsult.html?farmer='+encodeURIComponent(w.farmer)+'&block='+encodeURIComponent(w.block)+'">Build a recommendation ›</a>'+
+  '</div>';
+  html += '<div style="height:24px;"></div>';
+  return html;
+}
+
+function cell(k,v){
+  return '<div class="cell"><div class="k">'+k+'</div><div class="val">'+BB.esc(v||'—')+'</div></div>';
+}
+
+function renderForm(){
+  var blocks=d.all('blocks');
+  var html='';
+  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm" id="backList2">‹ All visits</button></div>';
+  html += '<div class="page-head" style="padding-top:6px;"><h1>New field check</h1><p>Capture what you see in the orchard. It saves on this device and syncs when you have signal.</p></div>';
+  html += '<div class="card card-p">';
+  html += '<div class="grid g2">';
+  html += '<div class="fld"><label>Block</label><select id="fBlock">'+
+    blocks.map(function(b){ var f=d.farmer(b.farmer); return '<option value="'+b.id+'"'+(b.id===blockFilter?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(b.name)+'</option>'; }).join('')+
+    '</select></div>';
+  html += '<div class="fld"><label>Date</label><input id="fDate" type="date" value="'+today()+'"></div>';
+  html += '<div class="fld"><label>Growth stage</label><input id="fStage" placeholder="e.g. Nut fill, Flowering"></div>';
+  html += '<div class="fld"><label>Weather</label><input id="fWeather" placeholder="e.g. Dry, 24°C"></div>';
+  html += '<div class="fld"><label>Soil moisture</label><select id="fMoist"><option>Dry</option><option>Moderate</option><option selected>Good</option><option>Wet</option></select></div>';
+  html += '<div class="fld"><label>Pest &amp; disease</label><input id="fPest" placeholder="e.g. Stink bug – low, or None"></div>';
+  html += '<div class="fld"><label>Vigour</label><select id="fVigour"><option>Excellent</option><option selected>Good</option><option>Fair</option><option>Poor</option></select></div>';
+  html += '<div class="fld"><label>Photos</label><input id="fPhotos" type="number" min="0" value="0"> <input id="fPhotoFile" type="file" accept="image/*" multiple style="margin-top:6px;padding:7px;"></div>';
+  html += '</div>';
+
+  html += '<div class="fld"><label>Advisor note <button type="button" id="dictate" class="rec-btn" style="float:right;margin-top:-2px;">🎙 Voice note</button></label>'+
+    '<textarea id="fNote" rows="4" placeholder="What you saw, what to do next…"></textarea>'+
+    '<div id="dictHint" class="faint" style="font-size:.72rem;margin-top:4px;"></div></div>';
+
+  html += '<button class="btn block" id="saveVisit">Save field check</button>';
+  html += '</div><div style="height:24px;"></div>';
+  return html;
+}
+
+function paint(){
+  var html;
+  if(state.view==='report') html=renderReport(state.open);
+  else if(state.view==='form') html=renderForm();
+  else html=renderList();
+  document.querySelector('main.wrap').innerHTML=html;
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-open]'), function(tr){
+    tr.onclick=function(){ state.view='report'; state.open=tr.getAttribute('data-open'); paint(); window.scrollTo(0,0); };
+  });
+  var nb=document.getElementById('newBtn'); if(nb) nb.onclick=function(){ state.view='form'; paint(); window.scrollTo(0,0); };
+  var bl=document.getElementById('backList'); if(bl) bl.onclick=function(){ state.view='list'; paint(); };
+  var bl2=document.getElementById('backList2'); if(bl2) bl2.onclick=function(){ state.view='list'; paint(); };
+  var gr=document.getElementById('genReport'); if(gr) gr.onclick=function(){ window.print(); };
+
+  var pf=document.getElementById('fPhotoFile');
+  if(pf) pf.onchange=function(){ document.getElementById('fPhotos').value=(pf.files?pf.files.length:0); };
+
+  wireDictation();
+
+  var sv=document.getElementById('saveVisit');
+  if(sv) sv.onclick=function(){
+    var block=document.getElementById('fBlock').value;
+    var b=d.by('blocks',block);
+    if(!b){ BB.toast('Pick a block first'); return; }
+    var rec=d.add('watch', {
+      block: block,
+      farmer: b.farmer,
+      date: document.getElementById('fDate').value || today(),
+      advisor: u.rep || 'rep_juba',
+      stage: document.getElementById('fStage').value.trim(),
+      weather: document.getElementById('fWeather').value.trim(),
+      soilMoist: document.getElementById('fMoist').value,
+      pest: document.getElementById('fPest').value.trim(),
+      vigour: document.getElementById('fVigour').value,
+      note: document.getElementById('fNote').value.trim(),
+      photos: Number(document.getElementById('fPhotos').value)||0
+    });
+    BB.toast('Field check saved for '+d.farmer(b.farmer).farm);
+    state.view='report'; state.open=rec.id; paint(); window.scrollTo(0,0);
+  };
+}
+
+// ---- voice dictation (Web Speech API) ----
+function wireDictation(){
+  var btn=document.getElementById('dictate'); if(!btn) return;
+  var hint=document.getElementById('dictHint');
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    btn.disabled=true; btn.style.opacity='.5'; btn.style.cursor='not-allowed';
+    hint.textContent='Voice capture is not available on this device — type the note instead.';
+    return;
+  }
+  var rec=null, listening=false;
+  btn.onclick=function(){
+    if(!navigator.onLine){ hint.textContent='Voice capture needs signal — you are offline right now. Type the note for now.'; return; }
+    if(listening && rec){ rec.stop(); return; }
+    try{
+      rec=new SR(); rec.lang='en-ZA'; rec.interimResults=false; rec.continuous=false;
+    }catch(e){ hint.textContent='Voice capture could not start — type the note instead.'; return; }
+    rec.onstart=function(){ listening=true; btn.classList.add('live'); btn.textContent='● Listening…'; hint.textContent='Speak your note, then tap again to stop.'; };
+    rec.onresult=function(ev){
+      var txt='';
+      for(var i=ev.resultIndex;i<ev.results.length;i++){ txt+=ev.results[i][0].transcript; }
+      var ta=document.getElementById('fNote');
+      ta.value=(ta.value ? ta.value.trim()+' ' : '')+txt.trim();
+    };
+    rec.onerror=function(){ hint.textContent='Could not hear that — try again or type the note.'; };
+    rec.onend=function(){ listening=false; btn.classList.remove('live'); btn.textContent='🎙 Voice note'; };
+    try{ rec.start(); }catch(e){ hint.textContent='Voice capture is busy — try again.'; }
+  };
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
+paint();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

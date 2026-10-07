@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>BioServices · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'index.html' });
+
+var d = BB.data, u = BB.user;
+var isAdvisor = u.roleKey==='advisor';
+
+var css=''+
+'.levers{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}'+
+'.lever{flex:1;min-width:140px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px 14px;}'+
+'.lever .lh{font-family:var(--display);font-weight:600;font-size:.95rem;color:#eaf4d8;}'+
+'.lever .lp{font-size:.76rem;opacity:.82;margin-top:2px;}'+
+'.tile .big-cnt{font-family:var(--display);font-size:1.7rem;font-weight:600;color:var(--green-dark);position:absolute;top:14px;right:16px;line-height:1;}'+
+'.tile .sub-cnt{color:var(--amber);font-weight:700;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+// live counts (respect advisor scoping to their own farms/records)
+function mine(rows, key){
+  if(!isAdvisor) return rows;
+  key = key || 'advisor';
+  return rows.filter(function(r){ return r[key]===u.rep; });
+}
+
+var soil = mine(d.all('soil'));
+var leaf = mine(d.all('leaf'));
+var watchRows = mine(d.all('watch'));
+var programs = mine(d.all('programs'));
+
+var soilPending = soil.filter(function(s){ return s.status!=='Interpreted'; }).length;
+var leafPending = leaf.filter(function(l){ return l.status!=='Interpreted'; }).length;
+var activePrograms = programs.filter(function(p){ return p.status==='Active'; }).length;
+
+// recent visits (last 30 days from the demo "today")
+var today = new Date('2026-07-28');
+var recentVisits = watchRows.filter(function(w){
+  var dd = new Date(w.date); return (today - dd) <= 30*86400000;
+}).length;
+
+var myFarms = isAdvisor ? d.where('farmers', function(f){ return f.rep===u.rep; }).length : d.all('farmers').length;
+
+var BRACKETS = [
+  { ic:'🧪', h:'BioAnalyze — Soil', href:'bioanalyze-soil.html', p:'Soil diagnostics: pH, organic matter, Ca:Mg, microbial life and P — read as a living system, not a number.',
+    cnt:soil.length, meta:'sample'+(soil.length===1?'':'s'), sub:soilPending, subLbl:'to interpret' },
+  { ic:'🍃', h:'BioAnalyze — Leaf', href:'bioanalyze-leaf.html', p:'Leaf-sap analysis for in-season correction — see what the plant is actually taking up, block by block.',
+    cnt:leaf.length, meta:'sample'+(leaf.length===1?'':'s'), sub:leafPending, subLbl:'to interpret' },
+  { ic:'🌱', h:'BioWatch', href:'biowatch.html', p:'Seasonal monitoring visits: crop stage, weather, soil moisture, pest and vigour — the record of every walk.',
+    cnt:watchRows.length, meta:'visit'+(watchRows.length===1?'':'s'), sub:recentVisits, subLbl:'last 30 days' },
+  { ic:'📑', h:'BioConsult', href:'bioconsult.html', p:'Regenerative programmes built from the data — balanced Biology, Chemistry and Physics, costed per hectare.',
+    cnt:programs.length, meta:'programme'+(programs.length===1?'':'s'), sub:activePrograms, subLbl:'active' }
+];
+
+var SECONDARY = [
+  { ic:'🌾', h:'Farms & farmers', href:'farms.html', p:'Every farm and block under management — the drill-down starts here.', meta:myFarms+' farm'+(myFarms===1?'':'s') },
+  { ic:'📚', h:'Product library', href:'products-library.html', p:'RenewAg range and recommended inputs across 13 suppliers, with data sheets.', meta:d.all('products').length+' products' },
+  { ic:'🗂', h:'Farm files', href:'farm-files.html', p:'One place for every soil report, programme and delivery note — tagged to the farm.', meta:d.all('files').length+' files' }
+];
+
+var html='';
+html += '<div class="page-head"><h1>BioServices</h1><p>'+
+  (isAdvisor?'Your agronomy workbench — the soil, leaf, monitoring and programme data for your farms.'
+            :'RenewAg agronomy — soil and leaf diagnostics, field monitoring and the programmes that come out of them.')+'</p></div>';
+
+// RenewAg philosophy band
+html += '<section class="hero-band">'+
+  '<div class="eyebrow" style="color:var(--lime);">RenewAg · The Biological Way</div>'+
+  '<h2 style="font-family:var(--display);font-size:1.35rem;font-weight:600;margin:3px 0 4px;color:#f2f7ea;">Stop guessing, start knowing.</h2>'+
+  '<p style="opacity:.86;font-size:.9rem;max-width:640px;">A healthy crop stands on three balanced levers. We measure all three, then feed the biology first — the chemistry and physics follow.</p>'+
+  '<div class="levers">'+
+    '<div class="lever"><div class="lh">Biology</div><div class="lp">Living soil — microbes, roots, carbon cycling.</div></div>'+
+    '<div class="lever"><div class="lh">Chemistry</div><div class="lp">Balanced nutrition, corrected to the analysis.</div></div>'+
+    '<div class="lever"><div class="lh">Physics</div><div class="lp">Structure, water and air the roots can use.</div></div>'+
+  '</div>'+
+'</section>';
+
+// four brackets
+html += '<div class="sec"><h2>The four brackets</h2><span class="ln"></span><span class="cnt">tap to open</span></div>';
+html += '<div class="grid g2">';
+BRACKETS.forEach(function(b){
+  html += '<a class="tile" href="'+b.href+'">'+
+    '<div class="big-cnt">'+b.cnt+'</div>'+
+    '<div class="ic">'+b.ic+'</div>'+
+    '<h3>'+BB.esc(b.h)+'</h3>'+
+    '<p>'+BB.esc(b.p)+'</p>'+
+    '<div class="meta"><span><b>'+b.cnt+'</b> '+BB.esc(b.meta)+'</span>'+
+      (b.sub>0?'<span class="sub-cnt">'+b.sub+' '+BB.esc(b.subLbl)+'</span>':'<span class="faint">'+BB.esc(b.subLbl)+'</span>')+
+    '</div></a>';
+});
+html += '</div>';
+
+// secondary
+html += '<div class="sec"><h2>Supporting</h2><span class="ln"></span></div>';
+html += '<div class="grid g3">';
+SECONDARY.forEach(function(s){
+  html += '<a class="tile" href="'+s.href+'">'+
+    '<div class="ic">'+s.ic+'</div>'+
+    '<h3>'+BB.esc(s.h)+'</h3>'+
+    '<p>'+BB.esc(s.p)+'</p>'+
+    '<div class="meta"><b>'+BB.esc(s.meta)+'</b></div></a>';
+});
+html += '</div>';
+
+html += '<div style="height:20px;"></div>';
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

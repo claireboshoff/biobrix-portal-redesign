@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>BioBrix OS — Home</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22431a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BioBrix">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'home' });
+
+var d = BB.data, u = BB.user;
+// the accounting snapshot, read once — several sections below decide what to show from it
+var sage = d.sage && d.sage();
+var isDir = u.roleKey==='director', isAdvisor=u.roleKey==='advisor',
+    isOps=u.roleKey==='operations', isWh=u.roleKey==='warehouse', isFin=u.roleKey==='finance';
+var hour = new Date().getHours();
+var greet = hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
+var first = u.name.split(' ')[0];
+
+// ---- live pulse numbers ----
+var orders = d.all('orders');
+var openForecast = orders.filter(function(o){return o.status==='Forecast'||o.status==='Pending';});
+var forecastVal = openForecast.reduce(function(s,o){return s+d.orderValue(o);},0);
+var confirmedVal = orders.filter(function(o){return o.status==='Confirmed'||o.status==='Delivered';}).reduce(function(s,o){return s+d.orderValue(o);},0);
+var lowStock = d.all('inventory').filter(function(i){return i.qty<i.reorder;}).length;
+var newSoil = d.all('soil').filter(function(s){return s.status==='New'||s.status==='Awaiting lab';}).length;
+var newLeaf = d.all('leaf').filter(function(l){return l.status==='New';}).length;
+var awaitingStock = orders.filter(function(o){return o.status==='Awaiting stock';}).length;
+var myFarmers = u.rep ? d.where('farmers',function(f){return f.rep===u.rep;}).length : d.all('farmers').length;
+
+// ---- primary actions per role (the 3 big buttons — "not overwhelming") ----
+var BIG = {
+  director: [
+    {t:'BioBrix Intelligence', s:'Ask it anything · what needs you today', ic:'✦', href:'intelligence.html', c:'#3f6b28'},
+    {t:(sage&&sage.live)?'Sales — week & month':'Operations board', s:(sage&&sage.live)?'By agent, by customer, against budget':'See the whole business, live', ic:'⬡', href:(sage&&sage.live)?'sales-report.html':'operations.html', c:'#22431a'},
+    {t:(sage&&sage.live)?'Forecast & actual':'Sales forecast', s:(sage&&sage.live)?'Plan the year, watch it against invoiced':(forecastVal? BB.money(forecastVal)+' in the pipeline':'Rep pipeline'), ic:'▲', href:(sage&&sage.live)?'forecast-plan.html':'forecast.html', c:'#2f6f9e'}
+  ],
+  advisor: [
+    {t:'Capture an order', s:'In front of the farmer, speak it', ic:'🎙', href:'voice-order.html', c:'#c77d17'},
+    {t:'BioServices', s:'Soil · Leaf · Watch · Consult', ic:'✦', href:'bioservices.html', c:'#22431a'},
+    {t:'Field visit (BioWatch)', s:'Log a monitoring check', ic:'🌱', href:'biowatch.html', c:'#3f6b28'}
+  ],
+  operations: [
+    {t:'New & pending orders', s:awaitingStock? awaitingStock+' awaiting stock':'Action the pipeline', ic:'▲', href:'orders.html', c:'#22431a'},
+    {t:'Stock across depots', s:lowStock? lowStock+' items low — reorder':'All 3 depots', ic:'⬡', href:'stock.html', c:'#2f6f9e'},
+    {t:'Suppliers & reorder', s:'13 suppliers, one view', ic:'📦', href:'suppliers.html', c:'#c77d17'}
+  ],
+  finance: [
+    {t:'Finance & reconciliation', s:'Invoices, Pastel sync, reported vs actual', ic:'🧾', href:'finance.html', c:'#22431a'},
+    {t:'Orders & quotes', s:'Approve, invoice, track', ic:'📋', href:'orders.html', c:'#3f6b28'},
+    {t:'Sales forecast', s:'Per product · rep · area · month', ic:'📈', href:'forecast.html', c:'#2f6f9e'}
+  ],
+  warehouse: [
+    {t:'My depot', s:'Stock, blending, deliveries', ic:'⬡', href:'depots.html', c:'#22431a'},
+    {t:'Stock take', s:'Count & update inventory', ic:'📦', href:'stock.html', c:'#3f6b28'},
+    {t:'Deliveries', s:'What is going out', ic:'🚚', href:'deliveries.html', c:'#2f6f9e'}
+  ]
+};
+var big = BIG[u.roleKey] || BIG.director;
+
+// Once their own figures are flowing, every seat's three buttons have to land on their business.
+// The sets above still point at sections running on demonstration data, so each seat gets a live
+// set of its own. FreedomHub seats keep the demonstration set so the full product can still be shown.
+var LIVE_BIG = {
+  advisor: [
+    {t:'Your customers', s:'What they owe, what they have bought', ic:'🌾', href:'farms.html', c:'#22431a'},
+    {t:'Sales — week & month', s:'Yours, against budget', ic:'▲', href:'sales-report.html', c:'#3f6b28'},
+    {t:'Forecast & actual', s:'Plan the year, watch it against invoiced', ic:'◎', href:'forecast-plan.html', c:'#2f6f9e'}
+  ],
+  operations: [
+    {t:'Operations board', s:'The whole business, live', ic:'⬡', href:'operations.html', c:'#22431a'},
+    {t:'What is moving', s:'Litres and kilograms going out', ic:'📦', href:'dispatch.html', c:'#3f6b28'},
+    {t:'BioBrix Intelligence', s:'Ask it anything · what needs you today', ic:'✦', href:'intelligence.html', c:'#2f6f9e'}
+  ],
+  finance: [
+    {t:'Finance', s:'Owed to you, overdue, over their limit', ic:'🧾', href:'finance.html', c:'#22431a'},
+    {t:'Sales — week & month', s:'By agent, by customer, against budget', ic:'▲', href:'sales-report.html', c:'#3f6b28'},
+    {t:'Commission', s:'Worked out on what was actually invoiced', ic:'◈', href:'commission.html', c:'#2f6f9e'}
+  ],
+  warehouse: [
+    {t:'What is moving', s:'Litres and kilograms going out', ic:'📦', href:'dispatch.html', c:'#22431a'},
+    {t:'Jobs & requests', s:'What has been asked for', ic:'✉', href:'jobs.html', c:'#3f6b28'}
+  ]
+};
+var fhSeat = /@freedomhub\.io$/i.test(u.email||'');
+var clientLive = !!(BB.auth && BB.auth.tenantLive ? BB.auth.tenantLive() : (sage && sage.live));
+if(clientLive && !fhSeat && LIVE_BIG[u.roleKey]) big = LIVE_BIG[u.roleKey];
+// Last line of defence: never put a card in front of someone who cannot open it.
+if(BB.auth && typeof BB.auth.canPage === 'function') big = big.filter(function(b){ return BB.auth.canPage(b.href); });
+
+// ---- pulse tiles per role ----
+var PULSE = {
+  director: [
+    {l:'Pipeline (forecast)', v:BB.money(forecastVal), s:openForecast.length+' open orders'},
+    {l:'Confirmed value', v:BB.money(confirmedVal), s:'this season', ok:1},
+    {l:'Quotes to approve', v:orders.filter(function(o){return d.quoteStatus(o)==='Awaiting approval';}).length, s:'in Orders — tap to approve', warn:orders.filter(function(o){return d.quoteStatus(o)==='Awaiting approval';}).length>0},
+    {l:'Samples in', v:(newSoil+newLeaf), s:'soil + leaf to action', warn:(newSoil+newLeaf)>0}
+  ],
+  advisor: [
+    {l:'My farmers', v:myFarmers, s:u.region},
+    {l:'Samples to interpret', v:(newSoil+newLeaf), s:'soil + leaf', warn:(newSoil+newLeaf)>0},
+    {l:'Active programmes', v:d.where('programs',function(p){return p.advisor===u.rep&&p.status==='Active';}).length, s:'BioConsult'},
+    {l:'My pipeline', v:BB.money(orders.filter(function(o){return o.rep===u.rep;}).reduce(function(s,o){return s+d.orderValue(o);},0)), s:'this season'}
+  ],
+  finance: [
+    {l:'Outstanding', v:BB.money(d.all('invoices').filter(function(i){return i.status!=='Paid';}).reduce(function(s,i){return s+(i.amount||0);},0)), s:d.all('invoices').filter(function(i){return i.status==='Overdue';}).length+' overdue', warn:d.all('invoices').some(function(i){return i.status==='Overdue';})},
+    {l:'Delivered, uninvoiced', v:orders.filter(function(o){return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id);}).length, s:'reported as sales', warn:orders.some(function(o){return (o.status==='Delivered'||o.status==='Confirmed') && !d.orderInvoiced(o.id);})},
+    {l:'Quotes in the chain', v:orders.filter(function(o){return !!d.quoteStatus(o) && !d.orderInvoiced(o.id);}).length, s:'awaiting approval → invoice'},
+    {l:'Reminders drafted', v:d.all('outbox').filter(function(x){return x.status==='Draft';}).length, s:'check & send', warn:d.all('outbox').some(function(x){return x.status==='Draft';})}
+  ],
+  operations: [
+    {l:'Orders to action', v:orders.filter(function(o){return o.status==='Pending'||o.status==='Awaiting stock';}).length, s:'new + awaiting', warn:1},
+    {l:'Stock alerts', v:lowStock, s:'below reorder', warn:lowStock>0},
+    {l:'Blending jobs', v:d.all('blending').length, s:'across depots'},
+    {l:'In transit', v:d.where('deliveries',function(x){return x.status==='In transit';}).length, s:'deliveries'}
+  ],
+  warehouse: [
+    {l:'Low stock', v:lowStock, s:'reorder soon', warn:lowStock>0},
+    {l:'Blending', v:d.all('blending').filter(function(b){return b.status==='Blending';}).length, s:'in progress'},
+    {l:'Deliveries out', v:d.where('deliveries',function(x){return x.status==='In transit';}).length, s:'today'},
+    {l:'Depots', v:d.all('depots').length, s:'network'}
+  ]
+};
+var pulse = PULSE[u.roleKey] || PULSE.director;
+
+// ---- all modules (collapsed grid — "everything, but tucked away") ----
+var MODULES = [
+  {sec:'Sales', items:[
+    {t:'Forecast & actual', s:'Plan the year in litres and kilograms', ic:'🎯', href:'forecast-plan.html', key:'plan'},
+    {t:'Sales — weekly & monthly', s:'By agent, by customer, against budget', ic:'📊', href:'sales-report.html', key:'salesreport'},
+    {t:'Commission', s:'Set a rate once, worked out every month', ic:'💰', href:'commission.html', key:'commission'},
+    {t:'Voice order capture', s:'Speak the order in the field', ic:'🎙', href:'voice-order.html', key:'voice'},
+    {t:'Sales forecast', s:isAdvisor?'Your pipeline by month':'Rep pipeline by month', ic:'📈', href:'forecast.html', key:'forecast'},
+    {t:'Territory potential', s:'Where the next farmer is', ic:'🗺', href:'territory.html', key:'territory'},
+    {t:'Orders', s:isAdvisor?'Your orders — where each one is':'Full order pipeline', ic:'📋', href:'orders.html', key:'orders'}
+  ]},
+  {sec:'Operations', items:[
+    {t:'Operations board', s:'Whole-business live view', ic:'⬡', href:'operations.html', key:'ops'},
+    {t:'Stock', s:isWh?'Count and confirm your depot':'Inventory across 3 depots', ic:'📦', href:'stock.html', key:'stock'},
+    {t:'Depots', s:isWh?'Your depot, live':'George · Ballito · Tzaneen', ic:'🏭', href:'depots.html', key:'depots'},
+    {t:'Suppliers & POs', s:'13 suppliers · raise purchase orders', ic:'🔗', href:'suppliers.html', key:'suppliers'},
+    {t:'Deliveries', s:'Logistics & dispatch', ic:'🚚', href:'deliveries.html', key:'deliveries'},
+    {t:'Labels', s:'Product · blend · delivery — print-ready', ic:'🏷', href:'labels.html', key:'labels'},
+    {t:'Finance & reconciliation', s:'Invoices · Pastel sync · reported vs actual · reminders', ic:'🧾', href:'finance.html', key:'finance'}
+  ]},
+  {sec:'Intelligence', items:[
+    {t:'BioBrix Intelligence', s:'Ask a question · farm health · reorder forecast · alerts', ic:'✦', href:'intelligence.html', key:'intelligence'},
+    {t:'Team feed', s:'One team, four provinces — talk & hand over', ic:'📣', href:'team.html', key:'team'},
+    {t:'Jobs to FreedomHub', s:'Ask for a change, a fix or a new button — the team builds it', ic:'✉', href:'jobs.html', key:'jobs'}
+  ]},
+  {sec:'BioServices · RenewAg', items:[
+    {t:'BioServices hub', s:'The four brackets', ic:'✦', href:'bioservices.html', key:'bioservices'},
+    {t:'Farms & farmers', s:isAdvisor?'Your farmers — call or WhatsApp them':'Farm → block → data', ic:'🌾', href:'farms.html', key:'farms'},
+    {t:'BioAnalyze — Soil', s:'Soil diagnostics', ic:'🧪', href:'bioanalyze-soil.html', key:'bioanalyze'},
+    {t:'BioAnalyze — Leaf', s:'Leaf-sap analysis', ic:'🍃', href:'bioanalyze-leaf.html', key:'bioanalyze'},
+    {t:'BioWatch', s:'Season monitoring', ic:'🌱', href:'biowatch.html', key:'biowatch'},
+    {t:'BioConsult', s:'Programmes & recommendations', ic:'📑', href:'bioconsult.html', key:'bioconsult'},
+    {t:'Product library', s:'Data sheets · 13 suppliers', ic:'📚', href:'products-library.html', key:'products'},
+    {t:'Farm files', s:'One place for every document', ic:'🗂', href:'farm-files.html', key:'files'}
+  ]}
+];
+
+// ---- render ----
+var html = '';
+html += '<section class="hero-band" style="margin-top:16px;">'+
+  '<div class="eyebrow" style="color:var(--lime);">'+greet+'</div>'+
+  '<h1 style="font-family:var(--display);font-size:1.6rem;font-weight:600;margin:2px 0 4px;">'+BB.esc(first)+' — here\'s what needs you.</h1>'+
+  '<p style="opacity:.85;font-size:.9rem;">'+BB.esc(u.role)+(u.region?' · '+BB.esc(u.region):'')+' · Everything below is saved on this device and syncs when you have signal.</p>'+
+'</section>';
+
+// 3 big buttons
+html += '<div class="grid g3" style="margin-top:16px;">';
+big.forEach(function(b){
+  html += '<a class="tile" href="'+b.href+'" style="border-top:3px solid '+b.c+';">'+
+    '<div class="ic" style="background:'+b.c+';color:#eaf4d8;">'+b.ic+'</div>'+
+    '<h3>'+b.t+'</h3><p>'+BB.esc(b.s)+'</p>'+
+    '<div class="meta"><b>Open ›</b></div></a>';
+});
+html += '</div>';
+
+// ---- From the accounting system (only when it is actually connected) ----
+// Without this the home screen still reads as a demo even after Sage is live, because every tile
+// below is built from portal-side orders. These four come straight from the accounting ledger.
+// A seat served product movement only has no ledger to show — these tiles would all read zero.
+if(sage && sage.live && !sage.productsOnly && (sage.customers||[]).length && (BB.auth.can('finance') || BB.auth.can('sales'))){
+  var scust = sage.customers||[], sinv = sage.invoices||[];
+  var open_ = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+  var owed = sinv.reduce(function(t,i){ return t+open_(i); },0);
+  var od   = sinv.filter(function(i){return i.status==='Overdue';});
+  var odVal= od.reduce(function(t,i){ return t+open_(i); },0);
+  var overLimit = scust.filter(function(c){ return c.creditLimit>0 && c.balance>c.creditLimit; });
+  var m = sage.meta||{};
+  html += '<div class="sec"><h2>From your accounting system</h2><span class="ln"></span><span class="cnt">read-only · last read '+BB.esc(m.lastSast||'—')+'</span></div>';
+  html += BB.staleNote();
+  // Each tile opens the list behind it — a number you cannot act on is decoration.
+  var tile = function(href, cls, label, value, sub){
+    // A seat that may not open Finance must not be handed a Finance link that will refuse it.
+    var canGo = !(BB.auth && typeof BB.auth.canPage === 'function') || BB.auth.canPage(href);
+    if(!canGo) return '<div class="stat'+(cls?' '+cls:'')+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+'</div></div>';
+    return '<a class="stat tap'+(cls?' '+cls:'')+'" href="'+href+'"><div class="l">'+label+'</div><div class="v">'+value+'</div><div class="s">'+sub+' ›</div></a>';
+  };
+  html += '<div class="grid g4">'+
+    tile('finance.html?show=open', '', 'Owed to you', BB.money(owed), sinv.filter(function(i){return open_(i)>0.5;}).length+' invoices still open')+
+    tile('finance.html?show=overdue', odVal?'bad':'', 'Overdue', BB.money(odVal), od.length+' invoices past due')+
+    tile('farms.html?show=overlimit', overLimit.length?'warn':'', 'Over their limit', overLimit.length, 'check before a rep drives out')+
+    tile('farms.html?show=accounts', '', 'Customers', scust.length, 'live from '+BB.esc(m.source||'the ledger'))+
+  '</div>';
+  if(BB.auth.can('finance')) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Every figure here comes from your own accounts, refreshed three times a day. <a href="finance.html" style="color:var(--green-dark);">Open Finance ›</a></div>';
+}
+
+// live pulse
+// A money seat gets a pulse built from the ledger — the month's trading, what is aging, who is
+// on hold. Nothing here is invented. Other seats keep the portal-side pulse, which is marked.
+var ledgerPulse = null;
+if(sage && sage.live && (BB.auth.can('finance') || isDir)){
+  var sinv2 = sage.invoices||[], spay2 = sage.payments||[], scust2 = sage.customers||[];
+  var open2 = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+  var ym = new Date().toISOString().slice(0,7);
+  var prevYm = (function(){ var dte=new Date(); dte.setMonth(dte.getMonth()-1); return dte.toISOString().slice(0,7); })();
+  var invM = sinv2.filter(function(i){ return (i.date||'').slice(0,7)===ym; });
+  // Compare like with like: the current month is part-finished, so last month is counted only up
+  // to the same day. Otherwise a healthy month on the 5th reads as a 90% collapse.
+  var dayNow = new Date().getDate();
+  var invP = sinv2.filter(function(i){ return (i.date||'').slice(0,7)===prevYm && parseInt((i.date||'').slice(8,10),10) <= dayNow; });
+  var payM = spay2.filter(function(x){ return (x.date||'').slice(0,7)===ym; });
+  var invMv = invM.reduce(function(t,i){ return t+(i.amount||0); },0);
+  var invPv = invP.reduce(function(t,i){ return t+(i.amount||0); },0);
+  var payMv = payM.reduce(function(t,x){ return t+(x.amount||0); },0);
+  var today0 = new Date(new Date().toISOString().slice(0,10));
+  var daysOver = function(i){ return i.dueDate ? Math.round((today0-new Date(i.dueDate))/86400000) : 0; };
+  var aged90 = sinv2.filter(function(i){ return open2(i)>0.5 && daysOver(i)>=90; });
+  var aged90v = aged90.reduce(function(t,i){ return t+open2(i); },0);
+  var held = scust2.filter(function(c){ return c.onHold; });
+  var delta = invPv? Math.round((invMv-invPv)/invPv*100) : null;
+  ledgerPulse = [
+    {l:'Invoiced this month', v:BB.money(invMv), s:invM.length+' invoices'+(delta!==null? ' · '+(delta>=0?'+':'')+delta+'% on the same days last month':'')},
+    {l:'Received this month', v:BB.money(payMv), s:payM.length+' receipts', ok:1},
+    {l:'90 days and older', v:BB.money(aged90v), s:aged90.length+' invoices — chase first', warn:aged90v>0},
+    {l:'Accounts on hold', v:held.length, s:'flagged in your accounts', warn:held.length>0}
+  ];
+}
+// A seat without ledger access still has its own figures: what has actually moved. Better a small
+// true pulse than a wall of demonstration tiles with an apology printed over them.
+var movePulse = null;
+if(!ledgerPulse && sage && sage.live && (sage.products||[]).length){
+  var mYm = new Date().toISOString().slice(0,7);
+  var mPrev = (function(){ var t=new Date(); t.setDate(1); t.setMonth(t.getMonth()-1); return t.toISOString().slice(0,7); })();
+  var q = function(p, k){ var m=(p.months||{})[k]; return m? (m.qty||0) : 0; };
+  var nowQ=0, prevQ=0, moving=0, busiest=null;
+  (sage.products||[]).forEach(function(p){
+    var a=q(p,mYm), b=q(p,mPrev); nowQ+=a; prevQ+=b; if(a>0) moving++;
+    if(a>0 && (!busiest || a>busiest.q)) busiest={n:p.name, q:a};
+  });
+  var fmt = function(v){ return (Math.round(v*10)/10).toLocaleString('en-ZA'); };
+  // No month-on-month figure here: the current month is part-finished, so any comparison with a
+  // whole month reads as a collapse. The two months stand side by side and speak for themselves.
+  movePulse = [
+    {l:'Out this month', v:fmt(nowQ), s:'units invoiced so far'},
+    {l:'Products moving', v:moving, s:'of '+(sage.products||[]).length+' on the books'},
+    {l:'Busiest line', v:busiest? fmt(busiest.q) : '0', s:busiest? busiest.n : 'nothing yet this month'},
+    {l:'Last month, in full', v:fmt(prevQ), s:'units invoiced'}
+  ];
+}
+// Once BioBrix is on its own figures, their people do not get a board of demonstration tiles.
+var showPortalPulse = !ledgerPulse && !movePulse && !(clientLive && !fhSeat);
+var pulseSet = ledgerPulse || movePulse || (showPortalPulse ? pulse : null);
+if(pulseSet){
+html += '<div class="sec"><h2>'+(ledgerPulse?'This month':(movePulse?'What has moved':'Live pulse'))+'</h2><span class="ln"></span><span class="cnt">'+
+  (ledgerPulse? 'from your accounting system' : (movePulse? 'from your own invoices' : 'updates as you work'))+'</span>'+((ledgerPulse||movePulse)?BB.liveChip():'')+'</div>';
+html += '<div class="grid g4">';
+pulseSet.forEach(function(p){
+  html += '<div class="stat'+(p.warn?' warn':'')+(p.ok?'':'')+'"><div class="l">'+p.l+'</div><div class="v">'+p.v+'</div><div class="s">'+BB.esc(p.s)+'</div></div>';
+});
+html += '</div>';
+}
+
+// The chase list — the oldest money, with the customer's own number to call. All from the ledger.
+if(sage && sage.live && (BB.auth.can('finance') || isDir)){
+  var sinv3 = sage.invoices||[], scust3 = sage.customers||[];
+  var byId3 = {}; scust3.forEach(function(c){ byId3[c.id]=c; });
+  var open3 = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+  var t0 = new Date(new Date().toISOString().slice(0,10));
+  var chase = sinv3.filter(function(i){ return i.status==='Overdue' && open3(i)>0.5; })
+    .map(function(i){ return {i:i, c:byId3[i.customer]||{name:'—'}, d:i.dueDate? Math.round((t0-new Date(i.dueDate))/86400000):0, v:open3(i)}; })
+    .sort(function(a,b){ return b.d-a.d || b.v-a.v; }).slice(0,6);
+  html += '<div class="sec"><h2>Chase these first</h2><span class="ln"></span><span class="cnt">oldest money owed · straight from your accounts</span>'+BB.liveChip()+'</div>';
+  if(!chase.length){ html += '<div class="card card-p"><div class="empty">Nothing overdue. Every account is inside its terms.</div></div>'; }
+  else{
+    html += '<div class="card">';
+    chase.forEach(function(x, ix){
+      var tel = String(x.c.phone||'').replace(/\D/g,'').replace(/^0/,'27');
+      var msg = encodeURIComponent('Good day '+(x.c.name||'')+', a friendly reminder from BioBrix about invoice '+(x.i.ref||'')+'. May we arrange payment?');
+      html += '<div class="row between" style="padding:12px 16px;gap:12px;align-items:flex-start;'+(ix?'border-top:1px solid var(--line-soft);':'')+'">'+
+        '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge b-bad">'+x.d+' days over</span><b style="font-size:.92rem;">'+BB.esc(x.c.name)+'</b></div>'+
+          '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(x.i.label||x.i.ref)+(x.i.kind==='opening'?' <span class="faint">(carried over from your previous system)</span>':'')+' · <b>'+BB.money(x.v)+'</b> outstanding · due '+BB.date(x.i.dueDate)+'</div>'+
+          '<div class="faint" style="font-size:.74rem;margin-top:2px;">'+BB.esc(x.i.kind==='opening'?'':(x.i.description||''))+(x.c.creditLimit? (x.i.kind==='opening'?'':' · ')+'limit '+BB.money(x.c.creditLimit):'')+'</div></div>'+
+        '<div class="row" style="gap:6px;flex:none;">'+
+          (tel? '<a class="btn ghost sm" href="tel:+'+tel+'">Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+tel+'?text='+msg+'">WhatsApp</a>' : '<span class="faint" style="font-size:.74rem;">no number on the account</span>')+
+          '<a class="btn sm" href="finance.html?show=overdue">Open ›</a></div>'+
+      '</div>';
+    });
+    html += '</div>';
+  }
+}
+// follow-ups: programme timing turned into dated reminders (advisor sees own; director sees all).
+// These run on the portal's own seeded farms. Once BioBrix is on their own figures their people
+// must never meet our example farmers, so the whole block stands down for a live client seat.
+if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && BB.auth.can('finance'))){
+  var fups = d.all('followups').filter(function(x){ return x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); }).slice(0,5);
+  var today0 = new Date(new Date().toISOString().slice(0,10));
+  html += '<div class="sec"><h2>Follow-ups due</h2><span class="ln"></span><span class="cnt">farmer gets an email + WhatsApp nudge 3 days before, with the weather window</span></div>';
+  if(!fups.length){ html += '<div class="card card-p"><div class="empty">Nothing due — every programme step is on track.</div></div>'; }
+  else {
+    html += '<div class="card" id="fuCard">';
+    fups.forEach(function(fu, i){
+      var f=d.farmer(fu.farmer), r=d.rep(fu.rep), pd=d.product(fu.prod), blk=d.by('blocks',fu.block)||{name:''};
+      var days=Math.round((new Date(fu.due)-today0)/86400000);
+      var cell=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27');
+      html += '<div class="row between" style="padding:12px 16px;gap:12px;align-items:flex-start;'+(i?'border-top:1px solid var(--line-soft);':'')+'">'+
+        '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><b>'+BB.esc(f.name)+'</b><span class="faint" style="font-size:.78rem;">'+BB.esc(f.farm)+'</span></div>'+
+          '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(fu.what)+' · '+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+' · <span class="faint">'+BB.date(fu.due)+'</span></div>'+
+          '<div class="faint" style="font-size:.74rem;margin-top:2px;">Farmer nudge '+(fu.farmerNudge?BB.date(fu.farmerNudge):'3 days before')+' · email + WhatsApp · automated'+(isDir?' · '+BB.esc(r.name):'')+'</div></div>'+
+        '<div class="row" style="gap:6px;flex:none;">'+
+          (cell?'<a class="btn ghost sm" href="tel:+'+cell+'">Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+cell+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', reminder from BioBrix: '+fu.what+' on '+blk.name+' is due '+BB.date(fu.due)+'. Shall I bring the product through?')+'">WhatsApp</a>':'')+
+          '<button class="btn sm" data-fudone="'+fu.id+'">Done ✓</button></div>'+
+      '</div>';
+    });
+    html += '</div>';
+  }
+}
+
+// collapsed everything
+// A seat whose whole job is two pages must not be shown an empty drawer called "everything else".
+var anyMore = MODULES.some(function(g){ return g.items.some(function(it){ return BB.auth.can(it.key); }); });
+if(anyMore){
+html += '<div class="sec"><h2>Everything else</h2><span class="ln"></span>'+
+  '<button class="btn ghost sm" id="tog">Show all tools</button></div>';
+html += '<div id="allmods" style="display:none;">';
+MODULES.forEach(function(group){
+  var visible = group.items.filter(function(it){ return BB.auth.can(it.key); });
+  if(!visible.length) return;
+  html += '<div class="sec"><h2 style="font-size:.92rem;color:var(--green-mid);">'+group.sec+'</h2><span class="ln"></span></div>';
+  html += '<div class="grid g3">';
+  visible.forEach(function(it){
+    html += '<a class="tile" href="'+it.href+'"><div class="ic">'+it.ic+'</div><h3>'+it.t+'</h3><p>'+BB.esc(it.s)+'</p></a>';
+  });
+  html += '</div>';
+});
+html += '</div>';
+}
+
+// footer row: switch seat + reset
+html += '<div class="divider"></div>'+
+  '<div class="row between" style="padding-bottom:20px;">'+
+    '<div class="faint" style="font-size:.78rem;">Signed in as <b>'+BB.esc(u.name)+'</b> · '+BB.esc(u.role)+'</div>'+
+    '<div class="row">'+
+      ((BB.auth.canPage&&BB.auth.canPage('client-portal.html'))?'<a class="btn ghost sm" href="client-portal.html">Farmer portal preview</a>':'')+((BB.auth.canPage&&BB.auth.canPage('showcase.html'))?'<a class="btn ghost sm" href="showcase.html">Desktop &amp; phone view</a>':'')+
+      // Switching seat and resetting demonstration data are how FreedomHub shows the product.
+      // They are not something BioBrix's own people should be offered on their own business.
+      (fhSeat || !clientLive
+        ? '<button class="btn ghost sm" id="switch">Switch seat</button>'+
+          '<button class="btn ghost sm" id="reset">Reset demo data</button>'
+        : '<a class="btn ghost sm" href="login.html">Sign out</a>')+
+    '</div>'+
+  '</div>';
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+
+Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
+  b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Follow-up done · '+d.farmer(fu.farmer).name); location.reload(); };
+});
+var togBtn = document.getElementById('tog');
+if(togBtn) togBtn.onclick=function(){
+  var m=document.getElementById('allmods'); var shown=m.style.display!=='none';
+  m.style.display=shown?'none':'block'; this.textContent=shown?'Show all tools':'Hide tools';
+};
+// These two only exist on a demonstration seat — a live client seat gets a plain Sign out instead.
+var swBtn = document.getElementById('switch');
+if(swBtn) swBtn.onclick=function(){ BB.auth.logout(); };
+var rsBtn = document.getElementById('reset');
+if(rsBtn) rsBtn.onclick=function(){ if(confirm('Reset all demo data to the seeded example?')){ BB.data.reset(); BB.toast('Demo data reset'); setTimeout(function(){location.reload();},600);} };
+
+
+// On a first sign-in there is no cached snapshot yet, so this page draws before the accounting
+// data arrives — and would sit there showing sample figures until the next navigation. When the
+// data lands, draw it again. Once only.
+window.addEventListener('bb:sage', function(){
+  try{ if(sessionStorage.getItem('bb_sage_drawn')) return; sessionStorage.setItem('bb_sage_drawn','1'); }catch(e){}
+  location.reload();
+});
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

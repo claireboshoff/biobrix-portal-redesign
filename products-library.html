@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Product library · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'bioservices.html' });
+
+var d = BB.data;
+var products = d.all('products');
+var suppliers = d.all('suppliers');
+
+var css=''+
+'.pcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:.15s;position:relative;}'+
+'.pcard:hover{border-color:var(--green-bright);box-shadow:var(--shadow-lg);}'+
+'.pcard.open{border-color:var(--green-bright);}'+
+'.ltag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.66rem;font-weight:700;letter-spacing:.3px;}'+
+'.lv-Biology{background:var(--ok-bg);color:var(--ok);}'+
+'.lv-Chemistry{background:var(--blue-bg);color:var(--blue);}'+
+'.lv-Physics{background:var(--amber-bg);color:var(--amber);}'+
+'.pcard .sheet{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);font-size:.85rem;line-height:1.6;color:var(--muted);}'+
+'.pcard.open .sheet{display:block;}'+
+'.pmeta{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:.76rem;color:var(--faint);}'+
+'.pmeta b{color:var(--green-mid);}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+var state={ lever:'All', supplier:'', open:{} };
+
+function levers(){ return ['All','Biology','Chemistry','Physics']; }
+
+function filtered(){
+  return products.filter(function(p){
+    if(state.lever!=='All' && p.lever!==state.lever) return false;
+    if(state.supplier && p.supplier!==state.supplier) return false;
+    return true;
+  });
+}
+
+function statRow(){
+  var reps = products.map(function(p){ return p.supplier; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
+  var bio=products.filter(function(p){ return p.lever==='Biology'; }).length;
+  var chem=products.filter(function(p){ return p.lever==='Chemistry'; }).length;
+  var phys=products.filter(function(p){ return p.lever==='Physics'; }).length;
+  return '<div class="grid g3">'+
+    '<div class="stat"><div class="l">Products</div><div class="v">'+products.length+'</div><div class="s">data sheets on file</div></div>'+
+    '<div class="stat"><div class="l">Suppliers represented</div><div class="v">'+reps+'</div><div class="s">of '+suppliers.length+' in the network</div></div>'+
+    '<div class="stat"><div class="l">By lever</div><div class="v" style="font-size:1.05rem;">'+bio+' Bio · '+chem+' Chem · '+phys+' Phys</div><div class="s">the three levers</div></div>'+
+  '</div>';
+}
+
+function chips(){
+  var html='<div class="row" style="margin:20px 0 10px;">';
+  levers().forEach(function(l){
+    html += '<button class="chip lever-chip'+(state.lever===l?' on':'')+'" data-lever="'+l+'">'+l+'</button>';
+  });
+  html += '</div>';
+  html += '<div class="fld" style="max-width:340px;"><label>Supplier</label><select id="supFilter"><option value="">All suppliers</option>'+
+    suppliers.map(function(s){ return '<option value="'+s.id+'"'+(s.id===state.supplier?' selected':'')+'>'+BB.esc(s.name)+'</option>'; }).join('')+
+    '</select></div>';
+  return html;
+}
+
+function cards(){
+  var list=filtered();
+  if(!list.length) return '<div class="card"><div class="empty"><div class="big">📚</div>No products match that filter.</div></div>';
+  var html='<div class="grid g3">';
+  list.forEach(function(p){
+    var sup=d.supplier(p.supplier);
+    var open=!!state.open[p.id];
+    html += '<div class="pcard'+(open?' open':'')+'" data-prod="'+p.id+'">'+
+      '<div class="row between" style="align-items:flex-start;">'+
+        '<div><b style="font-family:var(--display);font-size:1rem;color:var(--green-dark);">'+BB.esc(p.name)+'</b>'+
+          '<div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+'</div></div>'+
+        '<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever)+'</span>'+
+      '</div>'+
+      '<div class="pmeta"><span>Pack <b>'+BB.esc(p.pack)+'</b></span><span><b>'+BB.money(p.price)+'</b>/'+BB.esc(p.unit)+'</span><span>'+BB.esc(sup.name)+'</span></div>'+
+      '<div class="sheet"><div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:4px;">Application &amp; notes</div>'+
+        BB.esc(p.sheet)+
+        '<div class="divider" style="margin:12px 0;"></div>'+
+        '<div class="pmeta" style="margin-top:0;"><span>Category <b>'+BB.esc(p.cat)+'</b></span><span>Supplier <b>'+BB.esc(sup.name)+'</b></span><span>Lead <b>'+sup.lead+' days</b></span></div>'+
+      '</div>'+
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function render(){
+  var html='';
+  html += '<div class="page-head"><h1>Product library</h1>'+
+    '<p>Every data sheet across the 13 suppliers, at the push of a button — biology, chemistry and physics inputs in one quick reference. Tap a product for the full sheet.</p></div>';
+  html += statRow();
+  html += chips();
+  html += '<div class="sec"><h2>Products</h2><span class="ln"></span><span class="cnt">'+filtered().length+' shown</span></div>';
+  html += '<div id="cardWrap">'+cards()+'</div>';
+  html += '<div style="height:24px;"></div>';
+  document.querySelector('main.wrap').innerHTML=html;
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('.lever-chip'), function(c){
+    c.onclick=function(){ state.lever=c.getAttribute('data-lever'); render(); };
+  });
+  var sf=document.getElementById('supFilter');
+  if(sf) sf.onchange=function(){ state.supplier=sf.value; render(); };
+  Array.prototype.forEach.call(document.querySelectorAll('.pcard'), function(card){
+    card.onclick=function(){
+      var id=card.getAttribute('data-prod');
+      state.open[id]=!state.open[id];
+      card.classList.toggle('open');
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

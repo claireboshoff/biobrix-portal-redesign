@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Operations board · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+
+var d = BB.data;
+// Is this a BioBrix seat on BioBrix's own figures? If so the board is built from the ledger.
+var liveBoard = !!(BB.auth && BB.auth.tenantLive && BB.auth.tenantLive() && !(BB.auth.isFreedomHub && BB.auth.isFreedomHub()));
+
+// ---- source data ----
+var orders = d.all('orders');
+var inventory = d.all('inventory');
+var deliveries = d.all('deliveries');
+var blending = d.all('blending');
+var depots = d.all('depots');
+var reps = d.all('reps');
+var soil = d.all('soil');
+var leaf = d.all('leaf');
+
+// ---- top stat computations ----
+var openOrders = orders.filter(function(o){ return o.status==='Forecast'||o.status==='Pending'; });
+var pipelineVal = openOrders.reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+var confirmedVal = orders.filter(function(o){ return o.status==='Confirmed'||o.status==='Delivered'; }).reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+var awaitingStock = orders.filter(function(o){ return o.status==='Awaiting stock'; }).length;
+var lowItems = inventory.filter(function(i){ return i.qty<i.reorder; });
+var inTransit = deliveries.filter(function(x){ return x.status==='In transit'; });
+
+// ---- render ----
+var html = '';
+
+html += '<section class="page-head">'+
+  '<div class="eyebrow">Operations</div>'+
+  '<h1>The board</h1>'+
+  '<p>'+(liveBoard
+    ? 'The whole business on one screen, straight from your accounting system \u2014 what has been invoiced and received, who is behind, who is selling it and what is going out the door. Read three times a day.'
+    : 'The whole business on one screen — sales, stock, blending and deliveries, live as the team works. Everything here is saved on this device and syncs when you have signal.')+'</p>'+
+'</section>';
+
+// ---- top stat row ----
+// With the accounting system connected, the top of the board is the real trading picture.
+// Orders, stock and blending do not exist in Sage, so they sit lower down and are marked.
+var sg = BB.data.sage && BB.data.sage();
+var STATS;
+if(sg && sg.live){
+  var si=sg.invoices||[], sp=sg.payments||[], sc=sg.customers||[];
+  var op=function(i){ return i.outstanding!=null?i.outstanding:(i.status==='Paid'?0:(i.amount||0)); };
+  var ym=new Date().toISOString().slice(0,7);
+  var t0=new Date(new Date().toISOString().slice(0,10));
+  var dov=function(i){ return i.dueDate? Math.round((t0-new Date(i.dueDate))/86400000):0; };
+  var invM=si.filter(function(i){return (i.date||'').slice(0,7)===ym;});
+  var payM=sp.filter(function(x){return (x.date||'').slice(0,7)===ym;});
+  var owed=si.reduce(function(t,i){return t+op(i);},0);
+  var od=si.filter(function(i){return i.status==='Overdue';});
+  var a90=si.filter(function(i){ return op(i)>0.5 && dov(i)>=90; });
+  var lim=sc.filter(function(c){ return c.creditLimit>0 && c.balance>c.creditLimit; });
+  STATS = [
+    {l:'Invoiced this month', v:BB.money(invM.reduce(function(t,i){return t+(i.amount||0);},0)), s:invM.length+' invoices', cls:''},
+    {l:'Received this month', v:BB.money(payM.reduce(function(t,x){return t+(x.amount||0);},0)), s:payM.length+' receipts', cls:''},
+    {l:'Owed to you', v:BB.money(owed), s:si.filter(function(i){return op(i)>0.5;}).length+' open invoices', cls:''},
+    {l:'Overdue', v:BB.money(od.reduce(function(t,i){return t+op(i);},0)), s:od.length+' past due', cls:od.length?'bad':''},
+    {l:'90 days and older', v:BB.money(a90.reduce(function(t,i){return t+op(i);},0)), s:a90.length+' invoices', cls:a90.length?'warn':''},
+    {l:'Over their limit', v:lim.length, s:'accounts to watch', cls:lim.length?'warn':''}
+  ];
+} else {
+  STATS = [
+    {l:'Open pipeline', v:BB.money(pipelineVal), s:openOrders.length+' forecast + pending', cls:''},
+    {l:'Confirmed this season', v:BB.money(confirmedVal), s:'won + delivered', cls:''},
+    {l:'Awaiting stock', v:awaitingStock, s:'orders held on stock', cls:awaitingStock>0?'warn':''},
+    {l:'Below reorder', v:lowItems.length, s:'stock lines low', cls:lowItems.length>0?'bad':''},
+    {l:'In transit', v:inTransit.length, s:'deliveries on the road', cls:''},
+    {l:'Blending jobs', v:blending.length, s:'across depots', cls:''}
+  ];
+}
+html += '<div class="grid g3">';
+STATS.forEach(function(st){
+  html += '<div class="stat'+(st.cls?' '+st.cls:'')+'">'+
+    '<div class="l">'+st.l+'</div>'+
+    '<div class="v">'+st.v+'</div>'+
+    '<div class="s">'+BB.esc(st.s)+'</div></div>';
+});
+html += '</div>';
+
+// ---- On their own figures, this board is built from the ledger --------------------------------
+// The four sections that used to live here (sales by rep, reported-vs-invoiced, stock health, and
+// the order queue) all ran on the portal's own orders and stock. BioBrix keep neither in Sage, so
+// on a live client seat they would render as a wall of zeros. These replace them with what their
+// accounting system actually knows.
+var sgB = d.sage && d.sage();
+if(liveBoard && sgB && sgB.live){
+  var plB = d.plan ? d.plan() : {agents:{}};
+  var invB = (sgB.invoices||[]).filter(function(i){ return i.kind!=='opening'; });
+  var custB = sgB.customers||[];
+  var byIdB = {}; custB.forEach(function(c){ byIdB[c.id]=c; });
+  var ymB = new Date().toISOString().slice(0,7);
+  var repsB = (sgB.reps||[]);
+  var agentName = function(k){
+    if(!k) return 'Not allocated to an agent';
+    var pr = (d.allUnscoped('reps')||[]).find(function(r){ return r.id===k; });
+    if(pr) return pr.name;
+    var m = k.indexOf('sage_rep_')===0 && repsB.find(function(r){ return 'sage_rep_'+r.id===k; });
+    return m? m.name : k;
+  };
+  var agentOf = function(c){
+    var set = plB.agents && plB.agents['sage_'+c.id]; if(set) return set;
+    return c.sageRep? ('sage_rep_'+c.sageRep) : null;
+  };
+
+  // --- this month, by agent ---
+  var byAgent = {}, monthTotal = 0;
+  invB.filter(function(i){ return (i.date||'').slice(0,7)===ymB; }).forEach(function(i){
+    var c = byIdB[i.customer]||{}; var k = agentOf(c) || '';
+    byAgent[k] = byAgent[k] || {v:0,n:0}; byAgent[k].v += (i.amount||0); byAgent[k].n++; monthTotal += (i.amount||0);
+  });
+  var agentRows = Object.keys(byAgent).map(function(k){ return {k:k, v:byAgent[k].v, n:byAgent[k].n}; })
+    .sort(function(a,b){ return b.v-a.v; });
+  var maxA = agentRows.reduce(function(m,x){ return Math.max(m,x.v); }, 0) || 1;
+
+  html += '<div class="sec"><h2>This month, by agent</h2><span class="ln"></span><span class="cnt">invoiced, from your accounting system</span>'+BB.liveChip()+'</div>';
+  html += '<div class="card card-p">';
+  if(!agentRows.length){
+    html += '<div class="empty">Nothing invoiced yet this month.</div>';
+  } else {
+    agentRows.forEach(function(x){
+      var pct = Math.round(x.v/maxA*100);
+      var unalloc = !x.k;
+      html += '<div style="margin-bottom:13px;">'+
+        '<div class="row between" style="margin-bottom:5px;">'+
+          '<div class="row" style="gap:8px;"><span style="width:11px;height:11px;border-radius:3px;background:'+(unalloc?'#b9c4ad':'var(--green-bright)')+';display:inline-block;"></span>'+
+            '<b style="font-size:.9rem;color:var(--green-dark);">'+BB.esc(agentName(x.k))+'</b>'+
+            '<span class="faint" style="font-size:.74rem;">'+x.n+' invoice'+(x.n===1?'':'s')+'</span></div>'+
+          '<b style="font-size:.88rem;color:var(--green-dark);">'+BB.money(Math.round(x.v))+'</b>'+
+        '</div>'+
+        '<div style="height:9px;border-radius:6px;background:var(--line-soft);overflow:hidden;">'+
+          '<div style="height:100%;width:'+pct+'%;background:'+(unalloc?'#b9c4ad':'var(--green-bright)')+';border-radius:6px;"></div></div>'+
+      '</div>';
+    });
+    if(byAgent['']){
+      html += '<div class="pline faint" style="font-size:.78rem;">'+BB.money(Math.round(byAgent[''].v))+' is not allocated to anyone yet. '+
+        'Allocate those accounts once in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales \u2192 By customer</a> and every report here, and the commission, follows.</div>';
+    }
+  }
+  html += '</div>';
+
+  // --- biggest movers, in litres and kilograms ---
+  var movers = (sgB.products||[]).map(function(pp){
+    var m=(pp.months||{})[ymB]; return { n:pp.name, c:pp.code, q:(m&&m.qty)||0, v:(m&&m.value)||0 };
+  }).filter(function(x){ return x.q>0; }).sort(function(a,b){ return b.q-a.q; }).slice(0,10);
+  html += '<div class="sec"><h2>Biggest movers this month</h2><span class="ln"></span><span class="cnt">in the quantity they were invoiced</span>'+BB.liveChip()+'</div>';
+  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th class="right">Quantity</th><th class="right">Invoiced</th></tr></thead><tbody>';
+  if(!movers.length){ html += '<tr><td colspan="4"><div class="empty">Nothing invoiced yet this month.</div></td></tr>'; }
+  movers.forEach(function(x){
+    html += '<tr><td><b style="color:var(--green-dark);">'+BB.esc(x.n)+'</b></td><td class="muted">'+BB.esc(x.c||'')+'</td>'+
+      '<td class="right">'+(Math.round(x.q*10)/10).toLocaleString('en-ZA')+'</td><td class="right">'+BB.money(Math.round(x.v))+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+  html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;"><a href="dispatch.html" style="color:var(--green-dark);">Every product, month by month \u203a</a></div>';
+} else {
+// ---- sales by rep ----
+var repRows = reps.map(function(r){
+  var val = orders.filter(function(o){ return o.rep===r.id; }).reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+  var cnt = orders.filter(function(o){ return o.rep===r.id; }).length;
+  return { rep:r, val:val, cnt:cnt };
+}).sort(function(a,b){ return b.val-a.val; });
+var maxRepVal = repRows.reduce(function(m,x){ return Math.max(m,x.val); }, 0) || 1;
+
+html += '<div class="sec"><h2>Sales by rep</h2><span class="ln"></span><span class="cnt">all orders this season</span></div>';
+html += '<div class="card card-p">';
+repRows.forEach(function(x){
+  var pct = Math.round(x.val/maxRepVal*100);
+  html += '<div style="margin-bottom:13px;">'+
+    '<div class="row between" style="margin-bottom:5px;">'+
+      '<div class="row" style="gap:8px;"><span style="width:11px;height:11px;border-radius:3px;background:'+BB.esc(x.rep.colour)+';display:inline-block;"></span>'+
+        '<b style="font-size:.9rem;color:var(--green-dark);">'+BB.esc(x.rep.name)+'</b>'+
+        '<span class="faint" style="font-size:.74rem;">'+BB.esc(x.rep.region)+' · '+x.cnt+' order'+(x.cnt===1?'':'s')+'</span></div>'+
+      '<b style="font-size:.88rem;color:var(--green-dark);">'+BB.money(x.val)+'</b>'+
+    '</div>'+
+    '<div style="height:9px;border-radius:6px;background:var(--line-soft);overflow:hidden;">'+
+      '<div style="height:100%;width:'+pct+'%;background:'+BB.esc(x.rep.colour)+';border-radius:6px;"></div></div>'+
+  '</div>';
+});
+html += '</div>';
+
+// ---- sales vs actuals (invoiced-vs-sale reconciliation) ----
+// Reported = what reps count as sold (Confirmed + Delivered orders).
+// Actual   = orders that are actually invoiced (real revenue).
+// Gap      = delivered/counted but not yet invoiced — the discrepancy.
+var recRows = reps.map(function(r){
+  var repOrders = orders.filter(function(o){ return o.rep===r.id; });
+  var reported = repOrders.filter(function(o){ return o.status==='Confirmed'||o.status==='Delivered'; })
+    .reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+  var actual = repOrders.filter(function(o){ return (o.status==='Confirmed'||o.status==='Delivered') && d.orderInvoiced(o.id); })
+    .reduce(function(s,o){ return s+d.orderValue(o); }, 0);
+  return { rep:r, reported:reported, actual:actual, gap:reported-actual };
+}).sort(function(a,b){ return b.gap-a.gap; });
+var recTot = recRows.reduce(function(t,x){ t.reported+=x.reported; t.actual+=x.actual; t.gap+=x.gap; return t; }, {reported:0,actual:0,gap:0});
+
+html += '<div class="sec"><h2>Sales vs actuals</h2><span class="ln"></span><span class="cnt">reported vs invoiced</span></div>';
+html += '<div class="card"><div class="card-p" style="padding-bottom:12px;">'+
+  '<p class="muted" style="font-size:.84rem;">The <b>gap</b> is product that reps have delivered and counted as a sale, but that has not been invoiced yet. Only invoiced product is actual revenue — so the gap is exactly what makes the rep numbers and the finance numbers differ.</p>'+
+'</div>';
+html += '<div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Rep</th><th class="right">Reported (rep sales)</th><th class="right">Actual (invoiced)</th><th class="right">Gap</th></tr></thead><tbody>';
+recRows.forEach(function(x){
+  var gapCls = x.gap>0 ? 'b-warn' : 'b-ok';
+  html += '<tr>'+
+    '<td><span class="row" style="gap:8px;"><span style="width:10px;height:10px;border-radius:3px;background:'+BB.esc(x.rep.colour)+';display:inline-block;"></span><b style="color:var(--green-dark);">'+BB.esc(x.rep.name)+'</b></span></td>'+
+    '<td class="right muted">'+BB.money(x.reported)+'</td>'+
+    '<td class="right muted">'+BB.money(x.actual)+'</td>'+
+    '<td class="right"><span class="badge '+gapCls+'">'+BB.money(x.gap)+'</span></td>'+
+  '</tr>';
+});
+html += '<tr style="border-top:2px solid var(--line);">'+
+  '<td><b style="color:var(--green-dark);">Total</b></td>'+
+  '<td class="right"><b style="color:var(--green-dark);">'+BB.money(recTot.reported)+'</b></td>'+
+  '<td class="right"><b style="color:var(--green-dark);">'+BB.money(recTot.actual)+'</b></td>'+
+  '<td class="right"><span class="badge '+(recTot.gap>0?'b-warn':'b-ok')+'">'+BB.money(recTot.gap)+'</span></td>'+
+'</tr>';
+html += '</tbody></table></div></div>';
+
+// ---- stock health by depot ----
+html += '<div class="sec"><h2>Stock health by depot</h2><span class="ln"></span><span class="cnt">'+depots.length+' depots</span></div>';
+html += '<div class="grid g3">';
+depots.forEach(function(dep){
+  var items = inventory.filter(function(i){ return i.depot===dep.id; });
+  var low = items.filter(function(i){ return i.qty<i.reorder; });
+  var bad = low.length>0;
+  html += '<a class="card card-p" href="stock.html" style="display:block;'+(bad?'border-left:3px solid var(--red);':'border-left:3px solid var(--green-bright);')+'">'+
+    '<div class="row between">'+
+      '<b style="color:var(--green-dark);">'+BB.esc(dep.name)+'</b>'+
+      BB.statusBadge(dep.status)+
+    '</div>'+
+    '<div class="faint" style="font-size:.74rem;margin:3px 0 10px;">'+BB.esc(dep.region)+'</div>'+
+    '<div class="row between">'+
+      '<div><div class="v" style="font-family:var(--display);font-size:1.3rem;color:var(--green-dark);">'+items.length+'</div><div class="faint" style="font-size:.7rem;">stock lines</div></div>'+
+      '<div class="right"><div class="v" style="font-family:var(--display);font-size:1.3rem;color:'+(bad?'var(--red)':'var(--green-dark)')+';">'+low.length+'</div><div class="faint" style="font-size:.7rem;">below reorder</div></div>'+
+    '</div>'+
+  '</a>';
+});
+html += '</div>';
+
+}
+
+// ---- needs action ----
+var actions = [];
+// On a live client seat this list is built from the ledger: who is over their limit, what is
+// ninety days old, who is on hold. The portal-side order and sample queues below are empty for
+// them by design — BioBrix keep neither in Sage.
+if(liveBoard && sgB && sgB.live){
+  var invN = (sgB.invoices||[]).filter(function(i){ return i.kind!=='opening'; });
+  var custN = sgB.customers||[];
+  var byIdN = {}; custN.forEach(function(c){ byIdN[c.id]=c; });
+  var openN = function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+  var t0N = new Date(new Date().toISOString().slice(0,10));
+  var overN = function(i){ return i.dueDate ? Math.round((t0N-new Date(i.dueDate))/86400000) : 0; };
+  invN.filter(function(i){ return openN(i)>0.5 && overN(i)>=90; })
+    .sort(function(a,b){ return overN(b)-overN(a); }).slice(0,8).forEach(function(i){
+      actions.push({ kind:'90+ days', what:(byIdN[i.customer]||{name:'\u2014'}).name+' \u00b7 '+(i.label||i.ref||''),
+        val:BB.money(Math.round(openN(i))), badge:'Overdue', href:'finance.html?show=overdue' });
+    });
+  custN.filter(function(c){ return c.creditLimit>0 && c.balance>c.creditLimit; })
+    .sort(function(a,b){ return (b.balance-b.creditLimit)-(a.balance-a.creditLimit); }).slice(0,8).forEach(function(c){
+      actions.push({ kind:'Over limit', what:c.name, val:BB.money(Math.round(c.balance))+' of '+BB.money(Math.round(c.creditLimit)),
+        badge:'Over limit', href:'farms.html?show=overlimit' });
+    });
+  custN.filter(function(c){ return c.onHold; }).slice(0,8).forEach(function(c){
+    actions.push({ kind:'On hold', what:c.name, val:BB.money(Math.round(c.balance||0)), badge:'On hold', href:'farms.html?show=accounts' });
+  });
+}
+if(!liveBoard) orders.filter(function(o){ return o.status==='Pending'||o.status==='Awaiting stock'; }).forEach(function(o){
+  actions.push({
+    kind: o.status==='Awaiting stock'?'Awaiting stock':'New order',
+    what: o.ref+' · '+d.farmer(o.farmer).name,
+    val: BB.money(d.orderValue(o)),
+    badge: o.status,
+    href: 'orders.html'
+  });
+});
+if(!liveBoard) lowItems.forEach(function(i){
+  actions.push({
+    kind: i.qty===0?'Out of stock':'Low stock',
+    what: d.product(i.prod).name+' · '+d.depot(i.depot).name,
+    val: i.qty+' / '+i.reorder+' '+(d.product(i.prod).unit||''),
+    badge: i.qty===0?'Out of stock':'Low stock',
+    href: 'stock.html'
+  });
+});
+if(!liveBoard) soil.filter(function(s){ return s.status==='New'||s.status==='Awaiting lab'; }).forEach(function(s){
+  actions.push({ kind:'Soil sample', what:d.farmer(s.farmer).name+' · '+s.status, val:'', badge:s.status, href:'bioanalyze-soil.html' });
+});
+if(!liveBoard) leaf.filter(function(l){ return l.status==='New'||l.status==='Awaiting lab'; }).forEach(function(l){
+  actions.push({ kind:'Leaf sample', what:d.farmer(l.farmer).name+' · '+l.status, val:'', badge:l.status, href:'bioanalyze-leaf.html' });
+});
+
+
+html += '<div class="sec"><h2>Needs action</h2><span class="ln"></span><span class="cnt">'+actions.length+' open</span></div>';
+html += '<div class="card">';
+if(!actions.length){
+  html += '<div class="empty"><div class="big">✓</div>Nothing waiting — the board is clear.</div>';
+} else {
+  html += '<div class="scroll"><table class="bb"><tbody>';
+  actions.forEach(function(a){
+    html += '<tr class="click" data-href="'+BB.esc(a.href)+'">'+
+      '<td style="white-space:nowrap;"><b style="color:var(--green-dark);font-size:.82rem;">'+BB.esc(a.kind)+'</b></td>'+
+      '<td>'+BB.esc(a.what)+'</td>'+
+      '<td class="muted" style="white-space:nowrap;">'+BB.esc(a.val)+'</td>'+
+      '<td class="right">'+BB.statusBadge(a.badge)+'</td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+}
+html += '</div>';
+
+// ---- latest orders + deliveries in transit (two columns) ----
+var latest = orders.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); }).slice(0,5);
+
+html += '<div class="grid g2" style="margin-top:26px;">';
+
+// latest orders
+html += '<div class="card"><div class="card-p" style="padding-bottom:0;"><div class="row between"><b style="color:var(--green-dark);">Latest orders</b><a class="faint" href="orders.html" style="font-size:.78rem;">All ›</a></div></div>';
+html += '<div class="scroll"><table class="bb"><thead><tr><th>Ref</th><th>Farmer</th><th>Value</th><th class="right">Status</th></tr></thead><tbody>';
+latest.forEach(function(o){
+  html += '<tr class="click" data-href="orders.html">'+
+    '<td><b style="color:var(--green-dark);">'+BB.esc(o.ref)+'</b></td>'+
+    '<td>'+BB.esc(d.farmer(o.farmer).name)+'</td>'+
+    '<td class="muted">'+BB.money(d.orderValue(o))+'</td>'+
+    '<td class="right">'+BB.statusBadge(o.status)+'</td>'+
+  '</tr>';
+});
+html += '</tbody></table></div></div>';
+
+// deliveries in transit
+html += '<div class="card"><div class="card-p" style="padding-bottom:0;"><div class="row between"><b style="color:var(--green-dark);">Deliveries in transit</b><a class="faint" href="deliveries.html" style="font-size:.78rem;">All ›</a></div></div>';
+if(!inTransit.length){
+  html += '<div class="empty">Nothing on the road right now.</div>';
+} else {
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Farmer</th><th>Depot</th><th class="right">ETA</th></tr></thead><tbody>';
+  inTransit.forEach(function(x){
+    html += '<tr class="click" data-href="deliveries.html">'+
+      '<td><b style="color:var(--green-dark);">'+BB.esc(d.farmer(x.farmer).name)+'</b></td>'+
+      '<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>'+
+      '<td class="right muted" style="white-space:nowrap;">'+BB.date(x.eta)+'</td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+}
+html += '</div>';
+
+html += '</div>';
+
+html += '<div style="height:24px;"></div>';
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+
+// row navigation
+Array.prototype.forEach.call(document.querySelectorAll('tr.click[data-href]'), function(tr){
+  tr.onclick = function(){ location.href = tr.getAttribute('data-href'); };
+});
+
+
+// On a first sign-in there is no cached snapshot yet, so this page draws before the accounting
+// data arrives — and would sit there showing sample figures until the next navigation. When the
+// data lands, draw it again. Once only.
+window.addEventListener('bb:sage', function(){
+  try{ if(sessionStorage.getItem('bb_sage_drawn')) return; sessionStorage.setItem('bb_sage_drawn','1'); }catch(e){}
+  location.reload();
+});
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

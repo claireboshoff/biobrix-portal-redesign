@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Orders · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'sales', back:'index.html' });
+
+var d = BB.data, u = BB.user;
+var isAdvisor = u.roleKey==='advisor';
+var canAdvance = u.roleKey==='director' || u.roleKey==='operations';
+
+var css=''+
+'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 4px;}'+
+'.exp td{background:#f7faf1;}'+
+'.exp .inner{padding:4px 0;}'+
+'.src{font-size:.64rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 8px;border-radius:6px;}'+
+'.src-voice{background:#fdf3e0;color:var(--amber);}'+
+'.src-portal{background:var(--blue-bg);color:var(--blue);}'+
+'.advsel{padding:6px 8px;font-size:.78rem;border:1.5px solid var(--line);border-radius:8px;background:#fff;}'+
+'.qp{margin-top:12px;padding:12px 14px;border-radius:11px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--green-bright);}'+
+'.qp .row.between{gap:12px;} .qp .btn{white-space:nowrap;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+var STATUSES = ['Forecast','Pending','Confirmed','Awaiting stock','Delivered'];
+var canInvoiceRole = u.roleKey==='director' || u.roleKey==='operations';
+var canInvoice = true; // decided per order in quotePanel/invoice block
+var isDirector = u.roleKey==='director';
+function canInvoiceOrder(o){ return canInvoiceRole || (isAdvisor && d.quoteStatus(o)==='Farmer approved'); }
+function quoteChip(o){
+  var q=d.quoteStatus(o); if(!q) return '';
+  var cls = q==='Awaiting approval'?'b-warn': q==='Approved'?'b-blue': q==='Sent to farmer'?'b-blue': q==='Farmer approved'?'b-ok':'b-grey';
+  return '<span class="badge '+cls+'" title="Quote">'+BB.esc(q==='Awaiting approval'?'Quote · awaiting '+(isDirector?'you':'Rudie'):'Quote · '+q.toLowerCase())+'</span>';
+}
+function farmerWA(o, msg){
+  var f=d.farmer(o.farmer); var cell=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27');
+  return 'https://wa.me/'+cell+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', '+msg);
+}
+// The quote → approval → margin → farmer → invoice chain, rendered per order.
+function quotePanel(o){
+  if(d.orderInvoiced(o.id)) return '';
+  var q=d.quoteStatus(o), r=d.rep(o.rep), f=d.farmer(o.farmer);
+  var list=d.orderValue(o), tot=d.quoteTotal(o), margin=d.agentMargin(o), pct=d.quotePct(o);
+  var h='<div class="qp">';
+  h+='<div class="row between" style="align-items:flex-start;"><div><div class="eyebrow">Quote &amp; approval</div>';
+  if(!q){
+    h+='<div style="font-size:.86rem;margin-top:3px;">No quote yet. List value <b>'+BB.money(list)+'</b>. '+(isAdvisor||isDirector?'Create the quote and it goes to Rudie for approval.':'')+'</div></div>';
+    if(isAdvisor||isDirector) h+='<button class="btn sm" data-q="create" data-oid="'+o.id+'">Create quote</button>';
+    h+='</div>';
+  } else if(q==='Awaiting approval'){
+    h+='<div style="font-size:.86rem;margin-top:3px;">Quoted by <b>'+BB.esc(r.name)+'</b> · list <b>'+BB.money(list)+'</b> · preset margin '+pct+'% → <b>'+BB.money(tot)+'</b> to the farmer.</div></div>';
+    if(isDirector) h+='<div class="row" style="gap:8px;"><button class="btn sm" data-q="approve" data-oid="'+o.id+'">✓ Approve quote</button><button class="btn ghost sm" data-q="decline" data-oid="'+o.id+'">Decline</button></div>';
+    else h+='<span class="badge b-warn">Waiting for Rudie</span>';
+    h+='</div>';
+  } else if(q==='Approved'){
+    h+='<div style="font-size:.86rem;margin-top:3px;">Approved by <b>'+BB.esc(o.quote.approvedBy||'Rudie')+'</b>. Set your margin, then send it to '+BB.esc(String(f.name).split(' ')[0])+'.</div></div></div>';
+    h+='<div class="row" style="gap:12px;margin-top:10px;flex-wrap:wrap;align-items:flex-end;">'+
+      '<div class="fld" style="margin:0;"><label>My margin %</label><input type="number" min="0" max="50" step="0.5" value="'+pct+'" data-pct="'+o.id+'" style="width:110px;"></div>'+
+      '<div style="font-size:.84rem;"><div class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">Farmer pays</div><b data-tot="'+o.id+'" style="font-family:var(--display);font-size:1.1rem;color:var(--green-dark);">'+BB.money(tot)+'</b></div>'+
+      '<div style="font-size:.84rem;"><div class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">My margin</div><b data-margin="'+o.id+'" style="color:var(--green-mid);">'+BB.money(margin)+'</b></div>'+
+      '<span style="flex:1;"></span>'+
+      '<button class="btn sm" data-q="send" data-oid="'+o.id+'">Send quote to farmer ›</button></div>';
+    return h+'</div>';
+  } else if(q==='Sent to farmer'){
+    h+='<div style="font-size:.86rem;margin-top:3px;">Quote of <b>'+BB.money(tot)+'</b> is in <b>'+BB.esc(String(f.name).split(' ')[0])+'\u2019s portal</b> for approval (your margin '+BB.money(margin)+', '+pct+'%).</div></div>';
+    h+='<div class="row" style="gap:8px;"><a class="btn ghost sm" target="_blank" rel="noopener" href="'+farmerWA(o,'your BioBrix quote for '+BB.money(tot)+' is ready in your portal — tap Approve and we get it moving.')+'">WhatsApp '+BB.esc(String(f.name).split(' ')[0])+'</a>'+
+       '<button class="btn sm" data-q="farmerok" data-oid="'+o.id+'" title="Farmer said yes on WhatsApp / phone">Farmer approved ✓</button></div>';
+    h+='</div>';
+  } else if(q==='Farmer approved'){
+    h+='<div style="font-size:.86rem;margin-top:3px;"><b>'+BB.esc(f.name)+' approved</b> '+BB.money(tot)+(o.quote.farmerApprovedAt?' on '+BB.date(o.quote.farmerApprovedAt):'')+'. Invoice it and it becomes actual revenue; your margin '+BB.money(margin)+' is in the invoice.</div></div>';
+    h+='<button class="btn sm" data-inv="'+o.id+'">Generate invoice</button>';
+    h+='</div>';
+  } else if(q==='Declined'){
+    h+='<div style="font-size:.86rem;margin-top:3px;">Quote declined by '+BB.esc(o.quote.declinedBy||'Rudie')+'. Adjust and re-quote.</div></div>';
+    if(isAdvisor||isDirector) h+='<button class="btn ghost sm" data-q="create" data-oid="'+o.id+'">Re-quote</button>';
+    h+='</div>';
+  }
+  return h+'</div>';
+}
+
+// Due date is ALWAYS the 25th — of the month AFTER the invoice date.
+function nextMonth25(){
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth() + 1; // next month, 0-indexed
+  if(m > 11){ m = 0; y += 1; }
+  return y + '-' + String(m + 1).padStart(2, '0') + '-25';
+}
+
+// Invoicing indicator: green once actually invoiced, amber when a
+// delivered/confirmed order is still counted as a sale but NOT yet invoiced.
+function invoiceBadge(o){
+  if(d.orderInvoiced(o.id)) return '<span class="badge b-ok">Invoiced</span>';
+  if(o.status==='Delivered' || o.status==='Confirmed') return '<span class="badge b-warn">Uninvoiced</span>';
+  return '';
+}
+
+function holdBadge(o){
+  var h = d.deliveryHold(o);
+  if(!h) return '';
+  var cls = h.sev==='high' ? 'b-bad' : 'b-warn';
+  return '<span class="badge '+cls+'" title="'+BB.esc(h.reason)+'">HOLD</span>';
+}
+
+function allOrders(){
+  var o = d.all('orders');
+  if(isAdvisor) o = o.filter(function(x){ return x.rep===u.rep; });
+  return o;
+}
+
+var filter = 'All';
+var expanded = {};
+
+function statBar(orders){
+  var open = orders.filter(function(o){ return o.status==='Forecast'||o.status==='Pending'; }).reduce(function(s,o){ return s+d.orderValue(o); },0);
+  var conf = orders.filter(function(o){ return o.status==='Confirmed'||o.status==='Delivered'; }).reduce(function(s,o){ return s+d.orderValue(o); },0);
+  var awaiting = orders.filter(function(o){ return o.status==='Awaiting stock'; }).length;
+  var html='<div class="grid g3">';
+  html += '<div class="stat"><div class="l">Open pipeline</div><div class="v">'+BB.money(open)+'</div><div class="s">forecast + pending</div></div>';
+  html += '<div class="stat"><div class="l">Confirmed value</div><div class="v">'+BB.money(conf)+'</div><div class="s">confirmed + delivered</div></div>';
+  html += '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting stock</div><div class="v">'+awaiting+'</div><div class="s">order'+(awaiting===1?'':'s')+' held on stock</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function srcBadge(s){
+  var cls = s==='Voice'?'src-voice':'src-portal';
+  return '<span class="src '+cls+'">'+BB.esc(s)+'</span>';
+}
+
+function render(){
+  var orders = allOrders();
+  var shown = filter==='All' ? orders : orders.filter(function(o){ return o.status===filter; });
+  shown = shown.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var html='';
+  html += '<div class="page-head"><h1>Orders</h1><p>'+
+    (isAdvisor?'Your full order pipeline — every order you have captured, live.'
+              :'The full pipeline across every rep. Tap a row for the products; advance status as it moves.')+'</p></div>';
+
+  html += statBar(orders);
+
+  // filter chips
+  html += '<div class="chips">';
+  ['All'].concat(STATUSES).forEach(function(s){
+    var n = s==='All'?orders.length:orders.filter(function(o){ return o.status===s; }).length;
+    html += '<button class="chip'+(filter===s?' on':'')+'" data-f="'+s+'">'+s+' <span style="opacity:.7;">'+n+'</span></button>';
+  });
+  html += '</div>';
+
+  // table
+  html += '<div class="card" style="margin-top:6px;"><div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Ref</th><th>Farmer</th>'+(isAdvisor?'':'<th>Rep</th>')+'<th>Delivery</th><th>Source</th><th class="right">Value</th><th>Status</th></tr></thead><tbody>';
+
+  if(!shown.length){
+    html += '<tr><td colspan="'+(isAdvisor?6:7)+'"><div class="empty"><div class="big">▲</div>No orders here yet.</div></td></tr>';
+  }
+
+  shown.forEach(function(o){
+    var f=d.farmer(o.farmer), r=d.rep(o.rep);
+    html += '<tr class="click" data-id="'+o.id+'">'+
+      '<td><b>'+BB.esc(o.ref)+'</b></td>'+
+      '<td>'+BB.esc(f.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(f.farm)+'</div></td>'+
+      (isAdvisor?'':'<td><span class="chip" style="background:'+r.colour+'22;border-color:'+r.colour+';color:'+r.colour+';"><span style="width:7px;height:7px;border-radius:50%;background:'+r.colour+';display:inline-block;"></span>'+BB.esc(r.name)+'</span></td>')+
+      '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">✓ delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'✓ delivered ':'🚚 '+BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
+      '<td>'+srcBadge(o.source)+'</td>'+
+      '<td class="right">'+BB.money(d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o))+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
+      '<td><div class="row" style="gap:5px;">'+BB.statusBadge(o.status)+quoteChip(o)+invoiceBadge(o)+holdBadge(o)+'</div></td>'+
+    '</tr>';
+    // expanded row
+    if(expanded[o.id]){
+      var cols = isAdvisor?6:7;
+      html += '<tr class="exp"><td colspan="'+cols+'"><div class="inner">';
+      html += '<div class="scroll"><table class="bb" style="background:transparent;"><thead><tr><th>Product</th><th>Pack</th><th class="right">Qty</th><th class="right">Line value</th></tr></thead><tbody>';
+      (o.lines||[]).forEach(function(l){
+        var p=d.product(l.prod);
+        html += '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="right">'+BB.num(l.qty)+'</td><td class="right">'+BB.money((p.price||0)*l.qty)+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="row between" style="margin-top:10px;">'+
+        '<div class="faint" style="font-size:.78rem;">Captured '+BB.date(o.date)+' · depot '+BB.esc(d.depot(o.depot).name)+'</div>';
+      if(canAdvance){
+        html += '<div class="row" style="gap:8px;"><span class="faint" style="font-size:.76rem;">Advance status</span>'+
+          '<select class="advsel" data-adv="'+o.id+'">'+
+          STATUSES.map(function(s){ return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>'; }).join('')+
+          '</select></div>';
+      }
+      html += '</div>';
+      html += quotePanel(o);
+      // Invoicing: turn a counted-but-uninvoiced sale into actual revenue.
+      if(canInvoiceRole && d.quoteStatus(o)!=='Farmer approved'){
+        if(d.orderInvoiced(o.id)){
+          html += '<div class="row" style="margin-top:8px;gap:8px;"><span class="badge b-ok">Invoiced</span>'+
+            '<span class="faint" style="font-size:.76rem;">This order counts as actual revenue.</span></div>';
+        } else if(o.status==='Delivered' || o.status==='Confirmed'){
+          html += '<div class="row between" style="margin-top:8px;">'+
+            '<span class="faint" style="font-size:.76rem;">Counted as a sale but not yet invoiced — invoice it to count as actual revenue.</span>'+
+            '<button class="btn sm" data-inv="'+o.id+'">Generate invoice</button></div>';
+        }
+      }
+      html += '</div></td></tr>';
+    }
+  });
+
+  html += '</tbody></table></div></div>';
+  html += '<div class="divider"></div><div class="row" style="padding-bottom:18px;"><a class="btn" href="voice-order.html">Capture an order</a><a class="btn ghost" href="forecast.html">Forecast</a></div>';
+
+  document.getElementById('ordMain').innerHTML=html;
+  bind();
+}
+
+function bind(){
+  var main=document.getElementById('ordMain');
+  Array.prototype.forEach.call(main.querySelectorAll('.chip[data-f]'), function(c){
+    c.onclick=function(){ filter=this.dataset.f; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('tr.click[data-id]'), function(row){
+    row.onclick=function(){ var id=this.dataset.id; expanded[id]=!expanded[id]; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('select[data-adv]'), function(sel){
+    sel.onclick=function(e){ e.stopPropagation(); };
+    sel.onchange=function(e){
+      e.stopPropagation();
+      var id=this.dataset.adv, val=this.value;
+      d.update('orders', id, { status:val });
+      BB.toast('Status updated to '+val);
+      render();
+    };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-inv]'), function(btn){
+    btn.onclick=function(e){
+      e.stopPropagation();
+      var o=d.by('orders', this.dataset.inv);
+      if(!o || d.orderInvoiced(o.id)) return;
+      d.add('invoices', {
+        ref:'INV-'+(1046+Math.floor(Math.random()*900)),
+        farmer:o.farmer,
+        order:o.id,
+        date:new Date().toISOString().slice(0,10),
+        dueDate:nextMonth25(),
+        description:'Order '+o.ref,
+        amount:d.quoteTotal(o),
+        status:'Outstanding',
+        paidDate:null
+      });
+      BB.toast('Invoice generated — now counts as actual');
+      render();
+    };
+  });
+  // ---- quote chain actions ----
+  Array.prototype.forEach.call(main.querySelectorAll('input[data-pct]'), function(inp){
+    inp.onclick=function(e){ e.stopPropagation(); };
+    inp.oninput=function(){
+      var o=d.by('orders', this.dataset.pct); if(!o) return;
+      var pct=Math.max(0,Math.min(50,Number(this.value)||0)); var list=d.orderValue(o); var tot=Math.round(list*(1+pct/100));
+      var t=main.querySelector('b[data-tot="'+o.id+'"]'), m=main.querySelector('b[data-margin="'+o.id+'"]');
+      if(t) t.textContent=BB.money(tot); if(m) m.textContent=BB.money(tot-list);
+    };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('button[data-q]'), function(btn){
+    btn.onclick=function(e){
+      e.stopPropagation();
+      var o=d.by('orders', this.dataset.oid); if(!o) return;
+      var act=this.dataset.q, f=d.farmer(o.farmer), r=d.rep(o.rep), today=new Date().toISOString().slice(0,10);
+      var q=Object.assign({}, o.quote||{});
+      if(act==='create'){ q={ status:'Awaiting approval', markupPct:(r.markupPct!=null?r.markupPct:0), createdBy:u.rep||u.id, createdAt:today }; BB.toast('Quote created — sent to Rudie for approval'); }
+      if(act==='approve'){ q.status='Approved'; q.approvedBy=u.name; q.approvedAt=today; BB.toast('Quote approved — back to '+String(r.name).split(' ')[0]+' to send'); }
+      if(act==='decline'){ q.status='Declined'; q.declinedBy=u.name; BB.toast('Quote declined'); }
+      if(act==='send'){ var inp=main.querySelector('input[data-pct="'+o.id+'"]'); if(inp){ q.markupPct=Math.max(0,Math.min(50,Number(inp.value)||0)); } q.status='Sent to farmer'; q.sentAt=today; BB.toast('Quote sent — '+String(f.name).split(' ')[0]+' sees it in the portal'); }
+      if(act==='farmerok'){ q.status='Farmer approved'; q.farmerApprovedAt=today; BB.toast(String(f.name).split(' ')[0]+' approved — ready to invoice'); }
+      var patch={ quote:q };
+      if(act==='farmerok' && (o.status==='Forecast'||o.status==='Pending')) patch.status='Confirmed';
+      d.update('orders', o.id, patch);
+      if(act==='create') d.add('feed', { from:u.rep||u.id, date:today, kind:'Order', farmer:o.farmer, ref:o.ref, text:'Quote for '+f.farm+' ('+BB.money(d.quoteTotal(Object.assign({},o,{quote:q})))+') needs approval.' });
+      render();
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="ordMain"></div></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

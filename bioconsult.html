@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>BioConsult · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'bioservices.html' });
+
+var d = BB.data, u = BB.user;
+var params = new URLSearchParams(location.search);
+var preFarmer = params.get('farmer') || '';
+var preBlock = params.get('block') || '';
+
+var css=''+
+'.prog{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--green-bright);border-radius:16px;padding:22px;box-shadow:var(--shadow);}'+
+'.line-row{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;}'+
+'@media(max-width:640px){.line-row{grid-template-columns:1fr 1fr;}}'+
+'@media print{.bb-head,.bb-nav,.noprint{display:none!important;}body{padding:0;}}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+function inMyScope(p){
+  if(u.roleKey==='director' || !u.rep) return true;
+  return p.advisor===u.rep;
+}
+function progValue(p){ return (p.lines||[]).reduce(function(s,l){ return s+(l.cost||0); },0); }
+
+var state={ view:'list', open:null };
+
+function programmes(){
+  return d.all('programs').filter(inMyScope).sort(function(a,b){
+    if(a.status===b.status) return 0; return a.status==='Active'?-1:1;
+  });
+}
+
+function statRow(){
+  var list=d.all('programs').filter(inMyScope);
+  var active=list.filter(function(p){ return p.status==='Active'; }).length;
+  var drafts=list.filter(function(p){ return p.status==='Draft'; }).length;
+  var tot=list.reduce(function(s,p){ return s+progValue(p); },0);
+  return '<div class="grid g3">'+
+    '<div class="stat"><div class="l">Active programmes</div><div class="v">'+active+'</div><div class="s">running this season</div></div>'+
+    '<div class="stat"><div class="l">Drafts</div><div class="v">'+drafts+'</div><div class="s">awaiting sign-off</div></div>'+
+    '<div class="stat"><div class="l">Programme value</div><div class="v">'+BB.money(tot)+'</div><div class="s">across all programmes</div></div>'+
+  '</div>';
+}
+
+function renderList(){
+  var list=programmes();
+  var html='';
+  html += '<div class="page-head"><h1>BioConsult — recommendations</h1>'+
+    '<p>The interpretation layer. Soil and leaf data become a regenerative programme for the block: the right products, rates and timing, costed for the farmer.</p></div>';
+  html += statRow();
+
+  html += '<div class="row between" style="margin:24px 0 14px;"><div class="sec" style="margin:0;flex:1;"><h2>Programmes</h2><span class="ln"></span><span class="cnt">'+list.length+'</span></div>'+
+    '<button class="btn sm" id="newBtn" style="margin-left:12px;">＋ Build a recommendation</button></div>';
+
+  html += '<div class="card">';
+  if(!list.length){
+    html += '<div class="empty"><div class="big">📑</div>No programmes yet. Build the first recommendation.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Farm · block</th><th>Crop</th><th>Season</th><th>Goal</th><th>Status</th><th class="right">Value</th></tr></thead><tbody>';
+    list.forEach(function(p){
+      var f=d.farmer(p.farmer); var b=d.by('blocks',p.block)||{name:'—'};
+      html += '<tr class="click" data-open="'+p.id+'">'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(b.name)+'</div></td>'+
+        '<td class="muted">'+BB.esc(p.crop||'—')+'</td>'+
+        '<td class="muted">'+BB.esc(p.season||'—')+'</td>'+
+        '<td class="faint" style="font-size:.78rem;max-width:220px;">'+BB.esc(p.goal||'—')+'</td>'+
+        '<td>'+BB.statusBadge(p.status)+'</td>'+
+        '<td class="right"><b>'+BB.money(progValue(p))+'</b></td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div><div style="height:24px;"></div>';
+  return html;
+}
+
+function renderDetail(id){
+  var p=d.by('programs',id); if(!p) return renderList();
+  var f=d.farmer(p.farmer); var b=d.by('blocks',p.block)||{name:'—',crop:'—'};
+  var adv=d.rep(p.advisor);
+
+  var html='';
+  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm noprint" id="backList">‹ All programmes</button></div>';
+  html += '<div class="prog" id="progCard">';
+  html += '<div class="row between" style="align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;">'+
+    '<div><div class="eyebrow">BioConsult programme</div>'+
+      '<h1 style="font-family:var(--display);font-size:1.35rem;color:var(--green-dark);margin-top:2px;">'+BB.esc(f.farm)+'</h1>'+
+      '<div class="muted" style="font-size:.85rem;">'+BB.esc(f.name)+' · '+BB.esc(b.name)+' · '+BB.esc(p.crop||'')+' · '+BB.esc(p.season||'')+'</div></div>'+
+    '<div style="text-align:right;">'+BB.statusBadge(p.status)+'</div>'+
+  '</div>';
+
+  html += '<div class="card-p" style="background:#f7faf1;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:16px;">'+
+    '<div style="font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);">Programme goal</div>'+
+    '<div style="font-size:.98rem;margin-top:3px;">'+BB.esc(p.goal||'—')+'</div></div>';
+
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Code</th><th>Rate</th><th>Timing</th><th class="right">Line cost</th></tr></thead><tbody>';
+  (p.lines||[]).forEach(function(l){
+    var pr=d.product(l.prod);
+    html += '<tr>'+
+      '<td><b style="color:var(--green-dark);">'+BB.esc(pr.name)+'</b></td>'+
+      '<td class="muted">'+BB.esc(pr.code)+'</td>'+
+      '<td class="muted">'+BB.esc(l.rate||'—')+'</td>'+
+      '<td class="muted">'+BB.esc(l.timing||'—')+'</td>'+
+      '<td class="right">'+BB.money(l.cost||0)+'</td>'+
+    '</tr>';
+  });
+  html += '</tbody><tfoot><tr><td colspan="4" class="right"><b>Total programme value</b></td><td class="right"><b style="color:var(--green-dark);font-size:1rem;">'+BB.money(progValue(p))+'</b></td></tr></tfoot></table></div>';
+
+  html += '<div class="divider"></div><div class="row between"><div class="faint" style="font-size:.76rem;">Prepared by '+BB.esc(adv.name)+' · '+BB.esc(adv.role||'Crop Advisor')+'</div>'+
+    '<div class="faint" style="font-size:.76rem;">BioBrix · The Biological Way</div></div>';
+  html += '</div>';
+
+  html += '<div class="row noprint" style="margin-top:14px;"><button class="btn" id="printProg">Print / share with farmer</button></div>';
+  html += '<div style="height:24px;"></div>';
+  return html;
+}
+
+var draftLines=[]; // {prod, rate, timing, cost}
+
+function renderForm(){
+  var farmers=d.all('farmers');
+  var blocks=d.all('blocks');
+  var products=d.all('products');
+  if(!draftLines.length) draftLines=[{prod:products[0].id, rate:'', timing:'', cost:0}];
+
+  var html='';
+  html += '<div class="row" style="margin:16px 0 10px;"><button class="btn ghost sm" id="backList2">‹ All programmes</button></div>';
+  html += '<div class="page-head" style="padding-top:6px;"><h1>Build a recommendation</h1><p>Frame the regenerative programme for a block — the products, rates and timing, costed as you build it.</p></div>';
+  html += '<div class="card card-p">';
+  html += '<div class="grid g2">';
+  html += '<div class="fld"><label>Farmer</label><select id="fFarmer">'+
+    farmers.map(function(f){ return '<option value="'+f.id+'"'+(f.id===preFarmer?' selected':'')+'>'+BB.esc(f.farm)+' — '+BB.esc(f.name)+'</option>'; }).join('')+'</select></div>';
+  html += '<div class="fld"><label>Block</label><select id="fBlock"></select></div>';
+  html += '<div class="fld"><label>Crop</label><input id="fCrop" placeholder="e.g. Macadamia"></div>';
+  html += '<div class="fld"><label>Season</label><input id="fSeason" value="2026/27"></div>';
+  html += '</div>';
+  html += '<div class="fld"><label>Programme goal</label><textarea id="fGoal" rows="2" placeholder="e.g. Rebuild biology + correct pH"></textarea></div>';
+
+  html += '<div class="sec" style="margin:8px 0 12px;"><h2 style="font-size:.95rem;">Product lines</h2><span class="ln"></span></div>';
+  html += '<p class="faint noprint" style="font-size:.76rem;margin-bottom:10px;">Line cost estimates at the block area × product price. Adjust the rate and timing in your own words.</p>';
+  html += '<div id="lines"></div>';
+  html += '<button class="btn ghost sm" id="addLine" style="margin-top:6px;">＋ Add product</button>';
+  html += '<div class="divider"></div>';
+  html += '<div class="row between"><div class="muted" style="font-size:.86rem;">Estimated programme value</div><div id="lineTotal" style="font-family:var(--display);font-size:1.3rem;font-weight:600;color:var(--green-dark);">R0</div></div>';
+  html += '<button class="btn block" id="saveProg" style="margin-top:14px;">Save programme (draft)</button>';
+  html += '</div><div style="height:24px;"></div>';
+  return html;
+}
+
+function blockHa(blockId){ var b=d.by('blocks',blockId); return (b&&b.ha)||1; }
+
+function lineCost(blockId, prodId){
+  var pr=d.product(prodId); var ha=blockHa(blockId);
+  return Math.round((pr.price||0)*(ha||1));
+}
+
+function refreshBlockOptions(){
+  var fSel=document.getElementById('fFarmer'); if(!fSel) return;
+  var farmerId=fSel.value;
+  var bSel=document.getElementById('fBlock');
+  var bl=d.where('blocks',function(b){ return b.farmer===farmerId; });
+  bSel.innerHTML=bl.length ? bl.map(function(b){ return '<option value="'+b.id+'"'+(b.id===preBlock?' selected':'')+'>'+BB.esc(b.name)+' · '+BB.esc(b.crop)+' · '+b.ha+' ha</option>'; }).join('')
+    : '<option value="">No blocks on this farm</option>';
+  // prefill crop from selected block
+  var chosen=d.by('blocks',bSel.value);
+  if(chosen && !document.getElementById('fCrop').value){ document.getElementById('fCrop').value=chosen.crop||''; }
+  recost();
+}
+
+function renderLines(){
+  var products=d.all('products');
+  var wrap=document.getElementById('lines'); if(!wrap) return;
+  wrap.innerHTML=draftLines.map(function(l,i){
+    return '<div class="line-row" data-i="'+i+'">'+
+      '<div class="fld" style="margin:0;"><label>Product</label><select class="lProd">'+
+        products.map(function(p){ return '<option value="'+p.id+'"'+(p.id===l.prod?' selected':'')+'>'+BB.esc(p.name)+' ('+BB.esc(p.lever)+')</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="fld" style="margin:0;"><label>Rate</label><input class="lRate" value="'+BB.esc(l.rate)+'" placeholder="5 L/ha"></div>'+
+      '<div class="fld" style="margin:0;"><label>Timing</label><input class="lTiming" value="'+BB.esc(l.timing)+'" placeholder="Planting rain"></div>'+
+      '<div class="fld" style="margin:0;"><label>&nbsp;</label><button type="button" class="btn ghost sm lDel" title="Remove">✕</button></div>'+
+    '</div>';
+  }).join('');
+  wireLines();
+}
+
+function wireLines(){
+  var wrap=document.getElementById('lines'); if(!wrap) return;
+  Array.prototype.forEach.call(wrap.querySelectorAll('.line-row'), function(row){
+    var i=Number(row.getAttribute('data-i'));
+    row.querySelector('.lProd').onchange=function(){ draftLines[i].prod=this.value; recost(); };
+    row.querySelector('.lRate').oninput=function(){ draftLines[i].rate=this.value; };
+    row.querySelector('.lTiming').oninput=function(){ draftLines[i].timing=this.value; };
+    row.querySelector('.lDel').onclick=function(){ if(draftLines.length>1){ draftLines.splice(i,1); renderLines(); recost(); } };
+  });
+}
+
+function recost(){
+  var bSel=document.getElementById('fBlock'); if(!bSel) return;
+  var blockId=bSel.value;
+  var tot=0;
+  draftLines.forEach(function(l){ l.cost=lineCost(blockId,l.prod); tot+=l.cost; });
+  var tEl=document.getElementById('lineTotal'); if(tEl) tEl.textContent=BB.money(tot);
+}
+
+function paint(){
+  var html;
+  if(state.view==='detail') html=renderDetail(state.open);
+  else if(state.view==='form') html=renderForm();
+  else html=renderList();
+  document.querySelector('main.wrap').innerHTML=html;
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-open]'), function(tr){
+    tr.onclick=function(){ state.view='detail'; state.open=tr.getAttribute('data-open'); paint(); window.scrollTo(0,0); };
+  });
+  var nb=document.getElementById('newBtn'); if(nb) nb.onclick=function(){ state.view='form'; draftLines=[]; paint(); window.scrollTo(0,0); };
+  var bl=document.getElementById('backList'); if(bl) bl.onclick=function(){ state.view='list'; paint(); };
+  var bl2=document.getElementById('backList2'); if(bl2) bl2.onclick=function(){ state.view='list'; paint(); };
+  var pp=document.getElementById('printProg'); if(pp) pp.onclick=function(){ window.print(); };
+
+  if(state.view==='form'){
+    renderLines();
+    refreshBlockOptions();
+    document.getElementById('fFarmer').onchange=function(){ document.getElementById('fCrop').value=''; refreshBlockOptions(); };
+    document.getElementById('fBlock').onchange=function(){
+      var chosen=d.by('blocks',this.value); if(chosen){ document.getElementById('fCrop').value=chosen.crop||''; }
+      recost();
+    };
+    document.getElementById('addLine').onclick=function(){
+      draftLines.push({prod:d.all('products')[0].id, rate:'', timing:'', cost:0}); renderLines(); recost();
+    };
+    document.getElementById('saveProg').onclick=saveProg;
+  }
+}
+
+function saveProg(){
+  var farmerId=document.getElementById('fFarmer').value;
+  var blockId=document.getElementById('fBlock').value;
+  if(!blockId){ BB.toast('Pick a block first'); return; }
+  var f=d.farmer(farmerId);
+  var lines=draftLines.map(function(l){ return { prod:l.prod, rate:l.rate.trim(), timing:l.timing.trim(), cost:lineCost(blockId,l.prod) }; });
+  var rec=d.add('programs', {
+    farmer: farmerId,
+    block: blockId,
+    crop: document.getElementById('fCrop').value.trim(),
+    season: document.getElementById('fSeason').value.trim() || '2026/27',
+    goal: document.getElementById('fGoal').value.trim(),
+    advisor: u.rep || 'rep_juba',
+    status: 'Draft',
+    lines: lines
+  });
+  BB.toast('Programme drafted for '+f.farm);
+  state.view='detail'; state.open=rec.id; paint(); window.scrollTo(0,0);
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
+// if arriving from a report with a farmer/block, drop straight into the builder
+if(preFarmer || preBlock){ state.view='form'; }
+paint();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

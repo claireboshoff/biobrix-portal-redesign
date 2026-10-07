@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Farms &amp; farmers · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'tech', back:'bioservices.html' });
+
+var d = BB.data, u = BB.user;
+var isAdvisor = u.roleKey==='advisor';
+
+var css=''+
+'.wa{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;background:#e9f9ef;color:#128C4A;border:1px solid #bfe8cf;}'+
+'.wa.tel{background:#eef2e7;color:var(--muted);border-color:var(--line);font-weight:600;}'+
+'.chips{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0;}'+
+'.cropchip{display:inline-block;padding:2px 8px;border-radius:20px;background:#eef6dc;color:var(--green-mid);font-size:.68rem;font-weight:600;margin:1px 2px 1px 0;}'+
+'.repchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:600;border:1px solid;}'+
+'.repdot{width:7px;height:7px;border-radius:50%;display:inline-block;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+var all = d.all('farmers');
+var regions = all.map(function(f){ return f.region; }).filter(function(v,i,a){ return a.indexOf(v)===i; }).sort();
+var reps = d.all('reps');
+
+// advisor defaults to their own farms; can flip to all
+var scope = isAdvisor ? 'mine' : 'all';
+var regionFilter = 'All';
+var repFilter = 'All';
+
+function esc(s){ return BB.esc(s); }
+function repChip(r){
+  return '<span class="repchip" style="background:'+r.colour+'18;border-color:'+r.colour+';color:'+r.colour+';">'+
+    '<span class="repdot" style="background:'+r.colour+';"></span>'+esc(r.name)+'</span>';
+}
+
+function visible(){
+  var rows = all.slice();
+  if(isAdvisor && scope==='mine') rows = rows.filter(function(f){ return f.rep===u.rep; });
+  if(regionFilter!=='All') rows = rows.filter(function(f){ return f.region===regionFilter; });
+  if(repFilter!=='All') rows = rows.filter(function(f){ return f.rep===repFilter; });
+  return rows.sort(function(a,b){ return String(a.farm).localeCompare(String(b.farm)); });
+}
+
+function statBar(rows){
+  var active = rows.filter(function(f){ return f.status==='Active'; }).length;
+  var prospect = rows.filter(function(f){ return f.status==='Prospect'; }).length;
+  var ha = rows.reduce(function(s,f){ return s+(f.ha||0); },0);
+  var html='<div class="grid g3">';
+  html += '<div class="stat"><div class="l">Farms shown</div><div class="v">'+rows.length+'</div><div class="s">'+active+' active · '+prospect+' prospect</div></div>';
+  html += '<div class="stat"><div class="l">Active clients</div><div class="v">'+active+'</div><div class="s">on programme</div></div>';
+  html += '<div class="stat"><div class="l">Hectares</div><div class="v">'+BB.num(ha)+'</div><div class="s">under management</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function render(){
+  var rows = visible();
+  // deep links from the home screen tiles
+  var show=(new URLSearchParams(location.search).get('show')||'').toLowerCase();
+  if(show==='overlimit') rows = rows.filter(function(f){ return d.creditLimit(f.id)>0 && d.accountBalance(f.id) > d.creditLimit(f.id); });
+  else if(show==='accounts') rows = rows.filter(function(f){ return !BB.isSample(f); });
+  var nSample = rows.filter(function(f){ return BB.isSample(f); }).length;
+  // twelve months of invoicing per customer, straight from the ledger
+  function invoiced12(farmerId){
+    var since=new Date(); since.setMonth(since.getMonth()-12); var cut=since.toISOString().slice(0,10);
+    return d.where('invoices', function(i){ return i.farmer===farmerId && i.kind!=='opening' && (i.date||'')>=cut; })
+            .reduce(function(t,i){ return t+(i.amount||0); },0);
+  }
+  var html='';
+  if(show) html += '<div class="row" style="gap:8px;margin:14px 0 0;"><a class="btn ghost sm" href="farms.html">‹ All farms &amp; customers</a><span class="faint" style="font-size:.8rem;align-self:center;">'+(show==='overlimit'?'Showing accounts over their credit limit':'Showing customers from your accounting system')+' — '+rows.length+'</span></div>';
+  html += '<div class="page-head"><h1>Farms &amp; farmers</h1><p>'+
+    (isAdvisor?'Your farms — tap through to a farmer to see their blocks, soil, leaf and programmes.'
+              :'Every farm under management. Tap a farmer to open their record: blocks, diagnostics and programmes.')+'</p></div>';
+  // Say plainly which of these are the client's own records and which are ours.
+  if(BB.sageLive()){
+    html += '<div class="bb-sample"><span class="t">Read this first</span><div>The customer records here come straight from <b>your accounting system</b> — names, towns and account balances are yours and are refreshed three times a day. '+
+      'Crops, hectares, blocks, soil and leaf results are <b>not</b> in your accounting system, so they are blank until they are captured here. '+
+      (nSample? 'The '+nSample+' rows marked <span class="chip-sample">Sample</span> are our demonstration farms, not yours.' : '')+'</div></div>';
+  }
+
+  html += statBar(rows);
+
+  // scope toggle for advisor
+  if(isAdvisor){
+    html += '<div class="chips" style="margin-top:12px;">'+
+      '<button class="chip'+(scope==='mine'?' on':'')+'" data-scope="mine">My farms</button>'+
+      '<button class="chip'+(scope==='all'?' on':'')+'" data-scope="all">All farms</button>'+
+    '</div>';
+  }
+
+  // region chips
+  html += '<div class="chips">';
+  html += '<span class="faint" style="font-size:.72rem;align-self:center;">Region:</span>';
+  ['All'].concat(regions).forEach(function(rg){
+    html += '<button class="chip'+(regionFilter===rg?' on':'')+'" data-region="'+esc(rg)+'">'+esc(rg)+'</button>';
+  });
+  html += '</div>';
+
+  // rep chips — directors filter by rep; advisor viewing all can too
+  if(!isAdvisor || scope==='all'){
+    html += '<div class="chips">';
+    html += '<span class="faint" style="font-size:.72rem;align-self:center;">Rep:</span>';
+    html += '<button class="chip'+(repFilter==='All'?' on':'')+'" data-rep="All">All</button>';
+    reps.forEach(function(r){
+      html += '<button class="chip'+(repFilter===r.id?' on':'')+'" data-rep="'+esc(r.id)+'">'+esc(r.name)+'</button>';
+    });
+    html += '</div>';
+  }
+
+  // table
+  html += '<div class="card" style="margin-top:8px;"><div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Farm</th><th>Farmer</th><th>Town / region</th><th>Crops</th><th class="right">Ha</th><th class="right">Invoiced</th><th>Rep</th><th>Status</th><th>Before you drive</th></tr></thead><tbody>';
+
+  if(!rows.length){
+    // An advisor with nothing allocated is the common case here, and "no match" would be a lie.
+    var sgF = d.sage && d.sage(), noneAllocated = sgF && sgF.live && !(sgF.customers||[]).length && BB.user.roleKey==='advisor';
+    html += '<tr><td colspan="8"><div class="empty"><div class="big">🌾</div>'+
+      (noneAllocated
+        ? '<b>No accounts are allocated to you yet.</b><br>Your accounting system is connected, but none of its customers are marked as yours. Whoever looks after the accounts can allocate them in <b>Sales \u2192 By customer</b>.'
+        : 'No farms match these filters.')+'</div></td></tr>';
+  }
+
+  rows.forEach(function(f){
+    var r=d.rep(f.rep);
+    var crops=(f.crops||[]).map(function(c){ return '<span class="cropchip">'+esc(c)+'</span>'; }).join('');
+    html += '<tr class="click" data-id="'+esc(f.id)+'">'+
+      '<td><b>'+esc(f.farm)+'</b>'+BB.sampleChip(f)+'</td>'+
+      '<td>'+esc(f.name)+'<div class="row" style="gap:6px;margin-top:3px;">'+(f.cell?'<a class="wa" href="https://wa.me/'+esc(String(f.cell).replace(/\D/g,'').replace(/^0/,'27'))+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="WhatsApp '+esc(f.name)+'">WhatsApp</a><a class="wa tel" href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'" onclick="event.stopPropagation()">'+esc(f.cell)+'</a>':'')+'</div></td>'+
+      '<td>'+esc(f.town)+'<div class="faint" style="font-size:.72rem;">'+esc(f.region)+'</div></td>'+
+      '<td>'+(crops||(f.sageId? '<span class="faint">not captured</span>':'<span class="faint">—</span>'))+'</td>'+
+      '<td class="right">'+(f.ha? BB.num(f.ha) : '<span class="faint">—</span>')+'</td>'+
+      // for a customer out of the accounting system, what they are worth is the useful column
+      '<td class="right">'+(f.sageId!=null ? '<b>'+BB.money(invoiced12(f.id))+'</b><div class="faint" style="font-size:.7rem;">last 12 months</div>' : '<span class="faint">—</span>')+'</td>'+
+      '<td>'+repChip(r)+'</td>'+
+      '<td>'+BB.statusBadge(f.status)+'</td>'+
+      (function(){ var t=d.tripInsight(f.id); return '<td><span class="badge b-'+t.sev+'" title="Balance '+BB.money(t.balance)+' · limit '+BB.money(t.limit)+'">'+esc(t.verdict)+'</span>'+(t.limit?'<div class="faint" style="font-size:.7rem;margin-top:3px;">'+BB.money(Math.max(0,t.available))+' credit open'+(t.openPipeline?' · '+BB.money(t.openPipeline)+' in pipeline':'')+'</div>':'')+'</td>'; })()+
+    '</tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  html += '<div style="height:20px;"></div>';
+
+  document.getElementById('farmMain').innerHTML=html;
+  bind();
+}
+
+function bind(){
+  var main=document.getElementById('farmMain');
+  Array.prototype.forEach.call(main.querySelectorAll('[data-scope]'), function(c){
+    c.onclick=function(){ scope=this.dataset.scope; repFilter='All'; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('[data-region]'), function(c){
+    c.onclick=function(){ regionFilter=this.dataset.region; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('[data-rep]'), function(c){
+    c.onclick=function(){ repFilter=this.dataset.rep; render(); };
+  });
+  Array.prototype.forEach.call(main.querySelectorAll('tr.click[data-id]'), function(row){
+    row.onclick=function(){ location.href='farm-detail.html?farmer='+encodeURIComponent(this.dataset.id); };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="farmMain"></div></main>');
+render();
+window.addEventListener('bb:sage', function(){ render(); });
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set your password · BioBrix OS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script>
+<style>
+  :root{--green-darkest:#12210c;--green-dark:#22431a;--green:#3f6b28;--green-bright:#68a53e;--lime:#b7d97a;
+    --bg:#f3f6ee;--panel:#fff;--ink:#16240f;--muted:#5d6b52;--faint:#8a9880;--line:#e2e8d8;--red:#c0392b;--ok:#2f8a3f;}
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);
+    font-family:"Inter",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .bgfield{position:fixed;inset:0;background:url('assets/hero-field.webp') center/cover no-repeat;filter:saturate(.8);}
+  .bgfield:after{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(18,33,12,.88),rgba(34,67,26,.78));}
+  .shell{position:relative;width:100%;max-width:440px;background:var(--panel);border-radius:18px;overflow:hidden;
+    box-shadow:0 20px 60px rgba(18,33,12,.35);}
+  .head{background:linear-gradient(150deg,var(--green-darkest),var(--green-dark));color:#eef5e4;padding:26px 28px 22px;text-align:center;}
+  .mark{width:46px;height:46px;border-radius:13px;margin:0 auto 10px;background:linear-gradient(140deg,var(--green-bright),var(--lime));
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.3rem;color:#13260c;}
+  .brand{font-weight:700;font-size:1.22rem;letter-spacing:.3px;}
+  .brand .os{color:var(--lime);font-weight:500;}
+  .sub{font-size:.62rem;letter-spacing:2.4px;text-transform:uppercase;opacity:.75;margin-top:4px;}
+  .body{padding:26px 28px 30px;}
+  h1{font-size:1.24rem;margin:0 0 6px;color:var(--green-dark);}
+  .lead{color:var(--muted);font-size:.9rem;line-height:1.55;margin:0 0 18px;}
+  label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 5px;font-weight:600;}
+  input{width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;color:var(--ink);background:#fff;}
+  input:focus{outline:none;border-color:var(--green-bright);}
+  .go{width:100%;margin-top:18px;padding:14px;border:0;border-radius:12px;background:var(--green-dark);color:#fff;
+    font-size:1rem;font-weight:600;font-family:inherit;cursor:pointer;}
+  .go:disabled{opacity:.6;cursor:default;}
+  .msg{margin-top:12px;font-size:.85rem;line-height:1.5;}
+  .msg.err{color:var(--red);} .msg.ok{color:var(--ok);}
+  .hint{margin-top:16px;font-size:.76rem;color:var(--faint);line-height:1.55;text-align:center;}
+  .who{background:#f6faf0;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:.86rem;margin-bottom:4px;}
+  .who b{color:var(--green-dark);}
+</style>
+</head>
+<body>
+<div class="bgfield"></div>
+<div class="shell">
+  <div class="head">
+    <div class="mark">B</div>
+    <div class="brand">BIOBRIX <span class="os">OS</span></div>
+    <div class="sub">The Biological Way</div>
+  </div>
+  <div class="body" id="body">
+    <h1>Checking your link…</h1>
+  </div>
+</div>
+<script>
+(function(){
+  var API = (window.BB_CONFIG||{}).API || '';
+  var token = new URLSearchParams(location.search).get('t') || '';
+  var body = document.getElementById('body');
+
+  function bad(msg){
+    body.innerHTML = '<h1>This link cannot be used</h1><p class="lead">'+msg+'</p>'+
+      '<p class="hint">Reply to the email you received and a new link will be sent. Links are good for ten days and work once.</p>';
+  }
+  if(!token){ bad('It is missing its code. Please open the link from your email exactly as it was sent.'); return; }
+
+  fetch(API+'/invite/check?t='+encodeURIComponent(token))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j.ok){ bad(j.error||'It has already been used, or it has expired.'); return; }
+      body.innerHTML =
+        '<h1>Welcome, '+esc((j.name||'').split(' ')[0])+'</h1>'+
+        '<p class="lead">Choose a password for your BioBrix OS sign-in. Only you will know it — nobody on the team can see it, and it is never sent by email.</p>'+
+        '<div class="who">Signing in as <b>'+esc(j.email)+'</b></div>'+
+        '<label for="p1">Your password</label><input id="p1" type="password" autocomplete="new-password" placeholder="at least 8 characters">'+
+        '<label for="p2">Type it again</label><input id="p2" type="password" autocomplete="new-password">'+
+        '<button class="go" id="go">Set it and open the portal</button>'+
+        '<div class="msg" id="msg"></div>'+
+        '<p class="hint">Works on your phone in the field, and keeps you signed in for 14 days.</p>';
+      document.getElementById('go').onclick = submit;
+      document.getElementById('p2').addEventListener('keydown', function(e){ if(e.key==='Enter') submit(); });
+    })
+    .catch(function(){ bad('We could not reach the portal just now. Please try again in a moment.'); });
+
+  function submit(){
+    var p1=document.getElementById('p1').value, p2=document.getElementById('p2').value;
+    var msg=document.getElementById('msg'), go=document.getElementById('go');
+    msg.className='msg';
+    if(p1.length < 8){ msg.className='msg err'; msg.textContent='Please choose at least 8 characters.'; return; }
+    if(p1 !== p2){ msg.className='msg err'; msg.textContent='The two do not match.'; return; }
+    go.disabled=true; go.textContent='Setting it…';
+    fetch(API+'/invite/claim',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({token:token, password:p1})})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j.ok){ go.disabled=false; go.textContent='Set it and open the portal'; msg.className='msg err'; msg.textContent=j.error||'That did not work.'; return; }
+        try{ localStorage.setItem('bb_token_v1', j.token); localStorage.setItem('bb_user_v1', JSON.stringify(j.user));
+             if(j.live) localStorage.setItem('bb_tenant_live_v1','1'); }catch(e){}
+        msg.className='msg ok'; msg.textContent='Done — opening your portal.';
+        location.replace('index.html');
+      })
+      .catch(function(){ go.disabled=false; go.textContent='Set it and open the portal'; msg.className='msg err'; msg.textContent='We could not reach the portal just now. Please try again.'; });
+  }
+  function esc(s){ return String(s||'').replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+})();
+</script>
+</body>
+</html>

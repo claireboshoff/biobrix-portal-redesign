@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Stock · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+
+var d = BB.data;
+
+// Warehouse seat is scoped to its own depot — one depot, no chips.
+// Directors / operations still see every depot + the full chip set.
+var scopeDepot = (BB.user && BB.user.roleKey==='warehouse' && BB.user.depot) ? BB.user.depot : null;
+
+var DEPOT_CHIPS = [
+  { id:'all', name:'All depots' },
+  { id:'dep_george', name:'George' },
+  { id:'dep_ballito', name:'Ballito' },
+  { id:'dep_tzaneen', name:'Tzaneen' }
+];
+var filter = scopeDepot || 'all';
+
+// Inventory the current seat is allowed to see (all depots, or just their own).
+function scopedInventory(){
+  var rows = d.store().inventory; // live reference so stock-take edits persist in-memory
+  return scopeDepot ? rows.filter(function(i){ return i.depot===scopeDepot; }) : rows;
+}
+
+function invRows(){
+  var rows = scopedInventory();
+  return filter==='all' ? rows : rows.filter(function(i){ return i.depot===filter; });
+}
+
+function statusOf(i){
+  if(i.qty<=0) return 'Out of stock';
+  if(i.qty<i.reorder) return 'Low stock';
+  return 'In stock';
+}
+
+function render(){
+  var rows = invRows();
+
+  // stat row (computed off the seat's inventory, not the filtered view)
+  var all = scopedInventory();
+  var totalValue = all.reduce(function(s,i){ return s + (i.qty||0)*(d.product(i.prod).price||0); }, 0);
+  var lowCount = all.filter(function(i){ return i.qty<i.reorder; }).length;
+  var depotCount = scopeDepot ? 1 : d.all("depots").length;
+
+  var html = '';
+  html += '<section class="page-head">'+
+    '<div class="eyebrow">Operations · Stock</div>'+
+    '<h1>'+(scopeDepot?('Stock at '+BB.esc(d.depot(scopeDepot).name)):'Stock across the depots')+'</h1>'+
+    '<p>'+(scopeDepot
+      ?'Every product line at your depot. Low and out-of-stock lines are flagged so you can reorder before a delivery is held. Count on the floor and save as you go — it works offline.'
+      :'Every product line in every depot. Low and out-of-stock lines are flagged so ops can reorder before a delivery is held. Count on the floor and save as you go — it works offline.')+'</p>'+
+  '</section>';
+
+  html += '<div class="grid g3">'+
+    '<div class="stat"><div class="l">Stock lines</div><div class="v">'+all.length+'</div><div class="s">'+(scopeDepot?('at '+d.depot(scopeDepot).name):('across '+depotCount+' depots'))+'</div></div>'+
+    '<div class="stat'+(lowCount>0?' bad':'')+'"><div class="l">Below reorder</div><div class="v">'+lowCount+'</div><div class="s">need reordering</div></div>'+
+    '<div class="stat"><div class="l">On-hand value</div><div class="v">'+BB.money(totalValue)+'</div><div class="s">at list price</div></div>'+
+  '</div>';
+
+  // filter chips — only for seats that see more than one depot
+  // ---- STOCK TAKE — one tap when nothing moved, voice when it did --------
+  var lastTake = null; try{ lastTake = JSON.parse(localStorage.getItem('bb_stocktake_'+(scopeDepot||filter))); }catch(e){}
+  html += '<div class="card card-p" id="takeCard" style="margin-top:14px;border-left:3px solid var(--green-bright);">'+
+    '<div class="row between" style="align-items:flex-start;gap:14px;">'+
+      '<div><div class="eyebrow">Stock take</div>'+
+        '<h2 style="font-family:var(--display);font-size:1.06rem;color:var(--green-dark);margin-top:2px;">'+(scopeDepot?BB.esc(d.depot(scopeDepot).name):(filter==='all'?'Choose a depot below':BB.esc(d.depot(filter).name)))+' · '+all.length+' lines</h2>'+
+        '<p class="muted" style="font-size:.84rem;margin-top:4px;max-width:520px;">Walk the shelves. If every count matches what is on the screen, one tap closes the take. If something moved, say it or type it in the table below.</p>'+
+        (lastTake?'<div class="faint" style="font-size:.76rem;margin-top:6px;">Last take: '+BB.esc(lastTake.when)+' by '+BB.esc(lastTake.by)+' · '+BB.esc(lastTake.note)+'</div>':'')+
+      '</div>'+
+      '<div class="row" style="gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end;">'+
+        (function(){ var mode=''; try{ mode=localStorage.getItem('bb_reorder_mode')||'notify'; }catch(e){} return '<span class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;">Below reorder →</span><span class="chip tog'+(mode==='notify'?' on':'')+'" data-rmode="notify" style="cursor:pointer;">Notify Renzie</span><span class="chip tog'+(mode==='auto'?' on':'')+'" data-rmode="auto" style="cursor:pointer;">Auto-raise PO</span>'; })()+
+        '<button class="btn lime" id="takeVoice" title="Say the product and the count">🎙 Say a count</button>'+
+        '<button class="btn" id="takeSame" style="padding:13px 20px;">✓ Nothing has changed</button>'+
+      '</div>'+
+    '</div>'+
+    '<div id="takeVoiceOut" style="display:none;margin-top:12px;padding:12px 14px;border-radius:11px;background:#f7faf1;border:1px solid var(--line);font-size:.86rem;"></div>'+
+  '</div>';
+
+  if(!scopeDepot){
+    html += '<div class="row" style="margin:20px 0 4px;">';
+    DEPOT_CHIPS.forEach(function(c){
+      html += '<button class="chip'+(filter===c.id?' on':'')+'" data-depot="'+c.id+'">'+BB.esc(c.name)+'</button>';
+    });
+    html += '</div>';
+  }
+
+  // table
+  html += '<div class="card" style="margin-top:12px;"><div class="scroll"><table class="bb">'+
+    '<thead><tr><th>Product</th><th>Depot</th><th>On hand</th><th>Reorder at</th><th>Status</th><th class="right">Stock take</th></tr></thead><tbody>';
+
+  if(!rows.length){
+    html += '<tr><td colspan="6"><div class="empty">No stock lines for this depot.</div></td></tr>';
+  } else {
+    rows.forEach(function(i, idx){
+      var p = d.product(i.prod);
+      var st = statusOf(i);
+      var low = st!=='In stock';
+      var rowStyle = st==='Out of stock' ? 'background:var(--red-bg);' : (st==='Low stock' ? 'background:var(--amber-bg);' : '');
+      html += '<tr style="'+rowStyle+'">'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
+        '<td class="muted">'+BB.esc(d.depot(i.depot).name)+'</td>'+
+        '<td><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
+        '<td class="muted">'+BB.num(i.reorder)+'</td>'+
+        '<td>'+BB.statusBadge(st)+'</td>'+
+        '<td class="right"><div class="row" style="justify-content:flex-end;gap:8px;">'+
+          '<input type="number" min="0" value="'+i.qty+'" data-count="'+i.depot+'|'+i.prod+'" style="width:88px;padding:7px 9px;font-size:.85rem;border:1.5px solid var(--line);border-radius:9px;text-align:right;">'+
+          (low ? '<button class="btn ghost sm" data-reorder="'+i.depot+'|'+i.prod+'">Reorder</button>' : '')+
+        '</div></td>'+
+      '</tr>';
+    });
+  }
+  html += '</tbody></table></div></div>';
+
+  html += '<p class="faint" style="font-size:.76rem;margin:14px 0 24px;">Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier.</p>';
+
+  var main = document.querySelector('main.wrap');
+  if(main){ main.innerHTML = html; } else { document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>'); }
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('.chip.tog[data-rmode]'), function(c){ c.onclick=function(){ try{ localStorage.setItem('bb_reorder_mode', this.dataset.rmode); }catch(e){} BB.toast(this.dataset.rmode==='auto'?'Below reorder → purchase order raised automatically with the supplier':'Below reorder → Renzie is notified to reorder'); render(); }; });
+  // one-tap stock take — everything matches
+  var same=document.getElementById('takeSame');
+  if(same) same.onclick=function(){
+    var dep = scopeDepot || (filter!=='all'?filter:null);
+    if(!dep){ BB.toast('Pick a depot first'); return; }
+    var rows = d.store().inventory.filter(function(i){ return i.depot===dep; });
+    var when = new Date(); var stamp = when.toLocaleDateString('en-ZA',{day:'numeric',month:'short'})+' '+when.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+    rows.forEach(function(i){ d.enqueue({ op:'stocktake', table:'inventory', depot:dep, prod:i.prod, qty:i.qty, confirmed:true }); });
+    try{ localStorage.setItem('bb_stocktake_'+dep, JSON.stringify({ when:stamp, by:BB.user.name, note:rows.length+' lines confirmed, no changes' })); }catch(e){}
+    d.add('feed', { from:BB.user.id, date:when.toISOString().slice(0,10), kind:'Stock', farmer:null, ref:null, text:'Stock take done at '+d.depot(dep).name+' — '+rows.length+' lines counted, nothing changed.' });
+    BB.toast('Stock take closed · '+rows.length+' lines confirmed');
+    render();
+  };
+  // voice count — "SoilPrime six hundred and forty" / "HumiMax 220"
+  var vb=document.getElementById('takeVoice'), vo=document.getElementById('takeVoiceOut');
+  if(vb) vb.onclick=function(){
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    vo.style.display='block';
+    if(!SR){ vo.innerHTML='<b>Voice needs Chrome or Safari on the phone.</b> Type the count in the table below instead.'; return; }
+    var rec=new SR(); rec.lang='en-ZA'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1;
+    vo.innerHTML='<span class="faint">Listening… say the product and the count, e.g. “SoilPrime 640”.</span>';
+    vb.disabled=true;
+    rec.onresult=function(e){
+      var t=''; for(var i=0;i<e.results.length;i++){ t+=e.results[i][0].transcript; }
+      vo.innerHTML='<span class="faint">Heard:</span> “'+BB.esc(t)+'”';
+      if(e.results[e.results.length-1].isFinal){ applyVoiceCount(t); }
+    };
+    rec.onerror=function(){ vb.disabled=false; vo.innerHTML='<b>Didn’t catch that.</b> Tap the mic and try again, or type the count below.'; };
+    rec.onend=function(){ vb.disabled=false; };
+    try{ rec.start(); }catch(err){ vb.disabled=false; }
+  };
+  function wordsToNumber(str){
+    var small={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+    var m=str.match(/\d[\d\s]*/); if(m) return parseInt(m[0].replace(/\s/g,''),10);
+    var total=0,cur=0,hit=false;
+    str.toLowerCase().replace(/-/g,' ').split(/\s+/).forEach(function(w){
+      if(small[w]!=null){ cur+=small[w]; hit=true; }
+      else if(w==='hundred'){ cur=(cur||1)*100; hit=true; }
+      else if(w==='thousand'){ cur=(cur||1)*1000; total+=cur; cur=0; hit=true; }
+    });
+    return hit? total+cur : null;
+  }
+  function applyVoiceCount(t){
+    var dep = scopeDepot || (filter!=='all'?filter:null);
+    var rows = d.store().inventory.filter(function(i){ return !dep || i.depot===dep; });
+    var low=t.toLowerCase().replace(/[^a-z0-9\s]/g,' ');
+    var best=null, bestScore=0;
+    rows.forEach(function(i){
+      var p=d.product(i.prod); var name=String(p.name||'').toLowerCase();
+      var toks=name.replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean);
+      var score=0; toks.forEach(function(tk){ if(tk.length>2 && low.indexOf(tk)>=0) score+=tk.length; });
+      if(low.indexOf(name.replace(/\s/g,''))>=0) score+=name.length;
+      if(score>bestScore){ bestScore=score; best=i; }
+    });
+    var qty=wordsToNumber(low);
+    if(!best || qty==null){ vo.innerHTML='<b>Heard</b> “'+BB.esc(t)+'” — <span class="muted">couldn’t match a product and a number. Try “SoilPrime 640”.</span>'; return; }
+    var p=d.product(best.prod); var was=best.qty;
+    best.qty=Math.max(0,Math.round(qty)); d.save();
+    d.enqueue({ op:'stocktake', table:'inventory', depot:best.depot, prod:best.prod, qty:best.qty, via:'voice' });
+    BB.toast('Counted · '+p.name+' '+BB.num(best.qty));
+    render();
+    var vo2=document.getElementById('takeVoiceOut'); if(vo2){ vo2.style.display='block'; vo2.innerHTML='<b>'+BB.esc(p.name)+'</b> updated: '+BB.num(was)+' → <b>'+BB.num(best.qty)+'</b>. Say the next one, or tap <b>Nothing has changed</b> to close the take.'; }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-depot]'), function(btn){
+    btn.onclick = function(){ filter = btn.getAttribute('data-depot'); render(); };
+  });
+  // stock take — update the live inventory row and persist
+  Array.prototype.forEach.call(document.querySelectorAll('input[data-count]'), function(inp){
+    inp.onchange = function(){
+      var parts = inp.getAttribute('data-count').split('|');
+      var depotId = parts[0], prodId = parts[1];
+      var row = d.store().inventory.find(function(r){ return r.depot===depotId && r.prod===prodId; });
+      if(row){
+        var val = Math.max(0, Math.round(Number(inp.value)||0));
+        row.qty = val;
+        d.save();
+        d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:val });
+        BB.toast('Count saved · '+d.product(prodId).name);
+        render();
+      }
+    };
+  });
+  // reorder — raise request with the supplier
+  Array.prototype.forEach.call(document.querySelectorAll('button[data-reorder]'), function(btn){
+    btn.onclick = function(){
+      var parts = btn.getAttribute('data-reorder').split('|');
+      var prodId = parts[1];
+      var p = d.product(prodId);
+      var sup = d.supplier(p.supplier);
+      BB.toast('Reorder raised with '+sup.name);
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap"></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

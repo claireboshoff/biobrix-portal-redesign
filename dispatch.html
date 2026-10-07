@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What is moving · BioBrix OS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<style>
+  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
+  td.num,th.num{text-align:right;white-space:nowrap;}
+  .mini{font-size:.72rem;color:var(--faint);}
+  .srch{width:100%;max-width:320px;padding:10px 12px;border:1.5px solid var(--line);border-radius:11px;font-size:.92rem;font-family:inherit;}
+  .up{color:var(--ok);} .down{color:var(--red);}
+  .note{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:.86rem;line-height:1.55;}
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ back:'index.html', active:'dispatch' });
+var d = BB.data, u = BB.user;
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="main"></div></main>');
+
+// Month keys, newest first, so "this month" follows the calendar rather than a hard-coded date.
+function ymOf(dt){ return dt.toISOString().slice(0,7); }
+function shift(n){ var t=new Date(); t.setDate(1); t.setMonth(t.getMonth()+n); return ymOf(t); }
+var THIS = shift(0), PREV = shift(-1), LASTYR = shift(-12);
+function monthName(ym){
+  var p=ym.split('-'); return new Date(+p[0], +p[1]-1, 1).toLocaleDateString('en-ZA',{month:'short', year:'2-digit'});
+}
+var filter = '';
+
+function render(){
+  var sg = d.sage && d.sage();
+  var host = document.getElementById('main');
+  var showValue = BB.auth.can('finance') || u.roleKey==='director' || u.roleKey==='operations';
+
+  var html = '<div class="page-head"><h1>What is moving</h1>'+
+    '<p>Every product you have invoiced, in the quantity that left the shelf — this month against last month, and against the same month a year ago. Straight off your own invoices, so what you see here is what actually went out.</p></div>';
+
+  if(!sg || !sg.live || !(sg.products||[]).length){
+    html += '<div class="note">Nothing to show yet — this page fills up from your invoices as soon as the accounting system has been read. It is read three times a day.</div>';
+    host.innerHTML = html; return;
+  }
+
+  html += BB.staleNote();
+
+  var prods = (sg.products||[]).map(function(p){
+    var m = p.months||{};
+    return { code:p.code, name:p.name, pack:p.pack||'', total:p.qty||0, totalV:p.value||0,
+             now:(m[THIS]&&m[THIS].qty)||0, prev:(m[PREV]&&m[PREV].qty)||0, yr:(m[LASTYR]&&m[LASTYR].qty)||0,
+             nowV:(m[THIS]&&m[THIS].value)||0 };
+  });
+
+  var sum = function(k){ return prods.reduce(function(t,p){ return t+p[k]; },0); };
+  var nowQ = sum('now'), prevQ = sum('prev'), yrQ = sum('yr');
+  var moving = prods.filter(function(p){ return p.now>0; }).length;
+
+  function qty(v){ return (Math.round(v*10)/10).toLocaleString('en-ZA'); }
+
+  html += '<div class="sec"><h2>This month</h2><span class="ln"></span><span class="cnt">'+monthName(THIS)+' so far</span>'+BB.liveChip()+'</div>';
+  html += '<div class="grid g4">'+
+    '<div class="stat"><div class="l">Units out</div><div class="v">'+qty(nowQ)+'</div><div class="s">across '+moving+' products</div></div>'+
+    '<div class="stat"><div class="l">'+monthName(PREV)+'</div><div class="v">'+qty(prevQ)+'</div><div class="s">'+(prevQ? (nowQ>=prevQ?'ahead of last month':'behind last month') : 'nothing last month')+'</div></div>'+
+    '<div class="stat"><div class="l">'+monthName(LASTYR)+'</div><div class="v">'+qty(yrQ)+'</div><div class="s">same month a year ago</div></div>'+
+    (showValue
+      ? '<div class="stat"><div class="l">Invoiced this month</div><div class="v">'+BB.money(Math.round(sum('nowV')))+'</div><div class="s">excluding VAT</div></div>'
+      : '<div class="stat"><div class="l">Products on the books</div><div class="v">'+prods.length+'</div><div class="s">sold at least once</div></div>')+
+  '</div>';
+
+  // ---- the list ----
+  var rows = prods.slice();
+  if(filter){
+    var q = filter.toLowerCase();
+    rows = rows.filter(function(p){ return (p.name||'').toLowerCase().indexOf(q)>=0 || (p.code||'').toLowerCase().indexOf(q)>=0; });
+  }
+  rows.sort(function(a,b){ return (b.now-a.now) || (b.total-a.total); });
+
+  html += '<div class="sec"><h2>Product by product</h2><span class="ln"></span><span class="cnt">busiest first</span></div>';
+  html += '<div style="margin-bottom:10px;"><input class="srch" id="srch" placeholder="Find a product or code" value="'+BB.esc(filter)+'"></div>';
+  html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+    '<th>Product</th><th>Code</th><th class="num">'+monthName(THIS)+'</th><th class="num">'+monthName(PREV)+'</th>'+
+    '<th class="num">'+monthName(LASTYR)+'</th><th class="num">All time</th>'+(showValue?'<th class="num">Invoiced</th>':'')+'</tr></thead><tbody>';
+  if(!rows.length){
+    html += '<tr><td colspan="'+(showValue?7:6)+'"><div class="empty">Nothing matches that.</div></td></tr>';
+  }
+  rows.slice(0,200).forEach(function(p){
+    var move = p.prev? (p.now>p.prev?'up':(p.now<p.prev?'down':'')) : '';
+    html += '<tr><td><b>'+BB.esc(p.name)+'</b>'+(p.pack?'<div class="mini">'+BB.esc(p.pack)+'</div>':'')+'</td>'+
+      '<td class="mini">'+BB.esc(p.code||'')+'</td>'+
+      '<td class="num'+(move?' '+move:'')+'"><b>'+qty(p.now)+'</b></td>'+
+      '<td class="num">'+qty(p.prev)+'</td><td class="num">'+qty(p.yr)+'</td><td class="num">'+qty(p.total)+'</td>'+
+      (showValue?'<td class="num">'+BB.money(Math.round(p.nowV))+'</td>':'')+'</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  if(rows.length>200) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Showing the 200 busiest. Search above for anything else.</div>';
+  html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Quantities are as they were invoiced — litres, kilograms or units, whichever the line was sold in. Credit notes are already taken off.</div>';
+
+  host.innerHTML = html;
+  var s = document.getElementById('srch');
+  if(s){
+    s.addEventListener('input', function(){ filter = s.value; render();
+      var n = document.getElementById('srch'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } });
+  }
+}
+
+render();
+window.addEventListener('bb:sage', function(){ render(); });
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

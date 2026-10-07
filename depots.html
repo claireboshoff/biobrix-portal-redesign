@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Depots · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+
+var d = BB.data;
+// Warehouse seat sees only its own depot (auto-opened). Directors / ops see all 3.
+var scopeDepot = (BB.user && BB.user.roleKey==='warehouse' && BB.user.depot) ? BB.user.depot : null;
+var depots = scopeDepot ? d.all('depots').filter(function(x){ return x.id===scopeDepot; }) : d.all('depots');
+var selected = scopeDepot || null;
+
+function depotSummary(id){
+  var inv = d.where('inventory', function(i){ return i.depot===id; });
+  var low = inv.filter(function(i){ return i.qty<i.reorder; });
+  var jobs = d.where('blending', function(b){ return b.depot===id; });
+  var dels = d.where('deliveries', function(x){ return x.depot===id; });
+  return { inv:inv, low:low, jobs:jobs, dels:dels };
+}
+
+function renderDetail(id){
+  var dep = d.depot(id);
+  var s = depotSummary(id);
+
+  var html = '';
+  html += '<div class="card card-p" style="margin-top:8px;border-top:3px solid var(--green-bright);">';
+  html += '<div class="row between"><div><div class="eyebrow">Depot detail</div><b style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+BB.esc(dep.name)+'</b></div>'+BB.statusBadge(dep.status)+'</div>';
+  html += '<p class="muted" style="font-size:.82rem;margin:4px 0 2px;">'+BB.esc(dep.region)+' · '+BB.esc(dep.address)+'</p>';
+  html += '<p class="faint" style="font-size:.78rem;">Warehouse manager <b style="color:var(--green-mid);">'+BB.esc(dep.manager)+'</b> runs stock and the mixing / blending floor here.</p>';
+
+  // top stock lines
+  html += '<div class="sec" style="margin:20px 0 10px;"><h2 style="font-size:.95rem;">Stock on hand</h2><span class="ln"></span><span class="cnt">'+s.inv.length+' lines · '+s.low.length+' low</span></div>';
+  if(!s.inv.length){
+    html += '<div class="empty">No stock lines at this depot yet.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>On hand</th><th>Reorder</th><th class="right">Status</th></tr></thead><tbody>';
+    s.inv.slice().sort(function(a,b){ return (a.qty/a.reorder)-(b.qty/b.reorder); }).slice(0,6).forEach(function(i){
+      var p = d.product(i.prod);
+      var st = i.qty<=0?'Out of stock':(i.qty<i.reorder?'Low stock':'In stock');
+      html += '<tr>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+'</span></td>'+
+        '<td>'+BB.num(i.qty)+' '+BB.esc(p.unit||'')+'</td>'+
+        '<td class="muted">'+BB.num(i.reorder)+'</td>'+
+        '<td class="right">'+BB.statusBadge(st)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // blending / mixing jobs
+  html += '<div class="sec" style="margin:20px 0 10px;"><h2 style="font-size:.95rem;">Mixing &amp; blending</h2><span class="ln"></span><span class="cnt">'+s.jobs.length+' job'+(s.jobs.length===1?'':'s')+'</span></div>';
+  if(!s.jobs.length){
+    html += '<div class="empty">No blending jobs on the floor.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Recipe</th><th>Batch</th><th>For</th><th>Due</th><th class="right">Status</th></tr></thead><tbody>';
+    s.jobs.forEach(function(b){
+      html += '<tr>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(b.recipe)+'</b></td>'+
+        '<td class="muted">'+BB.esc(b.batch)+'</td>'+
+        '<td>'+BB.esc(d.farmer(b['for']).name)+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+BB.date(b.due)+'</td>'+
+        '<td class="right">'+BB.statusBadge(b.status)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // deliveries
+  html += '<div class="sec" style="margin:20px 0 10px;"><h2 style="font-size:.95rem;">Deliveries</h2><span class="ln"></span><span class="cnt">'+s.dels.length+'</span></div>';
+  if(!s.dels.length){
+    html += '<div class="empty">Nothing dispatching from here.</div>';
+  } else {
+    html += '<div class="scroll"><table class="bb"><thead><tr><th>Farmer</th><th>Transport</th><th>ETA</th><th class="right">Status</th></tr></thead><tbody>';
+    s.dels.forEach(function(x){
+      html += '<tr>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(d.farmer(x.farmer).name)+'</b></td>'+
+        '<td class="muted">'+BB.esc(x.transport)+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+BB.date(x.eta)+'</td>'+
+        '<td class="right">'+BB.statusBadge(x.status)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  html += '</div>';
+  // ---- depot tasks & messages (mirrors the depot's Telegram group) ----
+  var tasks = d.where('depotTasks', function(t){ return t.depot===id; }).sort(function(a,b){ return (a.status==='Done')-(b.status==='Done') || (a.due||'').localeCompare(b.due||''); });
+  var dep = d.depot(id);
+  html += '<div class="sec"><h2>Depot tasks &amp; messages</h2><span class="ln"></span><span class="cnt">'+tasks.filter(function(t){return t.status!=='Done';}).length+' open · the depot\u2019s own group</span></div>';
+  html += '<div class="card card-p">';
+  html += '<div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;"><input id="newTask" placeholder="e.g. Blend 800 L Pome Cal Foliar — due Thu" style="flex:1;min-width:220px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:.9rem;"><input id="newTaskDue" type="date" style="padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:.85rem;"><button class="btn sm" id="addTask" data-depot="'+id+'">Add task</button>'+
+    '<a class="btn ghost sm" target="_blank" rel="noopener" href="https://t.me/share/url?url='+encodeURIComponent(location.origin+location.pathname)+'&text='+encodeURIComponent(dep.name+' — today: '+tasks.filter(function(t){return t.status!=='Done';}).map(function(t){return '• '+t.text;}).join(' '))+'" title="Post today\u2019s list to the depot Telegram group">Telegram group ›</a>'+
+    '<a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(dep.name+' — today: '+tasks.filter(function(t){return t.status!=='Done';}).map(function(t){return '• '+t.text;}).join(' '))+'">WhatsApp ›</a></div>';
+  if(!tasks.length) html += '<div class="empty">No tasks yet — add the first one above.</div>';
+  tasks.forEach(function(t){
+    var who=d.person(t.by);
+    html += '<div class="row between" style="padding:9px 0;border-top:1px solid var(--line-soft);gap:12px;'+(t.status==='Done'?'opacity:.55;':'')+'">'+
+      '<div><div style="font-size:.9rem;'+(t.status==='Done'?'text-decoration:line-through;':'')+'">'+BB.esc(t.text)+'</div><div class="faint" style="font-size:.72rem;">'+BB.esc(who.name)+(t.due?' · due '+BB.date(t.due):'')+'</div></div>'+
+      (t.status==='Done'?'<span class="badge b-ok">Done</span>':'<button class="btn ghost sm" data-taskdone="'+t.id+'">Done ✓</button>')+'</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function render(){
+  var html = '';
+  html += '<section class="page-head">'+
+    '<div class="eyebrow">Operations · Depots</div>'+
+    '<h1>'+(scopeDepot?BB.esc(d.depot(scopeDepot).name):'The depot network')+'</h1>'+
+    '<p>'+(scopeDepot
+      ?'Your depot — stock on hand, the mixing / blending floor, and everything dispatching from here.'
+      :'George, Ballito and Tzaneen. Each warehouse manager runs stock and the mixing / blending floor from here. Tap a depot to see its stock, jobs and deliveries.')+'</p>'+
+  '</section>';
+
+  html += '<div class="grid g3">';
+  depots.forEach(function(dep){
+    var s = depotSummary(dep.id);
+    var bad = s.low.length>0;
+    var on = selected===dep.id;
+    html += '<div class="card card-p depot-card" data-depot="'+dep.id+'" style="cursor:pointer;'+(on?'border-color:var(--green-bright);box-shadow:var(--shadow-lg);':'')+(bad?'border-left:3px solid var(--red);':'border-left:3px solid var(--green-bright);')+'">'+
+      '<div class="row between"><b style="font-family:var(--display);color:var(--green-dark);">'+BB.esc(dep.name)+'</b>'+BB.statusBadge(dep.status)+'</div>'+
+      '<div class="faint" style="font-size:.74rem;margin:2px 0 2px;">'+BB.esc(dep.region)+'</div>'+
+      '<div class="muted" style="font-size:.76rem;">Manager · '+BB.esc(dep.manager)+'</div>'+
+      '<div class="faint" style="font-size:.72rem;margin-bottom:11px;">'+BB.esc(dep.address)+'</div>'+
+      '<div class="row" style="gap:16px;font-size:.74rem;">'+
+        '<div><div class="v" style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+s.inv.length+'</div><span class="faint">in stock</span></div>'+
+        '<div><div class="v" style="font-family:var(--display);font-size:1.15rem;color:'+(bad?'var(--red)':'var(--green-dark)')+';">'+s.low.length+'</div><span class="faint">low</span></div>'+
+        '<div><div class="v" style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+s.jobs.length+'</div><span class="faint">blending</span></div>'+
+        '<div><div class="v" style="font-family:var(--display);font-size:1.15rem;color:var(--green-dark);">'+s.dels.length+'</div><span class="faint">deliveries</span></div>'+
+      '</div>'+
+    '</div>';
+  });
+  html += '</div>';
+
+  html += '<div id="detail">'+(selected?renderDetail(selected):'<div class="empty" style="margin-top:24px;"><div class="big">🏭</div>Tap a depot above to open it.</div>')+'</div>';
+
+  html += '<div style="height:24px;"></div>';
+
+  var main = document.querySelector('main.wrap');
+  main.innerHTML = html;
+  wire();
+}
+
+function wire(){
+  var at=document.getElementById('addTask'); if(at) at.onclick=function(){ var txt=document.getElementById('newTask').value.trim(); if(!txt){ BB.toast('Type the task first'); return; } d.add('depotTasks',{ depot:this.dataset.depot, text:txt, by:BB.user.id, due:document.getElementById('newTaskDue').value||null, status:'Open' }); BB.toast('Task added · depot group updated'); render(); };
+  Array.prototype.forEach.call(document.querySelectorAll('button[data-taskdone]'), function(b){ b.onclick=function(e){ e.stopPropagation(); d.update('depotTasks', this.dataset.taskdone, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Done'); render(); }; });
+  var nt=document.getElementById('newTask'); if(nt) nt.onclick=function(e){ e.stopPropagation(); };
+  Array.prototype.forEach.call(document.querySelectorAll('.depot-card[data-depot]'), function(card){
+    card.onclick = function(){
+      var id = card.getAttribute('data-depot');
+      selected = (selected===id) ? null : id;
+      render();
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap"></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

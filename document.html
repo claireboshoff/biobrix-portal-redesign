@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Document · BioBrix</title>
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<style>
+  body{background:#e9ede2;padding:0;}
+  .sheet{max-width:800px;margin:22px auto;background:#fff;box-shadow:0 8px 30px rgba(20,41,12,.15);border-radius:10px;overflow:hidden;}
+  .lh{background:linear-gradient(120deg,var(--green-darkest),var(--green-dark));color:#eaf4d8;padding:26px 34px;display:flex;justify-content:space-between;align-items:flex-start;}
+  .lh .wm{font-family:var(--display);font-weight:700;font-size:1.5rem;letter-spacing:1px;}
+  .lh .wm .os{color:var(--lime);}
+  .lh .tag{font-size:.62rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--lime);margin-top:4px;}
+  .lh .meta{text-align:right;font-size:.74rem;color:rgba(255,255,255,.7);}
+  .body{padding:30px 34px 38px;}
+  .dtitle{font-family:var(--display);font-size:1.5rem;color:var(--green-dark);font-weight:600;}
+  .drow{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-top:4px;}
+  .divider{height:2px;background:var(--lime);width:60px;margin:16px 0 20px;border-radius:2px;}
+  table.doc{width:100%;border-collapse:collapse;margin:10px 0;font-size:.9rem;}
+  table.doc th{text-align:left;background:var(--green-darkest);color:#eaf4d8;padding:9px 12px;font-weight:500;}
+  table.doc td{padding:9px 12px;border-bottom:1px solid var(--line-soft);}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;margin:14px 0;}
+  .kv .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);}
+  .kv .v{font-family:var(--display);font-size:1.1rem;color:var(--ink);font-weight:600;}
+  .flag{background:#eef6dc;border-left:4px solid var(--green-bright);border-radius:6px;padding:13px 16px;margin:16px 0;font-size:.92rem;}
+  .flag b{color:var(--green-dark);}
+  .sec2{font-family:var(--display);font-weight:600;color:var(--green-dark);font-size:1.02rem;margin:22px 0 8px;}
+  ol.how{margin:6px 0 4px 20px;font-size:.92rem;line-height:1.6;} ol.how li{margin-bottom:6px;} ol.how b{color:var(--green-dark);}
+  .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .foot{border-top:1px solid var(--line);margin-top:24px;padding-top:14px;font-size:.72rem;color:var(--faint);text-align:center;}
+  .toolbar{max-width:800px;margin:0 auto;display:flex;gap:10px;justify-content:flex-end;padding:0 8px;}
+  @media print{ .bb-head,.bb-nav,.toolbar{display:none!important;} body{background:#fff;padding:0;} .sheet{box-shadow:none;margin:0;max-width:none;border-radius:0;} }
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'docs', back:'client-portal.html' });
+var d = BB.data;
+var q = new URLSearchParams(location.search);
+var farmerId = q.get('farmer'), kind = q.get('kind')||'Document', name = q.get('name')||'BioBrix Document', recId = q.get('id');
+// a farmer seat can only ever open their own farm's documents
+if(BB.user && BB.user.roleKey==='farmer'){ farmerId = BB.user.farmer; }
+function pick(table, sortDesc){
+  var rows = d.where(table,function(x){return x.farmer===farmerId;});
+  if(recId){ var hit = rows.find(function(x){return x.id===recId;}); if(hit) return hit; }
+  return rows.sort(function(a,b){return (b.date||'').localeCompare(a.date||'');})[0];
+}
+function programmeFor(){ var ps=d.where('programs',function(x){return x.farmer===farmerId;}); return ps.find(function(x){return x.status==='Active';})||ps[0]; }
+// "what to do next" — the programme lines that answer this report, so the farmer knows what to buy and when
+function nextSteps(intro){
+  var pr = programmeFor(); if(!pr || !(pr.lines||[]).length) return '';
+  return '<div class="sec2">What to do next</div><p class="muted" style="font-size:.9rem;margin:0 0 8px;">'+BB.esc(intro||'')+'</p>'+
+    '<table class="doc"><thead><tr><th>Product</th><th>How much</th><th>When</th></tr></thead><tbody>'+
+    (pr.lines||[]).map(function(ln){ var pd=d.product(ln.prod); return '<tr><td><b>'+BB.esc(pd.name)+'</b>'+(pd.sheet?'<div class="faint" style="font-size:.74rem;max-width:420px;">'+BB.esc(pd.sheet)+'</div>':'')+'</td><td>'+BB.esc(ln.rate||'')+'</td><td>'+BB.esc(ln.timing||'')+'</td></tr>'; }).join('')+
+    '</tbody></table>'+
+    '<div class="acts"><a class="btn sm" href="client-portal.html#orders">＋ Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019ve read my '+kind.toLowerCase()+' report — can we talk about the next step?')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
+}
+function waLink(msg){ return 'https://wa.me/'+String(advisor.cell||'').replace(/\D/g,'').replace(/^0/,'27')+'?text='+encodeURIComponent('Hi '+String(advisor.name||'').split(' ')[0]+', it\u2019s '+f.name+' from '+f.farm+'. '+msg); }
+var f = d.farmer(farmerId) || {name:'—',farm:'—'};
+var advisor = d.rep(f.rep);
+var today = BB.date(new Date().toISOString());
+
+function block(kind){
+  if(kind==='Soil'){
+    var s = pick('soil');
+    if(!s) return '<p class="muted">No soil analysis on file yet.</p>';
+    var blkS = d.by('blocks', s.block)||{name:''};
+    return (blkS.name?'<div class="muted" style="font-size:.86rem;margin-bottom:4px;">'+BB.esc(blkS.name)+' · '+BB.esc(blkS.crop||'')+'</div>':'')+'<div class="kv">'+
+      kv('pH', s.ph!=null?s.ph:'—')+kv('Organic matter', s.om||'—')+
+      kv('Ca : Mg ratio', s.ca_mg||'—')+kv('Microbial activity', s.microbial||'—')+
+      kv('Phosphorus (P)', s.p||'—')+kv('Sampled', BB.date(s.date))+'</div>'+
+      flag('What it means', s.flag||'Pending interpretation.')+
+      (s.status==='Interpreted' ? nextSteps('Your programme is built to correct exactly this. Here is what goes on, how much, and when.') : flag('Next', 'Results are at the lab. '+BB.esc(String(advisor.name||'Your advisor').split(' ')[0])+' will interpret them and update this report — you will see it here first.'));
+  }
+  if(kind==='Leaf'){
+    var l = pick('leaf');
+    if(!l) return '<p class="muted">No leaf-sap analysis on file yet.</p>';
+    var blkL = d.by('blocks', l.block)||{name:''};
+    return (blkL.name?'<div class="muted" style="font-size:.86rem;margin-bottom:4px;">'+BB.esc(blkL.name)+'</div>':'')+'<div class="kv">'+kv('Crop', l.crop||'—')+kv('Nitrogen (N)', l.n||'—')+kv('Potassium (K)', l.k||'—')+kv('Calcium (Ca)', l.ca||'—')+kv('Sampled', BB.date(l.date))+'</div>'+
+      flag('What it means', l.flag||'Pending interpretation.')+
+      (l.status==='Interpreted' ? nextSteps('Leaf-sap tells us what the plant is actually taking up. These are the foliar steps in your programme.') : flag('Next', 'Sap is at the lab. The reading lands here the moment it is interpreted.'));
+  }
+  if(kind==='Programme'){
+    var pr = (recId && d.by('programs',recId) && d.by('programs',recId).farmer===farmerId) ? d.by('programs',recId) : programmeFor();
+    if(!pr) return '<p class="muted">No programme on file yet.</p>';
+    var tot=(pr.lines||[]).reduce(function(s,ln){return s+(ln.cost||0);},0);
+    var blkP = d.by('blocks', pr.block)||{name:''};
+    return '<div class="kv">'+kv('Crop', pr.crop||'—')+kv('Season', pr.season||'—')+kv('Block', blkP.name||'—')+kv('Status', pr.status||'—')+'</div>'+
+      flag('The goal', pr.goal||'')+
+      '<div class="sec2">How this programme works</div>'+
+      '<ol class="how">'+
+        '<li><b>Feed the biology first.</b> Soil products go on with the rain or irrigation so the microbes wake up and start cycling nutrients.</li>'+
+        '<li><b>Correct what the lab found.</b> Each product below targets a reading from your soil or leaf report — nothing is applied for the sake of it.</li>'+
+        '<li><b>Time it to the crop.</b> The “when” column follows your crop stages, so the plant gets it when it can use it.</li>'+
+        '<li><b>Measure, then adjust.</b> '+BB.esc(String(advisor.name||'Your advisor').split(' ')[0])+' re-samples during the season and updates this programme in your portal.</li>'+
+      '</ol>'+
+      '<div class="sec2">What to buy, how much, and when</div>'+
+      '<table class="doc"><thead><tr><th>Product</th><th>Rate</th><th>Timing</th><th style="text-align:right">Value</th></tr></thead><tbody>'+
+      (pr.lines||[]).map(function(ln){ var pd=d.product(ln.prod); return '<tr><td><b>'+BB.esc(pd.name)+'</b>'+(pd.sheet?'<div class="faint" style="font-size:.74rem;max-width:420px;">'+BB.esc(pd.sheet)+'</div>':'')+'</td><td>'+BB.esc(ln.rate||'')+'</td><td>'+BB.esc(ln.timing||'')+'</td><td style="text-align:right">'+BB.money(ln.cost||0)+'</td></tr>';}).join('')+
+      '<tr><td colspan="3" style="font-weight:600">Programme total</td><td style="text-align:right;font-weight:700;color:var(--green-dark)">'+BB.money(tot)+'</td></tr></tbody></table>'+
+      '<div class="acts"><a class="btn sm" href="client-portal.html#orders">＋ Order these products</a><a class="btn ghost sm" href="'+waLink('I\u2019m looking at my '+(pr.season||'')+' programme — quick question.')+'" target="_blank" rel="noopener">WhatsApp '+BB.esc(String(advisor.name||'my advisor').split(' ')[0])+'</a></div>';
+  }
+  if(kind==='Monitoring'){
+    var w = pick('watch');
+    if(!w) return '<p class="muted">No monitoring visits on file yet.</p>';
+    return '<div class="kv">'+kv('Growth stage', w.stage||'—')+kv('Weather', w.weather||'—')+kv('Soil moisture', w.soilMoist||'—')+kv('Crop vigour', w.vigour||'—')+kv('Pest watch', w.pest||'—')+kv('Visited', BB.date(w.date))+'</div>'+
+      flag('Advisor note', w.note||'');
+  }
+  if(kind==='Delivery'){
+    var o = d.where('orders',function(x){return x.farmer===farmerId;})[0];
+    if(!o) return '<p class="muted">No orders on file yet.</p>';
+    return '<div class="kv">'+kv('Order ref', o.ref)+kv('From depot', d.depot(o.depot).name)+kv('Deliver', BB.monthName(o.deliverMonth))+kv('Status', o.status)+'</div>'+
+      '<table class="doc"><thead><tr><th>Product</th><th style="text-align:right">Qty</th></tr></thead><tbody>'+
+      (o.lines||[]).map(function(ln){return '<tr><td>'+BB.esc(d.product(ln.prod).name)+'</td><td style="text-align:right">'+BB.num(ln.qty)+' '+BB.esc(d.product(ln.prod).unit||'')+'</td></tr>';}).join('')+'</tbody></table>';
+  }
+  return '<p class="muted">'+BB.esc(name)+'</p>';
+}
+function kv(k,v){ return '<div><div class="k">'+BB.esc(k)+'</div><div class="v">'+BB.esc(v)+'</div></div>'; }
+function flag(l,t){ return '<div class="flag"><b>'+BB.esc(l)+':</b> '+BB.esc(t)+'</div>'; }
+
+var html='<div class="toolbar"><a class="btn ghost sm" href="client-portal.html">‹ Back to my farm</a><button class="btn sm" onclick="window.print()">🖨 Print / Save PDF</button></div>'+
+'<div class="sheet">'+
+  '<div class="lh"><div><div class="wm">BIOBRIX <span class="os">·</span></div><div class="tag">The Biological Way</div></div>'+
+    '<div class="meta">Prepared '+today+'<br>'+BB.esc(advisor.name||'')+(advisor.cell?'<br>'+BB.esc(advisor.cell):'')+'</div></div>'+
+  '<div class="body">'+
+    '<div class="dtitle">'+BB.esc(name)+'</div>'+
+    '<div class="drow"><span>'+BB.esc(f.farm)+' · '+BB.esc(f.name)+'</span><span>'+BB.esc(kind==='Programme'?'RenewAg programme':kind==='Delivery'?'Delivery note':kind+' report')+'</span></div>'+
+    '<div class="divider"></div>'+
+    block(kind)+
+    '<div class="foot">BioBrix (Pty) Ltd · The Biological Way · This report is prepared for '+BB.esc(f.name)+' and is confidential.</div>'+
+  '</div>'+
+'</div>';
+document.body.insertAdjacentHTML('beforeend','<main>'+html+'</main>');
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecast &amp; actual · BioBrix OS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<style>
+  .wrap{max-width:1160px;margin:0 auto;padding:0 18px 92px;}
+  td.num,th.num{text-align:right;white-space:nowrap;}
+  .qty{width:96px;padding:7px 9px;text-align:right;font-size:.88rem;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;}
+  .qty:focus{border-color:var(--green-bright);outline:none;}
+  .qty.proposed{border-style:dashed;border-color:var(--green-bright);background:#f6fbef;}
+  .mini{font-size:.72rem;color:var(--faint);}
+  .pick{padding:8px 11px;font-size:.85rem;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit;max-width:100%;}
+  .bar{height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden;} .bar > i{display:block;height:100%;}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 16px;}
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ back:'index.html' });
+var d = BB.data, u = BB.user;
+document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="main"></div></main>');
+
+function money(v){ return BB.money(Math.round(v)); }
+function ym(s){ return (s||'').slice(0,7); }
+function monthLabel(k){ var p=k.split('-'); return BB.monthName(parseInt(p[1],10)-1)+' '+p[0].slice(2); }
+// The season BioBrix plans against: 12 months from the month we are in.
+function seasonMonths(startYm){
+  var out=[], p=startYm.split('-'), y=parseInt(p[0],10), m=parseInt(p[1],10);
+  for(var i=0;i<12;i++){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} }
+  return out;
+}
+
+function render(){
+  var sg = d.sage && d.sage(), pl = d.plan();
+  var host = document.getElementById('main');
+  var canEdit = BB.auth.can('finance') || u.roleKey==='director' || u.roleKey==='advisor';
+  // Their own products, ranked by what they actually sell, come from the accounting system.
+  // The demo list is only used until that arrives.
+  var sageProducts = (sg && sg.products) || [];
+  var products = sageProducts.length
+    ? sageProducts.map(function(x){ return { id:'sp_'+x.code, name:x.name, code:x.code, pack:x.pack||'', months:x.months||{}, sold:x.qty, real:true }; })
+    : d.allUnscoped('products');
+  var q = new URLSearchParams(location.search);
+  var startYm = q.get('from') || new Date().toISOString().slice(0,7);
+  var months = seasonMonths(startYm);
+  var view = (q.get('view')||'product').toLowerCase();
+  var fc = pl.forecasts || {};
+
+  var html = '<div class="page-head"><h1>Forecast &amp; actual</h1>'+
+    '<p>Plan the year in litres and kilograms, product by product, and watch it against what is actually invoiced — in one place, updated as the year goes. Add a new customer or a new product in August and it simply joins the plan.</p></div>';
+
+  html += BB.staleNote();
+  html += '<div class="tabs">'+
+    ['product|By product','customer|By customer','value|Value vs invoiced'].map(function(o){
+      var k=o.split('|')[0],t=o.split('|')[1];
+      return '<a class="btn sm'+(view===k?'':' ghost')+'" href="forecast-plan.html?view='+k+'&from='+startYm+'">'+t+'</a>';
+    }).join('')+
+    '<span style="flex:1"></span>'+
+    '<a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+seasonMonths(startYm)[0].replace(/^(\d{4})-(\d{2})$/,function(_,y,m){var mm=parseInt(m,10)-1,yy=+y;if(mm<1){mm=12;yy--;}return yy+'-'+String(mm).padStart(2,'0');})+'">‹ earlier</a>'+
+    '<a class="btn ghost sm" href="forecast-plan.html?view='+view+'&from='+months[1]+'">later ›</a>'+
+  '</div>';
+
+  // ---------- actuals from the ledger ----------
+  var actualByMonth = {}, actualByCustomerMonth = {};
+  if(sg && sg.live){
+    (sg.invoices||[]).filter(function(i){ return i.kind!=='opening'; }).forEach(function(i){
+      var k=ym(i.date); if(!k) return;
+      actualByMonth[k]=(actualByMonth[k]||0)+(i.amount||0);
+      var ck=i.customer+'|'+k; actualByCustomerMonth[ck]=(actualByCustomerMonth[ck]||0)+(i.amount||0);
+    });
+  }
+
+  // ---------- by product: quantity plan ----------
+  if(view==='product'){
+    var real = products.length && products[0].real;
+    html += '<div class="sec"><h2>The year in litres and kilograms</h2><span class="ln"></span><span class="cnt">'+
+      (real? products.length+(products.length===1?' product':' products')+' you actually sell · last year in grey under each box' : 'type a number — it saves for everyone')+'</span>'+(real?BB.liveChip():'')+'</div>';
+    if(real){
+      // Counting what we could propose lets the button say something true rather than "fill".
+      var canFill=0, wouldChange=0;
+      products.forEach(function(p2){
+        months.forEach(function(m){
+          var ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4);
+          if(p2.months && p2.months[ly] && p2.months[ly].qty){
+            canFill++;
+            if(!((fc[d.fKey(m,p2.id,null)]||{}).qty)) wouldChange++;
+          }
+        });
+      });
+      html += '<div class="row between" style="gap:12px;margin:0 0 12px;align-items:flex-start;">'+
+        '<div class="faint" style="font-size:.78rem;max-width:62ch;">Ranked by what you sold. The grey figure under each box is that month last year, from your accounting system — type over it, or take the lot as a starting plan and adjust from there.</div>'+
+        (canEdit && wouldChange? '<button class="btn" id="fillYear" style="flex:none;">Start from last year ('+wouldChange+' months)</button>' : '')+
+      '</div>';
+    }
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Product</th><th class="mini">Unit</th>'+
+      months.map(function(m){ return '<th class="num">'+monthLabel(m)+'</th>'; }).join('')+'<th class="num">Year</th></tr></thead><tbody>';
+    products.forEach(function(p){
+      var rowTotal=0;
+      var cells = months.map(function(m){
+        var key = d.fKey(m, p.id, null);
+        var v = (fc[key]&&fc[key].qty)||'';
+        if(v) rowTotal += Number(v)||0;
+        // the same month a year ago, so the plan starts from evidence rather than a blank box
+        var lastYear = null;
+        if(p.months){ var ly = (parseInt(m.slice(0,4),10)-1)+m.slice(4); if(p.months[ly]) lastYear = p.months[ly].qty; }
+        var proposed = (fc[key]||{}).from==='last year';
+        return '<td class="num">'+(canEdit
+          ? '<input class="qty'+(proposed?' proposed':'')+'" inputmode="decimal" data-f="'+key+'" value="'+v+'" placeholder="'+(lastYear? BB.num(lastYear) : '—')+'" title="'+(proposed?'taken from last year — change it if it should differ':'')+'">'
+          : (v||'<span class="faint">—</span>'))+
+          (lastYear? '<div class="mini">was '+BB.num(lastYear)+'</div>' : '')+'</td>';
+      }).join('');
+      html += '<tr><td><b>'+BB.esc(p.name)+'</b><div class="mini">'+BB.esc(p.code||'')+(p.sold? ' · '+BB.num(p.sold)+' sold to date':'')+'</div></td>'+
+        '<td class="mini">'+BB.esc(p.pack||'L')+'</td>'+cells+
+        '<td class="num"><b>'+(rowTotal? BB.num(rowTotal) : '—')+'</b></td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+    if(!real) html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Showing sample products until the next read of your accounting system.</div>';
+  }
+
+  // ---------- by customer ----------
+  if(view==='customer'){
+    var customers = (sg && sg.customers) || [];
+    var top = customers.map(function(c){
+      var t=0; months.forEach(function(m){ t += actualByCustomerMonth[c.id+'|'+m]||0; });
+      var last12=0; (sg.invoices||[]).forEach(function(i){ if(i.customer===c.id && i.kind!=='opening') last12+=(i.amount||0); });
+      return {c:c, last12:last12};
+    }).sort(function(a,b){ return b.last12-a.last12; }).slice(0,40);
+    html += '<div class="sec"><h2>By customer</h2><span class="ln"></span><span class="cnt">your 40 biggest · last year invoiced shown as the starting point</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Customer</th><th class="num">Invoiced to date</th>'+
+      months.slice(0,6).map(function(m){ return '<th class="num">'+monthLabel(m)+'</th>'; }).join('')+'</tr></thead><tbody>';
+    top.forEach(function(r){
+      var cells = months.slice(0,6).map(function(m){
+        var key = d.fKey(m, null, 'sage_'+r.c.id);
+        var v = (fc[key]&&fc[key].value)||'';
+        return '<td class="num">'+(canEdit? '<input class="qty" inputmode="decimal" data-fv="'+key+'" value="'+v+'" placeholder="—">' : (v? money(v):'<span class="faint">—</span>'))+'</td>';
+      }).join('');
+      html += '<tr><td><b>'+BB.esc(r.c.name)+'</b><div class="mini">'+BB.esc(r.c.town||'')+'</div></td>'+
+        '<td class="num">'+money(r.last12)+'</td>'+cells+'</tr>';
+    });
+    html += '</tbody></table></div></div>';
+    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Amounts in rands. A customer who only starts in August simply gets a figure from August — nothing has to be rebuilt.</div>';
+  }
+
+  // ---------- value vs invoiced ----------
+  if(view==='value'){
+    html += '<div class="sec"><h2>Forecast against what was invoiced</h2><span class="ln"></span><span class="cnt">actuals straight from your accounting system</span>'+BB.liveChip()+'</div>';
+    html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Month</th><th class="num">Forecast</th><th class="num">Invoiced</th><th class="num">Difference</th><th>How it is tracking</th></tr></thead><tbody>';
+    var fTot=0, aTot=0;
+    months.forEach(function(m){
+      // a month's forecast = the month total typed here, else the sum of the per-customer figures
+      var mk = d.fKey(m, null, null);
+      var typed = (fc[mk]&&fc[mk].value)||0;
+      var fromCustomers = Object.keys(fc).filter(function(k){ return k.indexOf(m+'|all|')===0 && k!==mk; })
+        .reduce(function(t,k){ return t+(Number(fc[k].value)||0); },0);
+      var f = typed || fromCustomers;
+      var a = actualByMonth[m]||0;
+      fTot+=f; aTot+=a;
+      var pct = f? Math.round(a/f*100) : null;
+      html += '<tr><td><b>'+monthLabel(m)+'</b></td>'+
+        '<td class="num">'+(canEdit? '<input class="qty" style="width:120px;" inputmode="decimal" data-fv="'+mk+'" value="'+(typed||'')+'" placeholder="'+(fromCustomers? Math.round(fromCustomers):'set')+'">' : (f? money(f):'<span class="faint">—</span>'))+'</td>'+
+        '<td class="num"><b>'+(a? money(a) : '<span class="faint">—</span>')+'</b></td>'+
+        '<td class="num">'+(f&&a? '<b style="color:'+(a>=f?'var(--ok)':'var(--red)')+';">'+(a>=f?'+':'')+money(a-f)+'</b>' : '<span class="faint">—</span>')+'</td>'+
+        '<td>'+(pct===null? '<span class="faint">no forecast set</span>'
+          : '<div class="bar" style="width:150px;"><i style="width:'+Math.min(pct,100)+'%;background:'+(pct>=100?'var(--ok)':pct>=80?'var(--amber)':'var(--red)')+';"></i></div><div class="mini">'+pct+'% of forecast</div>')+'</td></tr>';
+    });
+    html += '</tbody><tfoot><tr><td><b>The year</b></td><td class="num"><b>'+(fTot?money(fTot):'—')+'</b></td><td class="num"><b>'+money(aTot)+'</b></td>'+
+      '<td class="num">'+(fTot? '<b style="color:'+(aTot>=fTot?'var(--ok)':'var(--red)')+';">'+(aTot>=fTot?'+':'')+money(aTot-fTot)+'</b>':'—')+'</td><td></td></tr></tfoot></table></div></div>';
+    html += '<div class="pline faint" style="font-size:.78rem;margin-top:8px;">Leave a month blank and it adds up the per-customer figures for you. Opening balances carried over from the previous system are left out of the invoiced column — they are not sales.</div>';
+  }
+
+  if(pl.updatedAt) html += '<div class="pline faint" style="font-size:.76rem;margin-top:14px;">Last change to the plan: '+BB.esc(String(pl.updatedAt).slice(0,16).replace('T',' '))+(pl.updatedBy? ' by '+BB.esc(pl.updatedBy):'')+'.</div>';
+
+  host.innerHTML = html;
+
+  function put(key, field, val){
+    var cur = (d.plan().forecasts||{})[key] || {};
+    cur[field] = val===''? null : (parseFloat(val)||0);
+    var patch = {}; patch[key] = cur;
+    // redraw so the difference and the progress bar answer immediately — typing a number and
+    // seeing nothing change is what makes people go back to a spreadsheet.
+    d.savePlan({ forecasts: patch }).then(function(){ BB.toast('Saved for everyone'); render(); })
+      .catch(function(){ render(); });
+  }
+  var fillBtn = document.getElementById('fillYear');
+  if(fillBtn) fillBtn.addEventListener('click', function(){
+    var patch={}, n=0;
+    products.forEach(function(p2){
+      months.forEach(function(m){
+        var key=d.fKey(m,p2.id,null);
+        if(((d.plan().forecasts||{})[key]||{}).qty) return;          // never overwrite a typed figure
+        var ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4);
+        var was = p2.months && p2.months[ly] && p2.months[ly].qty;
+        if(was){ patch[key]={qty:was, from:'last year'}; n++; }
+      });
+    });
+    if(!n){ BB.toast('Nothing to take — every month already has a figure'); return; }
+    fillBtn.disabled=true; fillBtn.textContent='Filling…';
+    d.savePlan({forecasts:patch}).then(function(){
+      BB.toast(n+' months filled from last year — change anything that should be different');
+      render();
+    }).catch(function(){ render(); });
+  });
+
+  host.querySelectorAll('input[data-f]').forEach(function(el){
+    el.addEventListener('change', function(){ put(el.getAttribute('data-f'), 'qty', el.value); });
+  });
+  host.querySelectorAll('input[data-fv]').forEach(function(el){
+    el.addEventListener('change', function(){ put(el.getAttribute('data-fv'), 'value', el.value); });
+  });
+}
+
+render();
+window.addEventListener('bb:sage', function(){ render(); });
+window.addEventListener('bb:plan', function(){ render(); });
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

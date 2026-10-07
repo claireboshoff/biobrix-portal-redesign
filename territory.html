@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Territory potential · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'sales', back:'index.html' });
+
+var d = BB.data, u = BB.user;
+
+var css=''+
+'.pbar{background:#eef2e7;border-radius:6px;height:8px;overflow:hidden;min-width:70px;}'+
+'.pbar i{display:block;height:100%;background:var(--green-bright);}'+
+'.readout{background:#f7faf1;border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:11px;padding:14px 16px;margin-top:12px;}'+
+'.readout.warn{border-left-color:var(--amber);background:var(--amber-bg);}'+
+'.map-card{overflow:hidden;}'+
+'.map-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line-soft);}'+
+'.map-tools .grp{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}'+
+'.map-tools .lbl{font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);margin-right:2px;}'+
+'.map-tools .sp{flex:1;}'+
+'.chip.tog{cursor:pointer;user-select:none;}'+
+'#vmap{height:460px;width:100%;background:#eef2e7;position:relative;z-index:0;}'+
+'@media(max-width:700px){#vmap{height:340px;} .map-tools .sp{display:none;}}'+
+'.map-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:11px 14px;font-size:.74rem;color:var(--muted);border-top:1px solid var(--line-soft);}'+
+'.map-legend .k{display:inline-flex;align-items:center;gap:6px;}'+
+'.map-legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}'+
+'.map-legend .sq{width:10px;height:10px;border-radius:3px;background:var(--green-darkest);display:inline-block;}'+
+'.map-legend .ring{width:14px;height:14px;border-radius:50%;border:2px solid var(--green-mid);background:rgba(104,165,62,.35);display:inline-block;}'+
+'.map-fallback{padding:34px 20px;text-align:center;color:var(--muted);font-size:.9rem;}'+
+'.map-fallback .big{font-size:2rem;margin-bottom:6px;}'+
+'.rep-pin{width:34px;height:34px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 3px 10px rgba(20,41,12,.35);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:.72rem;color:#fff;letter-spacing:.3px;}'+
+'.rep-pin-wrap{background:none;border:none;}'+
+'.depot-pin{width:22px;height:22px;border-radius:6px;background:var(--green-darkest);border:2px solid #fff;box-shadow:0 2px 8px rgba(20,41,12,.35);display:flex;align-items:center;justify-content:center;color:var(--lime);font-size:.62rem;font-weight:800;}'+
+'.depot-pin.comm{background:var(--amber);color:#fff;}'+
+'.depot-pin-wrap{background:none;border:none;}'+
+'.leaflet-container{font-family:var(--body);font-size:.82rem;}'+
+'.leaflet-tile-pane{filter:saturate(.45) contrast(.92) brightness(1.04);}'+
+'.leaflet-popup-content-wrapper{border-radius:12px;box-shadow:var(--shadow-lg);padding:2px;}'+
+'.leaflet-popup-content{margin:12px 14px;line-height:1.45;min-width:200px;}'+
+'.pp h4{font-family:var(--display);font-size:.98rem;font-weight:600;color:var(--green-dark);margin:0 0 2px;}'+
+'.pp .sub{font-size:.72rem;color:var(--faint);margin-bottom:8px;}'+
+'.pp .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:.78rem;}'+
+'.pp .kv b{color:var(--ink);font-weight:600;text-align:right;}'+
+'.pp .kv span{color:var(--muted);}'+
+'.pp .pbar{margin-top:7px;}'+
+'.pp .act{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}'+
+'.pp .act a,.pp .act button{font-size:.74rem;font-weight:600;color:var(--green-mid);background:#f1f7e6;border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;font-family:inherit;}'+
+'.leaflet-control-attribution{font-size:.6rem;background:rgba(255,255,255,.7)!important;}'+
+'table.bb tr.hl td{background:#eef6dc;}';
+document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
+
+var territory = d.all('territory');
+var regions = territory.map(function(t){ return t.region; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+
+var totPotential = territory.reduce(function(s,t){ return s+(t.potential||0); },0);
+var totFarms = territory.reduce(function(s,t){ return s+(t.farms||0); },0);
+var totHa = territory.reduce(function(s,t){ return s+(t.ha||0); },0);
+var avgPen = territory.length ? Math.round(territory.reduce(function(s,t){ return s+(t.penetration||0); },0)/territory.length) : 0;
+
+var html='';
+html += '<div class="page-head"><h1>Territory potential</h1><p>The whole country in one view — where the next farmer is, who covers it, and how much is still open.</p></div>';
+
+// stat tiles
+html += '<div class="grid g4">';
+html += '<div class="stat"><div class="l">Total potential</div><div class="v">'+BB.money(totPotential)+'</div><div class="s">addressable, all regions</div></div>';
+html += '<div class="stat"><div class="l">Addressable farms</div><div class="v">'+BB.num(totFarms)+'</div><div class="s">across '+regions.length+' regions</div></div>';
+html += '<div class="stat"><div class="l">Hectares in reach</div><div class="v">'+BB.num(totHa)+'</div><div class="s">total farmed area</div></div>';
+html += '<div class="stat'+(avgPen<25?' warn':'')+'"><div class="l">Avg penetration</div><div class="v">'+avgPen+'%</div><div class="s">room to grow</div></div>';
+html += '</div>';
+
+// ---- vision map (who's where, live) ----
+html += '<div class="sec"><h2>Vision map</h2><span class="ln"></span><span class="cnt">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</span></div>';
+html += '<div class="card map-card">';
+html += '<div class="map-tools">'+
+  '<div class="grp"><span class="lbl">Show</span>'+
+    '<span class="chip tog on" data-layer="territory">Territories</span>'+
+    '<span class="chip tog on" data-layer="farmers">Farmers</span>'+
+    '<span class="chip tog on" data-layer="depots">Depots</span>'+
+    '<span class="chip tog on" data-layer="reps">Team</span>'+
+  '</div><span class="sp"></span>'+
+  '<div class="grp"><span class="lbl">Go to</span>'+
+    '<span class="chip tog" data-region="">All of SA</span>'+
+    regions.map(function(r){ return '<span class="chip tog" data-region="'+BB.esc(r)+'">'+BB.esc(r)+'</span>'; }).join('')+
+  '</div></div>';
+html += '<div id="vmap"></div>';
+html += '<div class="map-legend">'+
+  d.all('reps').map(function(r){ return '<span class="k"><span class="dot" style="background:'+r.colour+';"></span>'+BB.esc(r.name.split(' ')[0])+' · '+BB.esc(r.region)+'</span>'; }).join('')+
+  '<span class="k"><span class="ring"></span>territory — size = potential, fill = penetration</span>'+
+  '<span class="k"><span class="sq"></span>depot</span>'+
+  '</div>';
+html += '</div>';
+
+// table by region/town
+html += '<div class="sec"><h2>By region &amp; town</h2><span class="ln"></span><span class="cnt">'+territory.length+' areas</span></div>';
+html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Region · Town</th><th class="right">Farms</th><th class="right">Hectares</th><th class="right">Potential</th><th>Penetration</th><th>Rep</th></tr></thead><tbody>';
+territory.slice().sort(function(a,b){ return b.potential-a.potential; }).forEach(function(t){
+  var r=d.rep(t.rep);
+  html += '<tr class="click" id="row-'+t.id+'" data-tid="'+t.id+'" title="Show on map">'+
+    '<td><b>'+BB.esc(t.town)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(t.region)+' · '+BB.esc(t.crop)+'</div></td>'+
+    '<td class="right">'+t.farms+'</td>'+
+    '<td class="right">'+BB.num(t.ha)+'</td>'+
+    '<td class="right">'+BB.money(t.potential)+'</td>'+
+    '<td><div class="row" style="gap:8px;flex-wrap:nowrap;"><div class="pbar"><i style="width:'+Math.min(100,t.penetration)+'%;"></i></div><span class="faint" style="font-size:.76rem;">'+t.penetration+'%</span></div></td>'+
+    '<td><span class="chip" style="background:'+r.colour+'22;border-color:'+r.colour+';color:'+r.colour+';"><span style="width:8px;height:8px;border-radius:50%;background:'+r.colour+';display:inline-block;"></span>'+BB.esc(r.name)+'</span></td>'+
+  '</tr>';
+});
+html += '</tbody></table></div></div>';
+
+// crop intelligence — hectares by crop & area + the right questions (data-set style prep)
+var cropRows={};
+territory.forEach(function(t){ String(t.crop||'').split('/').forEach(function(c){ c=c.trim(); if(!c) return; var k=c==='Avo'?'Avocado':c==='Mac'?'Macadamia':c==='Cane'?'Sugarcane':c==='Veg'?'Vegetables':c==='Pome'?'Apple':c; cropRows[k]=cropRows[k]||{crop:k, regions:{}, ha:0, potential:0, farms:0}; var share=1/String(t.crop).split('/').length; cropRows[k].ha+=Math.round((t.ha||0)*share); cropRows[k].potential+=Math.round((t.potential||0)*share); cropRows[k].farms+=Math.round((t.farms||0)*share); cropRows[k].regions[t.region]=(cropRows[k].regions[t.region]||0)+Math.round((t.ha||0)*share); }); });
+var cropList=Object.keys(cropRows).map(function(k){return cropRows[k];}).sort(function(a,b){return b.potential-a.potential;});
+html += '<div class="sec"><h2>Crop intelligence</h2><span class="ln"></span><span class="cnt">hectares by crop &amp; area · what to ask before the visit</span></div>';
+html += '<div class="card"><div class="scroll"><table class="bb"><thead><tr><th>Crop</th><th>Where</th><th class="right">Hectares in reach</th><th class="right">Farms</th><th class="right">Potential</th><th>Prep</th></tr></thead><tbody>';
+cropList.forEach(function(c){
+  var prep=d.cropPrep(c.crop);
+  html += '<tr><td><b>'+BB.esc(c.crop)+'</b></td><td>'+Object.keys(c.regions).map(function(r){return '<span class="chip" style="margin:2px 2px 2px 0;">'+BB.esc(r)+' · '+BB.num(c.regions[r])+' ha</span>';}).join('')+'</td><td class="right">'+BB.num(c.ha)+'</td><td class="right">'+c.farms+'</td><td class="right">'+BB.money(c.potential)+'</td>'+
+    '<td>'+(prep?'<details><summary style="cursor:pointer;color:var(--green-mid);font-weight:600;font-size:.8rem;">Ask the right questions</summary><div style="font-size:.78rem;margin-top:6px;max-width:420px;"><b>Watch for:</b> '+BB.esc(prep.problems.join(' · '))+'<ol style="margin:6px 0 4px 18px;">'+prep.questions.map(function(q){return '<li>'+BB.esc(q)+'</li>';}).join('')+'</ol><b>BioBrix answer:</b> '+prep.products.map(function(pid){return BB.esc(d.product(pid).name);}).join(', ')+'</div></details>':'<span class="faint" style="font-size:.76rem;">data set to load</span>')+'</td></tr>';
+});
+html += '</tbody></table></div></div>';
+html += '<p class="faint" style="font-size:.76rem;margin-top:8px;">Point us at your data sources (industry hectares, problem maps per area) and this table reads from them instead of the seeded figures.</p>';
+
+// funnel a new farmer
+html += '<div class="sec"><h2>Funnel a new farmer</h2><span class="ln"></span></div>';
+html += '<div class="card card-p">';
+html += '<p class="muted" style="font-size:.86rem;margin-bottom:14px;">Enter a lead and see if it is viable and who should service it — before you drive out there.</p>';
+html += '<div class="grid g2">';
+html += '<div class="fld"><label>Farm / business name</label><input id="pFarm" placeholder="e.g. Bergsig Boerdery"></div>';
+html += '<div class="fld"><label>Farmer name</label><input id="pName" placeholder="e.g. Andre Kruger"></div>';
+html += '<div class="fld"><label>Region</label><select id="pRegion"><option value="">Select region…</option>'+
+  regions.map(function(r){ return '<option>'+BB.esc(r)+'</option>'; }).join('')+'</select></div>';
+html += '<div class="fld"><label>Town</label><input id="pTown" placeholder="e.g. Tzaneen"></div>';
+html += '<div class="fld"><label>Main crop</label><input id="pCrop" placeholder="e.g. Macadamia"></div>';
+html += '<div class="fld"><label>Hectares</label><input id="pHa" type="number" min="0" placeholder="e.g. 220"></div>';
+html += '</div>';
+html += '<button class="btn" id="check">Check viability</button>';
+html += '<div id="readout"></div>';
+html += '</div>';
+
+html += '<div style="height:20px;"></div>';
+
+document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+
+// ---- vision map logic ----
+var TOWN = {
+  'tzaneen':[-23.8330,30.1630], 'letsitele':[-23.8760,30.3930],
+  'george':[-33.9630,22.4617], 'oudtshoorn':[-33.5906,22.2014],
+  'ballito':[-29.5390,31.2140], 'stanger':[-29.3370,31.2890], 'kwadukuza':[-29.3370,31.2890],
+  'bloemfontein':[-29.0852,26.1596], 'ficksburg':[-28.8730,27.8770],
+  'polokwane':[-23.9045,29.4689], 'nelspruit':[-25.4753,30.9694], 'mbombela':[-25.4753,30.9694], 'hoedspruit':[-24.3530,30.9530],
+  'durban':[-29.8587,31.0218], 'pietermaritzburg':[-29.6006,30.3794], 'richards bay':[-28.7807,32.0383],
+  'cape town':[-33.9249,18.4241], 'paarl':[-33.7342,18.9621], 'stellenbosch':[-33.9321,18.8602], 'robertson':[-33.8020,19.8830], 'worcester':[-33.6464,19.4485], 'ceres':[-33.3690,19.3100], 'mossel bay':[-34.1830,22.1460], 'knysna':[-34.0363,23.0471], 'plettenberg bay':[-34.0527,23.3716],
+  'kimberley':[-28.7282,24.7499], 'upington':[-28.4478,21.2561], 'welkom':[-27.9770,26.7350], 'bethlehem':[-28.2300,28.3000], 'kroonstad':[-27.6500,27.2300],
+  'nelson mandela bay':[-33.9608,25.6022], 'port elizabeth':[-33.9608,25.6022], 'gqeberha':[-33.9608,25.6022], 'east london':[-33.0153,27.9116],
+  'potchefstroom':[-26.7145,27.0970], 'klerksdorp':[-26.8520,26.6660], 'rustenburg':[-25.6670,27.2420],
+  'pretoria':[-25.7479,28.2293], 'johannesburg':[-26.2041,28.0473], 'ermelo':[-26.5330,29.9830], 'standerton':[-26.9500,29.2500]
+};
+var REGION_CENTRE = { 'Limpopo':[-23.9,29.8], 'KwaZulu-Natal':[-29.2,30.6], 'Free State':[-28.8,26.9], 'Southern Cape':[-33.8,22.3], 'National':[-29.0,25.0] };
+function coords(town, region){ var c=TOWN[String(town||'').trim().toLowerCase()]; if(c) return c; return REGION_CENTRE[region]||null; }
+function initials(n){ return String(n||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
+
+var MAP=null, layers={}, tMarkers={};
+function penBar(p){ return '<div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:6px;"><div class="pbar" style="flex:1;"><i style="width:'+Math.min(100,p)+'%;"></i></div><span class="faint" style="font-size:.74rem;">'+p+'% penetration</span></div>'; }
+
+function buildMap(){
+  var el=document.getElementById('vmap'); if(!el) return;
+  if(typeof L==='undefined'){
+    el.innerHTML='<div class="map-fallback"><div class="big">🗺</div><b>The map needs signal.</b><br>Every territory, farmer and depot is still listed below — nothing else is affected.</div>';
+    el.style.height='auto'; return;
+  }
+  var SA=L.latLngBounds([-35.6,15.5],[-21.6,33.6]);
+  MAP=L.map('vmap',{ zoomControl:false, maxBounds:SA.pad(0.25), maxBoundsViscosity:0.8, minZoom:4, maxZoom:12, scrollWheelZoom:false, attributionControl:true });
+  L.control.zoom({position:'bottomright'}).addTo(MAP);
+  MAP.on('click', function(){ MAP.scrollWheelZoom.enable(); });
+  MAP.on('mouseout', function(){ MAP.scrollWheelZoom.disable(); });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap', maxZoom:19 }).addTo(MAP);
+
+  // panes: territories below, farmers above, pins on top
+  MAP.createPane('terr'); MAP.getPane('terr').style.zIndex=410;
+  MAP.createPane('farm'); MAP.getPane('farm').style.zIndex=430;
+  MAP.createPane('pins'); MAP.getPane('pins').style.zIndex=450;
+
+  layers.territory=L.layerGroup().addTo(MAP);
+  layers.farmers=L.layerGroup().addTo(MAP);
+  layers.depots=L.layerGroup().addTo(MAP);
+  layers.reps=L.layerGroup().addTo(MAP);
+
+  var maxPot=Math.max.apply(null, territory.map(function(t){return t.potential||0;}))||1;
+  var pts=[];
+
+  // territories
+  territory.forEach(function(t){
+    var c=coords(t.town,t.region); if(!c) return; pts.push(c);
+    var r=d.rep(t.rep);
+    var radius=14+Math.round(Math.sqrt((t.potential||0)/maxPot)*22);
+    var m=L.circleMarker(c,{ pane:'terr', radius:radius, color:r.colour, weight:2, fillColor:r.colour, fillOpacity:0.18+Math.min(1,(t.penetration||0)/100)*0.55 });
+    m.bindPopup('<div class="pp"><h4>'+BB.esc(t.town)+'</h4><div class="sub">'+BB.esc(t.region)+' · '+BB.esc(t.crop)+'</div>'+
+      '<div class="kv"><span>Potential</span><b>'+BB.money(t.potential)+'</b><span>Farms</span><b>'+t.farms+'</b><span>Hectares</span><b>'+BB.num(t.ha)+'</b><span>Covered by</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
+      penBar(t.penetration||0)+
+      (t.note?'<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(t.note)+'</div>':'')+
+      '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here ›</button></div></div>', {maxWidth:280});
+    m.on('popupopen', function(){ highlightRow(t.id); });
+    m.on('popupclose', function(){ highlightRow(null); });
+    layers.territory.addLayer(m); tMarkers[t.id]=m;
+  });
+
+  // farmers
+  d.all('farmers').forEach(function(f){ addFarmerMarker(f); });
+
+  // depots
+  d.all('depots').forEach(function(dp){
+    var town=(dp.name||'').replace(/\s*Depot$/i,'');
+    var c=coords(town,dp.region); if(!c) return;
+    var comm=/commission/i.test(dp.status||'');
+    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'depot-pin-wrap',html:'<div class="depot-pin'+(comm?' comm':'')+'" title="'+BB.esc(dp.name)+'">D</div>',iconSize:[22,22],iconAnchor:[-14,-14]}) });
+    m.bindPopup('<div class="pp"><h4>'+BB.esc(dp.name)+'</h4><div class="sub">'+BB.esc(dp.region)+'</div>'+
+      '<div class="kv"><span>Status</span><b>'+BB.esc(dp.status)+'</b><span>Manager</span><b>'+BB.esc(dp.manager)+'</b></div>'+
+      '<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(dp.address||'')+'</div>'+
+      '<div class="act"><a href="depots.html">Open depot ›</a><a href="stock.html">Stock ›</a></div></div>');
+    layers.depots.addLayer(m);
+  });
+
+  // team — reps at their base town
+  d.all('reps').forEach(function(r){
+    var c=coords(r.base,r.region); if(!c) return;
+    var mine=territory.filter(function(t){return t.rep===r.id;});
+    var pot=mine.reduce(function(s,t){return s+(t.potential||0);},0);
+    var farmers=d.all('farmers').filter(function(f){return f.rep===r.id;}).length;
+    var m=L.marker(c,{ pane:'pins', icon:L.divIcon({className:'rep-pin-wrap',html:'<div class="rep-pin" style="background:'+r.colour+';" title="'+BB.esc(r.name)+'">'+initials(r.name)+'</div>',iconSize:[34,34],iconAnchor:[52,52]}) });
+    m.bindPopup('<div class="pp"><h4>'+BB.esc(r.name)+'</h4><div class="sub">'+BB.esc(r.role)+' · based '+BB.esc(r.base)+'</div>'+
+      '<div class="kv"><span>Covers</span><b>'+BB.esc(r.region)+'</b><span>Areas</span><b>'+mine.length+'</b><span>Farmers</span><b>'+farmers+'</b><span>Potential</span><b>'+BB.money(pot)+'</b><span>Cell</span><b>'+BB.esc(r.cell)+'</b></div>'+
+      '<div class="act"><a href="farms.html">Farms ›</a><a href="forecast.html">Forecast ›</a></div></div>');
+    layers.reps.addLayer(m);
+  });
+
+  if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.28)); else MAP.setView([-29,25],5);
+  // Leaflet sometimes measures a 0-height container on first paint inside cards
+  setTimeout(function(){ try{ MAP.invalidateSize(); if(pts.length) MAP.fitBounds(L.latLngBounds(pts).pad(0.28)); }catch(e){} }, 120);
+
+  // toggles
+  document.querySelectorAll('.chip.tog[data-layer]').forEach(function(ch){
+    ch.onclick=function(){
+      var k=ch.getAttribute('data-layer'); var on=ch.classList.toggle('on');
+      if(on) MAP.addLayer(layers[k]); else MAP.removeLayer(layers[k]);
+    };
+  });
+  // region jump
+  document.querySelectorAll('.chip.tog[data-region]').forEach(function(ch){
+    ch.onclick=function(){
+      document.querySelectorAll('.chip.tog[data-region]').forEach(function(x){x.classList.remove('on');}); ch.classList.add('on');
+      var reg=ch.getAttribute('data-region');
+      var sel=reg?territory.filter(function(t){return t.region===reg;}):territory;
+      var b=sel.map(function(t){return coords(t.town,t.region);}).filter(Boolean);
+      if(b.length) MAP.flyToBounds(L.latLngBounds(b).pad(reg?0.6:0.28),{duration:0.8});
+    };
+  });
+  // table → map
+  document.querySelectorAll('tr[data-tid]').forEach(function(tr){
+    tr.onclick=function(){
+      var m=tMarkers[tr.getAttribute('data-tid')]; if(!m) return;
+      if(!MAP.hasLayer(layers.territory)){ MAP.addLayer(layers.territory); var c=document.querySelector('.chip.tog[data-layer="territory"]'); if(c) c.classList.add('on'); }
+      document.getElementById('vmap').scrollIntoView({behavior:'smooth',block:'center'});
+      MAP.flyTo(m.getLatLng(), 8, {duration:0.9});
+      setTimeout(function(){ m.openPopup(); }, 950);
+    };
+  });
+}
+function addFarmerMarker(f){
+  if(!MAP || !layers.farmers) return;
+  var c=coords(f.town,f.region); if(!c) return;
+  var r=d.rep(f.rep);
+  var prospect=/prospect/i.test(f.status||'');
+  // small deterministic offset so a farmer doesn't sit dead-centre on the territory ring
+  var h=0; String(f.id||f.name).split('').forEach(function(ch){h=(h*31+ch.charCodeAt(0))%997;});
+  var la=c[0]+0.09*Math.cos(h), ln=c[1]+0.12*Math.sin(h);
+  var m=L.circleMarker([la,ln],{ pane:'farm', radius:6, color:'#fff', weight:2, fillColor:prospect?'#9aa88f':r.colour, fillOpacity:1, dashArray:prospect?'2,2':null });
+  m.bindPopup('<div class="pp"><h4>'+BB.esc(f.farm||f.name)+'</h4><div class="sub">'+BB.esc(f.name)+' · '+BB.esc(f.town||f.region)+'</div>'+
+    '<div class="kv"><span>Status</span><b>'+BB.esc(f.status||'')+'</b><span>Crops</span><b>'+BB.esc((f.crops||[]).join(', ')||'—')+'</b><span>Hectares</span><b>'+BB.num(f.ha||0)+'</b><span>Rep</span><b style="color:'+r.colour+';">'+BB.esc(r.name)+'</b></div>'+
+    '<div class="act"><a href="farm-detail.html?farmer='+encodeURIComponent(f.id)+'">Farm file ›</a><a href="voice-order.html">Capture order ›</a></div></div>');
+  layers.farmers.addLayer(m);
+  return m;
+}
+function highlightRow(id){
+  document.querySelectorAll('tr.hl').forEach(function(x){x.classList.remove('hl');});
+  if(!id) return; var tr=document.getElementById('row-'+id); if(tr) tr.classList.add('hl');
+}
+window.prefillFunnel=function(region,town){
+  var r=document.getElementById('pRegion'), t=document.getElementById('pTown');
+  if(r) r.value=region; if(t) t.value=town;
+  if(MAP) MAP.closePopup();
+  var card=document.getElementById('pFarm'); if(card){ card.closest('.card').scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(function(){ card.focus(); },500); }
+};
+buildMap();
+
+// ---- viability logic ----
+function repForRegion(region){
+  // rep whose territory sits in that region (most potential there)
+  var inRegion = territory.filter(function(t){ return t.region===region; });
+  if(inRegion.length){
+    inRegion.sort(function(a,b){ return b.potential-a.potential; });
+    return d.rep(inRegion[0].rep);
+  }
+  // fall back: rep whose base region matches
+  var byBase = d.all('reps').find(function(r){ return r.region===region; });
+  if(byBase) return byBase;
+  // else Rudie
+  return d.rep('rep_rudie');
+}
+function regionStats(region){
+  var inR = territory.filter(function(t){ return t.region===region; });
+  var pot = inR.reduce(function(s,t){ return s+(t.potential||0); },0);
+  var pen = inR.length ? Math.round(inR.reduce(function(s,t){ return s+(t.penetration||0); },0)/inR.length) : 0;
+  return { potential:pot, pen:pen };
+}
+
+var lastProspect=null;
+
+document.getElementById('check').onclick=function(){
+  var farm=document.getElementById('pFarm').value.trim();
+  var name=document.getElementById('pName').value.trim();
+  var region=document.getElementById('pRegion').value;
+  var town=document.getElementById('pTown').value.trim();
+  var crop=document.getElementById('pCrop').value.trim();
+  var ha=Number(document.getElementById('pHa').value)||0;
+  var out=document.getElementById('readout');
+
+  if(!name || !region){ out.innerHTML='<div class="readout warn">Add at least a farmer name and a region to check viability.</div>'; return; }
+
+  var rep=repForRegion(region);
+  var rs=regionStats(region);
+  var viable = rs.pen < 85; // room to grow
+  var msg='<b>'+(viable?'Viable':'Territory near saturated')+'</b> — '+BB.esc(rep.name)+' services '+BB.esc(region)+
+    '; territory penetration '+rs.pen+'%, '+BB.money(rs.potential)+' potential in this region.';
+  if(ha) msg += ' '+BB.num(ha)+' ha adds real volume.';
+
+  out.innerHTML='<div class="readout'+(viable?'':' warn')+'">'+msg+
+    '<div class="row" style="margin-top:12px;">'+
+    (viable?'<button class="btn sm" id="addProspect">Add as prospect</button>':'')+
+    '</div></div>';
+
+  lastProspect={ farm:farm, name:name, region:region, town:town, crop:crop, ha:ha, rep:rep };
+
+  var btn=document.getElementById('addProspect');
+  if(btn) btn.onclick=addProspect;
+};
+
+function addProspect(){
+  if(!lastProspect) return;
+  var p=lastProspect;
+  var rec=d.add('farmers', {
+    name: p.name || 'New prospect',
+    farm: p.farm || (p.name+' farm'),
+    region: p.region,
+    town: p.town || '',
+    rep: p.rep.id,
+    crops: p.crop ? [p.crop] : [],
+    ha: p.ha || 0,
+    cell: '',
+    status: 'Prospect'
+  });
+  BB.toast('Prospect added — assigned to '+p.rep.name);
+  try{ var nm=addFarmerMarker(rec); if(nm){ MAP.flyTo(nm.getLatLng(), 8, {duration:0.9}); setTimeout(function(){ nm.openPopup(); }, 950); } }catch(e){}
+  document.getElementById('readout').innerHTML='<div class="readout"><b>'+BB.esc(rec.name)+'</b> is now a prospect, assigned to <b>'+BB.esc(p.rep.name)+'</b> ('+BB.esc(p.region)+'). '+
+    'They will see it on their farms list. <a href="voice-order.html" style="color:var(--green-mid);font-weight:600;">Capture their first order ›</a></div>';
+  lastProspect=null;
+}
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Deliveries · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=live35"></script><script src="guard.js?v=live35"></script>
+<script src="bb-data.js?v=live35"></script>
+<script src="bb-shell.js?v=live35"></script>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'ops', back:'index.html' });
+
+var d = BB.data;
+
+// Warehouse seat sees only deliveries for its own depot. Directors / ops see all.
+var scopeDepot = (BB.user && BB.user.roleKey==='warehouse' && BB.user.depot) ? BB.user.depot : null;
+
+var STATUS_CHIPS = [
+  { id:'all', name:'All' },
+  { id:'In transit', name:'In transit' },
+  { id:'Delivered', name:'Delivered' },
+  { id:'Awaiting stock', name:'Awaiting stock' }
+];
+var STATUS_OPTIONS = ['Awaiting stock','In transit','Delivered'];
+var filter = 'all';
+
+function orderRef(delivery){
+  var o = d.by('orders', delivery.order);
+  return o ? o.ref : '—';
+}
+
+function render(){
+  var all = d.all('deliveries');
+  if(scopeDepot){ all = all.filter(function(x){ return x.depot===scopeDepot; }); }
+  var inTransit = all.filter(function(x){ return x.status==='In transit'; }).length;
+  var delivered = all.filter(function(x){ return x.status==='Delivered'; }).length;
+  var awaiting = all.filter(function(x){ return x.status==='Awaiting stock'; }).length;
+
+  var rows = filter==='all' ? all : all.filter(function(x){ return x.status===filter; });
+
+  var html = '';
+  html += '<section class="page-head">'+
+    '<div class="eyebrow">Operations · Deliveries</div>'+
+    '<h1>Logistics &amp; dispatch</h1>'+
+    '<p>Every order on its way out of a depot. Advance a delivery as it moves — held on stock, on the road, or dropped at the farm.</p>'+
+  '</section>';
+
+  html += '<div class="grid g3">'+
+    '<div class="stat"><div class="l">In transit</div><div class="v">'+inTransit+'</div><div class="s">on the road</div></div>'+
+    '<div class="stat"><div class="l">Delivered</div><div class="v">'+delivered+'</div><div class="s">this season</div></div>'+
+    '<div class="stat'+(awaiting>0?' warn':'')+'"><div class="l">Awaiting stock</div><div class="v">'+awaiting+'</div><div class="s">held on stock</div></div>'+
+  '</div>';
+
+  html += '<div class="row" style="margin:20px 0 4px;">';
+  STATUS_CHIPS.forEach(function(c){
+    html += '<button class="chip'+(filter===c.id?' on':'')+'" data-status="'+BB.esc(c.id)+'">'+BB.esc(c.name)+'</button>';
+  });
+  html += '</div>';
+
+  html += '<div class="card" style="margin-top:12px;"><div class="scroll"><table class="bb">'+
+    '<thead><tr><th>Order</th><th>Farmer</th><th>Depot</th><th>Transport</th><th>ETA</th><th>Status</th><th class="right">Advance</th></tr></thead><tbody>';
+
+  if(!rows.length){
+    html += '<tr><td colspan="7"><div class="empty">No deliveries in this view.</div></td></tr>';
+  } else {
+    rows.forEach(function(x){
+      var opts = STATUS_OPTIONS.map(function(s){ return '<option value="'+BB.esc(s)+'"'+(s===x.status?' selected':'')+'>'+BB.esc(s)+'</option>'; }).join('');
+      // finance hold — flag deliveries whose order is on account-overdue / over-limit hold
+      var hold = d.deliveryHold(d.by('orders', x.order));
+      var holdBadge = hold ? ' <span class="badge '+(hold.sev==='high'?'b-bad':'b-warn')+'" title="'+BB.esc(hold.reason)+'">HOLD</span>' : '';
+      html += '<tr>'+
+        '<td><b style="color:var(--green-dark);">'+BB.esc(orderRef(x))+'</b></td>'+
+        '<td>'+BB.esc(d.farmer(x.farmer).name)+'</td>'+
+        '<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>'+
+        '<td class="muted">'+BB.esc(x.transport)+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+BB.date(x.eta)+'</td>'+
+        '<td>'+BB.statusBadge(x.status)+holdBadge+'</td>'+
+        '<td class="right"><select data-del="'+BB.esc(x.id)+'" style="padding:7px 9px;font-size:.82rem;border:1.5px solid var(--line);border-radius:9px;background:#fff;">'+opts+'</select></td>'+
+      '</tr>';
+    });
+  }
+  html += '</tbody></table></div></div>';
+
+  html += '<div style="height:24px;"></div>';
+
+  var main = document.querySelector('main.wrap');
+  main.innerHTML = html;
+  wire();
+}
+
+function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-status]'), function(btn){
+    btn.onclick = function(){ filter = btn.getAttribute('data-status'); render(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('select[data-del]'), function(sel){
+    sel.onchange = function(){
+      var id = sel.getAttribute('data-del');
+      var status = sel.value;
+      d.update('deliveries', id, { status:status });
+      BB.toast('Delivery updated · '+status);
+      render();
+    };
+  });
+}
+
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap"></main>');
+render();
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
+</script>
+</body>
+</html>
