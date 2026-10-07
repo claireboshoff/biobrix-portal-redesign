@@ -127,6 +127,7 @@
       sample: sample ? txt(sample).slice(0, 300) : undefined,
       figures: stats, charts: charts, rankings: ranks,
       tables: readTables(Math.min(200, maxRows || 25)),
+      column_filters: BB.tableFilters ? BB.tableFilters.list().map(function (t) { return { table: t.table, title: t.title, shown: t.shown, rows: t.rows, filtered: t.columns.filter(function (c) { return c.filter; }).map(function (c) { return c.column; }) }; }) : undefined,
       controls: readControls()
     };
     var s = JSON.stringify(out);
@@ -337,6 +338,14 @@
   // ---------- the loop ------------------------------------------------------------------------------
   var TOOLS = {
     get_page: function (a) { step('Reading this page'); return readPage(a.max_rows); },
+    filter_table: function (a) {
+      if (!BB.tableFilters) throw new Error('Tables are still loading; try again.');
+      if (!a.column) return { tables: BB.tableFilters.list() };
+      var spec = a.clear ? { clear: true } : a.sort ? { sort: a.sort } : (a.values && a.values.length) ? { values: a.values } : a.op ? { op: a.op, value: a.value, value2: a.value2 } : null;
+      if (!spec) return { tables: BB.tableFilters.list() };
+      step((a.clear ? 'Cleared ' : a.sort ? 'Sorted by ' : 'Filtered ') + a.column + (a.values ? ': ' + a.values.join(', ') : a.op ? ' ' + a.op + ' ' + (a.value || '') : ''));
+      return BB.tableFilters.set(a.table, a.column, spec);
+    },
     list_pages: function () { return listPages(); },
     describe_data: function () { step('Checking what you can see'); return describeData(); },
     query_data: function (a) { step('Looking up ' + String(a.table).replace(/^sage\./, '') + (a.group_by ? ' by ' + a.group_by : '')); return queryData(a); },

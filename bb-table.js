@@ -316,5 +316,44 @@
   var timer = null;
   new MutationObserver(function () { if (applying) return; clearTimeout(timer); timer = setTimeout(scan, 60); }).observe(document.body, { childList: true, subtree: true });
   scan();
-  BB.tableFilters = { scan: scan, clearAll: function () { TABLES.forEach(function (T) { T.st.f = {}; T.st.sort = null; apply(T); }); saveState(); } };
+  // ---- for the Ask bar: read and set column filters by table + column name -------------------------
+  function find(table) { scan(); var q = String(table == null ? '' : table).toLowerCase(), live = TABLES.filter(function (T) { return document.contains(T.el); });
+    return live.filter(function (T, i) { return String(i) === q || cardTitle(T.el).toLowerCase() === q; })[0] || live.filter(function (T) { return cardTitle(T.el).toLowerCase().indexOf(q) >= 0; })[0] || (live.length === 1 ? live[0] : null); }
+  function list() {
+    scan();
+    return TABLES.filter(function (T) { return document.contains(T.el); }).map(function (T, i) {
+      var shown = T.rows.filter(function (r) { return !r.tr.dataset.bbtHid; }).length;
+      return { table: i, title: cardTitle(T.el) || ('Table ' + (i + 1)), rows: T.rows.length, shown: shown,
+        sort: T.st.sort ? { column: (T.cols.filter(function (c) { return c.i === T.st.sort.i; })[0] || {}).label, dir: T.st.sort.dir } : null,
+        columns: T.cols.map(function (c) {
+          var vals = {}; T.rows.forEach(function (r) { var v = r.v[c.i] && r.v[c.i] !== '—' ? r.v[c.i] : '(Blank)'; vals[v] = (vals[v] || 0) + 1; });
+          var keys = Object.keys(vals), F = T.st.f[c.i];
+          return { column: c.label, type: c.type, values: c.type === 'text' && keys.length <= 30 ? keys : undefined, distinct: keys.length,
+            filter: F ? (F.kind === 'in' ? { values: Array.from(F.set) } : { op: F.op, value: F.v1, value2: F.v2 || undefined }) : undefined };
+        }) };
+    });
+  }
+  // spec: {values:[…]} | {op, value, value2} | {sort:'asc'|'desc'} | {clear:true}; column '*' with clear resets the table
+  function set(table, column, spec) {
+    var T = find(table); if (!T) throw new Error('No table called "' + table + '" on this page.');
+    spec = spec || {};
+    if (column === '*' && spec.clear) { T.st.f = {}; T.st.sort = null; saveState(); apply(T); return list()[TABLES.indexOf(T)]; }
+    var q = String(column || '').toLowerCase(), c = T.cols.filter(function (x) { return x.label.toLowerCase() === q; })[0] || T.cols.filter(function (x) { return x.label.toLowerCase().indexOf(q) >= 0; })[0];
+    if (!c) throw new Error('No column "' + column + '". Columns: ' + T.cols.map(function (x) { return x.label; }).join(', '));
+    if (spec.clear) { delete T.st.f[c.i]; if (T.st.sort && T.st.sort.i === c.i) T.st.sort = null; }
+    else if (spec.sort) T.st.sort = { i: c.i, dir: spec.sort === 'desc' ? 'desc' : 'asc' };
+    else if (spec.values) {
+      var have = {}; T.rows.forEach(function (r) { have[r.v[c.i] && r.v[c.i] !== '—' ? r.v[c.i] : '(Blank)'] = 1; });
+      var keep = Object.keys(have).filter(function (v) { return spec.values.some(function (w) { return String(w).toLowerCase() === v.toLowerCase(); }); });
+      if (!keep.length) throw new Error('None of those values are in "' + c.label + '". Values: ' + Object.keys(have).slice(0, 30).join(', '));
+      T.st.f[c.i] = { kind: 'in', set: new Set(keep) };
+    } else if (spec.op) {
+      var ok = opsFor(c.type).some(function (g) { return g.some(function (o) { return o[0] === spec.op; }); });
+      if (!ok) throw new Error('Operator "' + spec.op + '" doesn\'t apply to a ' + c.type + ' column.');
+      T.st.f[c.i] = { kind: 'cond', op: spec.op, v1: spec.value == null ? '' : String(spec.value), v2: spec.value2 == null ? '' : String(spec.value2) };
+    }
+    saveState(); apply(T);
+    return list()[TABLES.indexOf(T)];
+  }
+  BB.tableFilters = { scan: scan, list: list, set: set, clearAll: function () { TABLES.forEach(function (T) { T.st.f = {}; T.st.sort = null; apply(T); }); saveState(); } };
 })();

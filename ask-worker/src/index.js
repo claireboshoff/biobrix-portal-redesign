@@ -29,7 +29,7 @@ You sit in a bar at the bottom of every page. The person talking to you is a sig
 How to work:
 - Answer from data, never from memory. Use the tools to look things up; never invent a figure, name or date. If the data doesn't hold the answer, say so plainly.
 - Questions about "this", "here" or what is on screen: call get_page first.
-- To filter or switch a view on the current page: call get_page, then interact with the matching control's ref. To go somewhere else: navigate (you continue on the new page; call get_page there before interacting).
+- To narrow or sort a table on the page, use filter_table (every table has column filters). To switch a view, tab or scope control on the page: call get_page, then interact with the matching control's ref. To go somewhere else: navigate (you continue on the new page; call get_page there before interacting).
 - Clicking anything that changes data or sends something (a "Done", "Draft reminder", "Invoice", "Check & send" button) needs the person's go-ahead: the portal asks them to confirm when you call interact on it, and tells you what they chose. Never try to get around that.
 - Your reply appears as a single answer card, not a chat thread. Open the final answer with a short title on its own line as a markdown heading (e.g. "# Overdue invoices"), then the answer. Links you include become buttons on the card, the first one most prominent.
 - Show, don't recite: when an answer is a list of more than a few rows, or a comparison, or a trend, call show with a table or chart, then write a short takeaway. Keep prose brief: lead with the answer, 1–4 short sentences or a tight list. No preamble, no closing offers.
@@ -56,6 +56,20 @@ const TOOLS = [
       action: { type: "string", enum: ["click", "select", "type"] },
       value: { type: "string", description: "Option label or value for select; text for type." }
     }, required: ["ref", "action"], additionalProperties: false }
+  },
+  {
+    name: "filter_table",
+    description: "Filter or sort a table on the current page by column, like the funnel on each column header. Call with only {} (or just a table) to list the tables, their columns, column types, current filters and the values in short text columns. Then set ONE column per call: values (keep only rows whose column equals one of these), or op + value (text: contains, ncontains, eq, neq, starts, ends, empty, nempty; number: eq, neq, gt, gte, lt, lte, between (value2), top, bottom (value = N), above, below (average); date: on, non, after, onafter, before, onbefore, between — dates as YYYY-MM-DD), or sort asc|desc, or clear true (column '*' clears the whole table). Filters stack across columns. Returns the table's columns, filters and how many rows now show. Prefer this over page chips for narrowing a table.",
+    input_schema: { type: "object", properties: {
+      table: { type: "string", description: "Table title (its card heading) or index from the listing. Optional when the page has one table." },
+      column: { type: "string" },
+      values: { type: "array", items: { type: "string" } },
+      op: { type: "string" },
+      value: { type: "string" },
+      value2: { type: "string" },
+      sort: { type: "string", enum: ["asc", "desc"] },
+      clear: { type: "boolean" }
+    }, additionalProperties: false }
   },
   {
     name: "navigate",
