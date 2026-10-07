@@ -215,18 +215,32 @@ territory.forEach(function(t){ String(t.crop||'').split('/').forEach(function(c)
 var cropList=Object.keys(cropRows).map(function(k){return cropRows[k];}).sort(function(a,b){return b.potential-a.potential;});
 var maxCropHa = Math.max.apply(null, cropList.map(function(c){ return c.ha; }).concat([1]));
 html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Crop intelligence</h3><div class="sub">hectares by crop &amp; area · what to ask before the visit</div></div><span class="badge b-grey">'+cropList.length+' crops</span></div>';
-html += '<div class="scroll"><table class="bb"><thead><tr><th>Crop</th><th>Where</th><th class="num">Hectares in reach</th><th></th><th class="num">Farms</th><th class="num">Potential</th><th>Prep</th></tr></thead><tbody>';
+html += '<div class="scroll"><table class="bb" id="cropTbl"><thead><tr><th>Crop</th><th>Where</th><th class="num">Hectares in reach</th><th></th><th class="num">Farms</th><th class="num">Potential</th></tr></thead><tbody>';
 cropList.forEach(function(c){
   var prep=d.cropPrep(c.crop);
-  html += '<tr><td><b>'+BB.esc(c.crop)+'</b></td><td>'+Object.keys(c.regions).map(function(r){return '<span class="crop-chip">'+BB.esc(r)+' · '+BB.num(c.regions[r])+' ha</span>';}).join('')+'</td>'+
+  html += '<tr class="click" data-crop="'+BB.esc(c.crop)+'" title="What to ask before the visit"><td><b>'+BB.esc(c.crop)+'</b>'+(prep?'':'<div class="faint" style="font-size:.72rem;">data set to load</div>')+'</td><td>'+Object.keys(c.regions).map(function(r){return '<span class="crop-chip">'+BB.esc(r)+' · '+BB.num(c.regions[r])+' ha</span>';}).join('')+'</td>'+
     '<td class="num">'+BB.num(c.ha)+'</td><td><div class="bar-cell" style="min-width:90px;"><div class="trk"><i style="width:'+Math.round(c.ha/maxCropHa*100)+'%;"></i></div></div></td>'+
-    '<td class="num">'+c.farms+'</td><td class="num">'+BB.money(c.potential)+'</td>'+
-    '<td>'+(prep?'<details><summary style="cursor:pointer;color:var(--green-mid);font-weight:600;font-size:.8rem;white-space:nowrap;">Ask the right questions</summary><div style="font-size:.78rem;margin-top:6px;max-width:420px;"><b>Watch for:</b> '+BB.esc(prep.problems.join(' · '))+'<ol style="margin:6px 0 4px 18px;">'+prep.questions.map(function(q){return '<li>'+BB.esc(q)+'</li>';}).join('')+'</ol><b>BioBrix answer:</b> '+prep.products.map(function(pid){return BB.esc(d.product(pid).name);}).join(', ')+'</div></details>':'<span class="faint" style="font-size:.76rem;">data set to load</span>')+'</td></tr>';
+    '<td class="num">'+c.farms+'</td><td class="num">'+BB.money(c.potential)+'</td></tr>';
 });
 html += '</tbody></table></div>';
-html += '<div class="card-f">Point us at your data sources (industry hectares, problem maps per area) and this table reads from them instead of the seeded figures.</div></div>';
+html += '<div class="card-f">Click a crop for what to watch for and the questions to ask before the visit. Point us at your data sources (industry hectares, problem maps per area) and this table reads from them instead of the seeded figures.</div></div>';
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap">'+html+'</main>');
+// crop rows: what to watch for, the questions to ask and BioBrix's answer, in a popup
+document.querySelectorAll('#cropTbl tr[data-crop]').forEach(function(tr){
+  tr.addEventListener('click', function(){
+    var c=cropList.filter(function(x){ return x.crop===tr.getAttribute('data-crop'); })[0]; if(!c) return;
+    var prep=d.cropPrep(c.crop);
+    BB.popup({ eyebrow:'Crop intelligence', title:c.crop, sub:Object.keys(c.regions).join(' · '),
+      stats:[{ l:'Hectares in reach', v:BB.num(c.ha) }, { l:'Farms', v:BB.num(c.farms) }, { l:'Potential', v:BB.money(c.potential) }],
+      html: prep ? '<div class="bbp-tt">Watch for</div><div>'+prep.problems.map(function(p){ return '<span class="crop-chip">'+BB.esc(p)+'</span>'; }).join('')+'</div>'+
+          '<div class="bbp-tt">Ask the right questions</div><ol style="margin:0 0 4px 20px;font-size:.9rem;line-height:1.6;">'+prep.questions.map(function(q){ return '<li>'+BB.esc(q)+'</li>'; }).join('')+'</ol>'+
+          '<div class="bbp-tt">BioBrix answer</div><div>'+prep.products.map(function(pid){ return '<span class="crop-chip" style="color:var(--green-dark);font-weight:600;">'+BB.esc(d.product(pid).name)+'</span>'; }).join('')+'</div>'
+        : '<div class="empty">No prep data set for '+BB.esc(c.crop)+' yet. Point us at the industry data and it fills in here.</div>',
+      table:{ columns:['Region','Hectares'], num:[1], rows:Object.keys(c.regions).map(function(r){ return [r, BB.num(c.regions[r])+' ha']; }) },
+      actions: prep && BB.auth.canPage('products-library.html') ? [{ label:'Product library', href:'products-library.html' }] : [] });
+  });
+});
 
 // ---- breakdown charts: potential by region (won vs open) and by rep ----
 // A chart part opens its areas over the page; tapping an area flies the map to it (as a table row does).

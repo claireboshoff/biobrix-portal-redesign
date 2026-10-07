@@ -232,7 +232,7 @@
     menu = document.createElement('div'); menu.className = 'col-filter-menu'; menu.setAttribute('role', 'dialog'); document.body.appendChild(menu);
     document.addEventListener('click', function (e) {
       if (menu.style.display !== 'block') return;
-      if (!menu.contains(e.target) && !e.target.closest('.th-filter')) { closeMenu(); return; }
+      if (!menu.contains(e.target) && !e.target.closest('.th-filter,.bb-cal,.bb-sel-menu')) { closeMenu(); return; }
       if (!e.target.closest('.cf-opsel')) { var om = menu.querySelector('.cf-opmenu.open'); if (om) om.classList.remove('open'); }
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });

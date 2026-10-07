@@ -599,7 +599,7 @@ document.addEventListener('click', function(e){
 var swBtn = document.getElementById('switch');
 if(swBtn) swBtn.onclick=function(){ BB.auth.logout(); };
 var rsBtn = document.getElementById('reset');
-if(rsBtn) rsBtn.onclick=function(){ if(confirm('Reset all demo data to the seeded example?')){ BB.data.reset(); BB.toast('Demo data reset'); setTimeout(function(){location.reload();},600);} };
+if(rsBtn) rsBtn.onclick=function(){ BB.confirm('Every change made on this device goes, and the seeded example comes back.', { title:'Reset the demo data?', ok:'Reset demo data' }).then(function(yes){ if(!yes) return; BB.data.reset(); BB.toast('Demo data reset'); setTimeout(function(){location.reload();},600); }); };
 
 
 // On a first sign-in there is no cached snapshot yet, so this page draws before the accounting

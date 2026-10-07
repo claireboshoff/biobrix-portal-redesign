@@ -82,6 +82,7 @@
     var out = [];
     MAIN().querySelectorAll('.chip,.seg button,.seg a,[role="tab"],select,input[type="search"],input[type="text"],input:not([type]),textarea,button,a.btn').forEach(function (el) {
       if (!outside(el) || !visible(el) || el.disabled) return;
+      if (el.closest('.bb-numw .st') || el.classList.contains('bb-sel-btn')) return;   // the themed face of a select/number; the select itself is listed
       if (out.length >= 140) return;
       var kind = kindOf(el);
       if (!el.dataset.askRef) el.dataset.askRef = 'c' + (++refSeq);
