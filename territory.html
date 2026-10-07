@@ -61,7 +61,19 @@ var css=''+
 '.pp .act{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}'+
 '.pp .act a,.pp .act button{font-size:.74rem;font-weight:600;color:var(--green-mid);background:#f1f7e6;border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;font-family:inherit;}'+
 '.leaflet-control-attribution{font-size:.6rem;background:rgba(255,255,255,.7)!important;}'+
-'table.bb tr.hl td{background:#eef6dc;}';
+'table.bb tr.hl td{background:#eef6dc;}'+
+'table.bb tr.hv td{background:#f3f8ec;}'+
+'table.bb tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--green-bright);}'+
+'table.bb tr.hl b{color:var(--green-darkest);}'+
+'table.bb tr.flash td{animation:tflash 1.2s ease;}'+
+'@keyframes tflash{0%{background:#d6eab3}100%{background:#eef6dc}}'+
+'.terr-split{display:grid;gap:16px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;margin-top:16px;}'+
+'.terr-split .map-card{position:sticky;top:calc(var(--top) + 12px);}'+
+'.terr-split .t-table .town small{display:block;font-size:.72rem;color:var(--faint);font-weight:400;}'+
+'.terr-split .t-table td,.terr-split .t-table th{padding-left:10px;padding-right:10px;}'+
+'.terr-split .t-table .bar-cell{min-width:64px !important;}'+
+'.terr-split .t-table .bar-cell .trk{min-width:30px;}'+
+'@media(max-width:1100px){.terr-split{grid-template-columns:minmax(0,1fr);} .terr-split .map-card{position:static;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var territory = d.all('territory');
@@ -84,8 +96,9 @@ html += '<div class="stat"><div class="l">Hectares in reach</div><div class="v">
 html += '<div class="stat'+(avgPen<25?' warn':'')+'"><div class="l">Avg penetration</div><div class="v">'+avgPen+'%</div><div class="s">room to grow</div></div>';
 html += '</div>';
 
-// ---- vision map (who's where, live) beside the region and rep breakdowns ----
-html += '<div class="split" style="margin-top:16px;">';
+// ---- vision map beside the region & town table: click a point, its row lights up (and back) ----
+var tRows = territory.slice().sort(function(a,b){ return b.potential-a.potential; });
+html += '<div class="terr-split">';
 html += '<div class="card map-card"><div class="card-h"><div><h3>Vision map</h3><div class="sub">'+territory.length+' areas · '+d.all('farmers').length+' farmers · '+d.all('depots').length+' depots · '+d.all('reps').length+' team</div></div></div>';
 html += '<div class="map-tools">'+
   '<div class="grp"><span class="lbl">Show</span>'+
@@ -105,30 +118,28 @@ html += '<div class="map-legend">'+
   '<span class="k"><span class="sq"></span>depot</span>'+
   '</div>';
 html += '</div>';
-html += '<div class="t-col">'+
+html += '<div class="card t-table"><div class="card-h"><div><h3>By region &amp; town</h3><div class="sub">'+territory.length+' areas · click a point on the map, or a row here</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
+  '<th>Town</th><th class="num">Potential</th><th>Reach</th><th>Rep</th></tr></thead><tbody>';
+tRows.forEach(function(t){
+  var r=d.rep(t.rep);
+  html += '<tr class="click" id="row-'+t.id+'" data-tid="'+t.id+'" title="Show on the map">'+
+    '<td class="town" title="'+BB.esc(t.crop)+'"><b>'+BB.esc(t.town)+'</b><small>'+BB.esc(t.region)+'</small></td>'+
+    '<td class="num"><b>'+BB.money(t.potential)+'</b></td>'+
+    '<td><div class="bar-cell" style="min-width:90px;"><div class="trk"><i style="width:'+Math.min(100,t.penetration)+'%;"></i></div><span class="faint" style="font-size:.76rem;">'+t.penetration+'%</span></div></td>'+
+    '<td><span class="rep" title="'+BB.esc(r.name)+'"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name.split(' ')[0])+'</span></td>'+
+  '</tr>';
+});
+html += '</tbody><tfoot><tr><td>All areas</td><td class="num">'+BB.money(totPotential)+'</td><td>'+avgPen+'% avg</td><td></td></tr></tfoot></table></div></div>';
+html += '</div>';
+
+// the breakdowns, side by side under the map
+html += '<div class="grid g2" style="margin-top:16px;">'+
   '<div class="card"><div class="card-h"><div><h3>Potential by region</h3><div class="sub">the dark part is already won, at today\'s penetration</div></div></div><div class="card-p"><div id="chRegion"></div></div></div>'+
   '<div class="card"><div class="card-h"><div><h3>Who covers it</h3><div class="sub">potential by rep</div></div></div><div class="card-p"><div id="chRep"></div></div></div>'+
 '</div>';
-html += '</div>';
 
-// table by region/town beside the funnel
-var tRows = territory.slice().sort(function(a,b){ return b.potential-a.potential; });
-html += '<div class="split" style="margin-top:16px;align-items:start;">';
-html += '<div class="card"><div class="card-h"><div><h3>By region &amp; town</h3><div class="sub">'+territory.length+' areas · tap a row to find it on the map</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
-  '<th>Region · Town</th><th class="num">Farms</th><th class="num">Hectares</th><th class="num">Potential</th><th>Penetration</th><th>Rep</th></tr></thead><tbody>';
-tRows.forEach(function(t){
-  var r=d.rep(t.rep);
-  html += '<tr class="click" id="row-'+t.id+'" data-tid="'+t.id+'" title="Show on map">'+
-    '<td><b>'+BB.esc(t.town)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(t.region)+' · '+BB.esc(t.crop)+'</div></td>'+
-    '<td class="num">'+t.farms+'</td>'+
-    '<td class="num">'+BB.num(t.ha)+'</td>'+
-    '<td class="num"><b>'+BB.money(t.potential)+'</b></td>'+
-    '<td><div class="bar-cell" style="min-width:110px;"><div class="trk"><i style="width:'+Math.min(100,t.penetration)+'%;"></i></div><span class="faint" style="font-size:.76rem;">'+t.penetration+'%</span></div></td>'+
-    '<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>'+
-  '</tr>';
-});
-html += '</tbody><tfoot><tr><td>All areas</td><td class="num">'+BB.num(totFarms)+'</td><td class="num">'+BB.num(totHa)+'</td><td class="num">'+BB.money(totPotential)+'</td><td>'+avgPen+'% average</td><td></td></tr></tfoot></table></div></div>';
-
+// the funnel on its own row
+html += '<div style="margin-top:16px;">';
 // funnel a new farmer
 html += '<div class="card" id="funnel"><div class="card-h"><div><h3>Funnel a new farmer</h3><div class="sub">is the lead viable, and who should service it, before you drive out</div></div></div><div class="card-p">';
 html += '<div class="grid g2" style="gap:0 12px;">';
@@ -238,7 +249,9 @@ function buildMap(){
       penBar(t.penetration||0)+
       (t.note?'<div class="faint" style="font-size:.74rem;margin-top:6px;">'+BB.esc(t.note)+'</div>':'')+
       '<div class="act"><button type="button" onclick="prefillFunnel(\''+BB.esc(t.region)+'\',\''+BB.esc(t.town)+'\')">Funnel a farmer here</button></div></div>', {maxWidth:280});
-    m.on('popupopen', function(){ highlightRow(t.id); });
+    m.on('popupopen', function(){ highlightRow(t.id, true); });
+    m.on('mouseover', function(){ var tr=document.getElementById('row-'+t.id); if(tr) tr.classList.add('hv'); });
+    m.on('mouseout', function(){ var tr=document.getElementById('row-'+t.id); if(tr) tr.classList.remove('hv'); });
     m.on('popupclose', function(){ highlightRow(null); });
     layers.territory.addLayer(m); tMarkers[t.id]=m;
   });
@@ -298,7 +311,7 @@ function buildMap(){
     tr.onclick=function(){
       var m=tMarkers[tr.getAttribute('data-tid')]; if(!m) return;
       if(!MAP.hasLayer(layers.territory)){ MAP.addLayer(layers.territory); var c=document.querySelector('.chip.tog[data-layer="territory"]'); if(c) c.classList.add('on'); }
-      document.getElementById('vmap').scrollIntoView({behavior:'smooth',block:'center'});
+      if(window.matchMedia('(max-width:1100px)').matches) document.getElementById('vmap').scrollIntoView({behavior:'smooth',block:'center'});
       MAP.flyTo(m.getLatLng(), 8, {duration:0.9});
       setTimeout(function(){ m.openPopup(); }, 950);
     };
@@ -319,10 +332,23 @@ function addFarmerMarker(f){
   layers.farmers.addLayer(m);
   return m;
 }
-function highlightRow(id){
-  document.querySelectorAll('tr.hl').forEach(function(x){x.classList.remove('hl');});
-  if(!id) return; var tr=document.getElementById('row-'+id); if(tr) tr.classList.add('hl');
+function highlightRow(id, fromMap){
+  document.querySelectorAll('tr.hl').forEach(function(x){x.classList.remove('hl','flash');});
+  if(!id) return; var tr=document.getElementById('row-'+id); if(!tr) return;
+  tr.classList.add('hl');
+  if(fromMap){
+    // a column filter may be hiding the row: say so instead of pointing at nothing
+    if(tr.style.display==='none'){ BB.toast(tr.querySelector('b').textContent+' is hidden by a filter on the table'); return; }
+    void tr.offsetWidth; tr.classList.add('flash');
+    var r=tr.getBoundingClientRect(), top=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--top'))||60;
+    if(r.top < top+50 || r.bottom > window.innerHeight-130) window.scrollBy({ top:r.top-(window.innerHeight/2)+r.height/2, behavior:'smooth' });
+  }
 }
+// hovering a row rings its point on the map
+document.querySelectorAll('tr[data-tid]').forEach(function(tr){
+  tr.addEventListener('mouseenter', function(){ var m=tMarkers[tr.getAttribute('data-tid')]; if(m) m.setStyle({ weight:5 }); });
+  tr.addEventListener('mouseleave', function(){ var m=tMarkers[tr.getAttribute('data-tid')]; if(m) m.setStyle({ weight:2 }); });
+});
 window.prefillFunnel=function(region,town){
   var r=document.getElementById('pRegion'), t=document.getElementById('pTown');
   if(r) r.value=region; if(t) t.value=town;

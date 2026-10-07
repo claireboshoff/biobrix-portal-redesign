@@ -4,7 +4,7 @@
    Data lives in localStorage (bb-data.js) so the app keeps working with no signal. */
 var CACHE = 'biobrix-os-v43';
 var SHELL = [
-  'index.html','login.html','welcome.html','bb-config.js?v=redesign1','guard.js?v=redesign1','bb-data.js?v=redesign1','bb-shell.js?v=redesign1','bb-intel.js?v=redesign1','bb-ask.js?v=redesign1','manifest.json',
+  'index.html','login.html','welcome.html','bb-config.js?v=redesign1','guard.js?v=redesign1','bb-data.js?v=redesign1','bb-shell.js?v=redesign1','bb-intel.js?v=redesign1','bb-ask.js?v=redesign1','bb-table.js?v=redesign1','manifest.json',
   'voice-order.html','forecast.html','territory.html','orders.html',
   'operations.html','stock.html','depots.html','suppliers.html','deliveries.html',
   'bioservices.html','farms.html','farm-detail.html','bioanalyze-soil.html',
