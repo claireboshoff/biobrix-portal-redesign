@@ -400,7 +400,7 @@
       S.messages.pop();
       var q = last.content.replace(/^\[[^\]]*\]\s*/, '');
       var a = BB.intel && (BB.intel.answer(q) || BB.intel.answer('at a glance'));
-      if (a) addView({ who: 'ai', text: '**' + a.title + '**\n' + a.lines.join('\n') + '\n\n[Open the detail](' + a.to + ')', offline: true });
+      if (a) addView({ who: 'ai', text: '# ' + a.title + '\n' + a.lines.join('\n') + '\n\n[Open the detail](' + a.to + ')', offline: true });
     } else if (last && last.role === 'user') {
       // a tool round failed to send: drop it and the assistant turn that asked for it
       S.messages.pop(); if (S.messages.length && S.messages[S.messages.length - 1].role === 'assistant') S.messages.pop();
@@ -466,16 +466,16 @@
     document.body.insertAdjacentHTML('beforeend',
       '<div class="askdock' + (localStorage.getItem(MINKEY) === '1' ? ' min' : '') + '" id="askdock" role="region" aria-label="Ask BioBrix">' +
         '<div class="ask-panel" id="askPanel" aria-live="polite">' +
-          '<div class="ask-ph">' + icon('sparkles') + '<b>BioBrix Intelligence</b><span class="ask-sub">asks your portal data · this seat only</span>' +
-            '<button type="button" class="ask-ib" id="askNew" title="New conversation" aria-label="New conversation">' + icon('plus') + '</button>' +
-            '<button type="button" class="ask-ib" id="askClose" title="Close" aria-label="Close">×</button></div>' +
+          '<div class="ask-ph"><span class="ask-ti">' + icon('sparkles') + '<h4 id="askTitle">BioBrix Intelligence</h4></span>' +
+            '<button type="button" class="ask-x" id="askClose" title="Close" aria-label="Close">×</button></div>' +
           '<div class="ask-log" id="askLog"></div>' +
+          '<div class="ask-ft" id="askFt"></div>' +
         '</div>' +
         '<div class="ask-sugs" id="askSugs"></div>' +
         '<form class="ask-bar" id="askForm" autocomplete="off">' +
           '<span class="spark" aria-hidden="true">' + icon('sparkles') + '</span>' +
           '<input id="askQ" type="text" placeholder="Ask BioBrix about your business, or tell it what to show" aria-label="Ask BioBrix">' +
-          '<button class="ask-ib hist" type="button" id="askHist" title="Show conversation" aria-label="Show conversation">' + icon('message') + '</button>' +
+          '<button class="ask-ib hist" type="button" id="askHist" title="Show the last answer" aria-label="Show the last answer">' + icon('message') + '</button>' +
           '<button class="ask-ib go" type="submit" title="Ask" aria-label="Ask">' + icon('chevron') + '</button>' +
           '<button class="ask-ib minb" type="button" id="askMin" title="Hide the Ask bar" aria-label="Hide the Ask bar">–</button>' +
         '</form>' +
@@ -485,11 +485,12 @@
     document.getElementById('askForm').addEventListener('submit', function (e) { e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
     document.getElementById('askClose').onclick = function () { closePanel(); };
     document.getElementById('askHist').onclick = function () { dock.classList.contains('open') ? closePanel() : openPanel(); };
-    document.getElementById('askNew').onclick = function () { if (busy) return; S = { messages: [], view: [], pending: null }; save(); paint(); input.focus(); };
     document.getElementById('askMin').onclick = function () { dock.classList.add('min'); localStorage.setItem(MINKEY, '1'); closePanel(); };
     document.getElementById('askFab').onclick = function () { dock.classList.remove('min'); localStorage.removeItem(MINKEY); input.focus(); };
     document.getElementById('askSugs').addEventListener('click', function (e) { var b = e.target.closest('[data-q]'); if (b) ask(b.getAttribute('data-q')); });
     log.addEventListener('click', function (e) { var c = e.target.closest('[data-confirm]'); if (c) settleConfirm(c.getAttribute('data-confirm') === 'yes'); });
+    // Clicking outside closes the answer (it stays one tap away on the bar), unless it's still working.
+    document.addEventListener('click', function (e) { if (!busy && !confirmWaiter && dock.classList.contains('open') && !e.target.closest('#askdock')) closePanel(); });
     input.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closePanel(); input.blur(); } });
     document.addEventListener('keydown', function (e) {
       if (e.key === '/' && !/input|textarea|select/i.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); dock.classList.remove('min'); input.focus(); }
@@ -497,27 +498,46 @@
   }
   function openPanel() { dock.classList.add('open'); paint(); }
   function closePanel() { dock.classList.remove('open'); }
+  // One answer card, like a search result: the latest question and what came back. Earlier turns stay
+  // in the conversation behind it (so "now only George depot" still works) but aren't shown as a thread.
+  function linksIn(text) {
+    var out = [], re = /\[([^\]]+)\]\(([^)\s]+)\)/g, m;
+    while ((m = re.exec(text))) { var h = safeHref(m[2]); if (h && !out.some(function (x) { return x.href === h; })) out.push({ label: m[1], href: h }); }
+    return out;
+  }
   function paint() {
     if (!dock) return;
     var sugs = document.getElementById('askSugs');
     sugs.innerHTML = suggestions().map(function (q) { return '<button type="button" class="ask-sug" data-q="' + esc(q) + '">' + esc(q) + icon('plus') + '</button>'; }).join('');
     document.getElementById('askHist').style.display = S.view.length ? '' : 'none';
     if (!dock.classList.contains('open')) return;
-    var html = '';
-    S.view.forEach(function (v, i) {
-      if (v.who === 'me') html += '<div class="ask-me">' + esc(v.text) + '</div>';
-      else if (v.who === 'ai') html += '<div class="ask-ai' + (v.offline ? ' off' : '') + '">' + md(v.text) + '</div>';
-      else if (v.who === 'step') html += '<div class="ask-step">' + icon('check') + esc(v.text) + '</div>';
-      else if (v.who === 'note') html += '<div class="ask-note">' + esc(v.text) + '</div>';
-      else if (v.who === 'show') html += '<div class="ask-show" data-i="' + i + '"></div>';
-      else if (v.who === 'confirm') html += '<div class="ask-confirm">' + icon('alert') + '<span>Click <b>' + esc(v.label) + '</b> on this page? It may change a record or send something.</span>' +
-        (v.state === 'open' ? '<button type="button" class="btn sm" data-confirm="yes">Go ahead</button><button type="button" class="btn ghost sm" data-confirm="no">Don’t</button>' : '<em>' + (v.state === 'yes' ? 'You allowed it' : 'You said no') + '</em>') + '</div>';
+    var start = 0; S.view.forEach(function (v, i) { if (v.who === 'me') start = i; });
+    var turn = S.view.slice(start), q = turn[0] && turn[0].who === 'me' ? turn[0].text : '';
+    var title = '', body = '', links = [], steps = [];
+    turn.forEach(function (v, k) {
+      var i = start + k;
+      if (v.who === 'ai') {
+        var t = v.text, m = t.match(/^\s*#{1,3}\s+(.+)\n?/);
+        if (m && !title) { title = m[1].replace(/\*\*/g, ''); t = t.slice(m[0].length); }
+        links = links.concat(linksIn(t));
+        t = t.replace(/^\s*\[[^\]]+\]\([^)\s]+\)\s*$/gm, '');   // a link on its own line lives in the footer as a button
+        body += '<div class="ask-ai">' + md(t) + '</div>';
+      } else if (v.who === 'show') body += '<div class="ask-show" data-i="' + i + '"></div>';
+      else if (v.who === 'note') body += '<div class="ask-note">' + esc(v.text) + '</div>';
+      else if (v.who === 'step') steps.push(v.text);
+      else if (v.who === 'confirm') body += '<div class="ask-confirm">' + icon('alert') + '<span>Click <b>' + esc(v.label) + '</b> on this page? It may change a record or send something.</span>' +
+        (v.state === 'open' ? '<button type="button" class="btn lime sm" data-confirm="yes">Go ahead</button><button type="button" class="btn ghost sm" data-confirm="no">Don’t</button>' : '<em>' + (v.state === 'yes' ? 'You allowed it' : 'You said no') + '</em>') + '</div>';
     });
-    if (busy) html += '<div class="ask-busy"><i></i><i></i><i></i></div>';
-    if (!S.view.length) html = '<div class="ask-empty">Ask about orders, stock, farms, money owed or anything on this page. It can also take you somewhere, or switch filters for you.</div>';
-    log.innerHTML = html;
+    // While it works, the latest step reads as a status line; once done the steps fold away.
+    if (busy) body += '<div class="ask-busy"><span class="dots"><i></i><i></i><i></i></span>' + esc(steps.length ? steps[steps.length - 1] : 'Thinking') + '…</div>';
+    document.getElementById('askTitle').textContent = title || (busy ? 'Working on it' : 'BioBrix Intelligence');
+    log.innerHTML = q ? '<div class="ask-q">You asked: “' + esc(q) + '”</div>' + body
+                      : '<div class="ask-empty">Ask about orders, stock, farms, money owed or anything on this page. It can also take you somewhere, or switch filters for you.</div>';
     log.querySelectorAll('.ask-show').forEach(function (h) { renderShow(S.view[+h.getAttribute('data-i')].spec, h); });
-    log.scrollTop = log.scrollHeight;
+    var ft = document.getElementById('askFt');
+    ft.innerHTML = busy ? '' : links.slice(0, 3).map(function (l, i) { return '<a class="' + (i ? '' : 'pri') + '" href="' + esc(l.href) + '">' + esc(l.label) + icon('chevron') + '</a>'; }).join('');
+    ft.style.display = ft.innerHTML ? '' : 'none';
+    log.scrollTop = 0;
   }
 
   build(); paint();

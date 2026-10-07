@@ -316,34 +316,40 @@
   .askdock.min .ask-bar,.askdock.min .ask-sugs,.askdock.min .ask-panel{display:none !important;}
   .askdock.min .ask-fab{display:inline-flex;}
   body.has-ask .toast{bottom:120px;}
-  .ask-panel{display:none;flex-direction:column;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 22px 50px -12px rgba(10,20,6,.4);max-height:min(58vh,560px);overflow:hidden;}
+  .ask-panel{display:none;flex-direction:column;border-radius:14px;background:rgba(15,28,10,.97);backdrop-filter:blur(12px);border:1px solid rgba(183,217,122,.18);color:#eaf4d8;
+    box-shadow:0 18px 44px -10px rgba(10,20,6,.55);max-height:min(56vh,540px);overflow:hidden;}
   .askdock.open .ask-panel{display:flex;}
-  .ask-ph{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;background:var(--rail);color:#eaf4d8;}
-  .ask-ph > .ico{width:16px;height:16px;color:var(--lime);}
-  .ask-ph b{font-family:var(--display);font-weight:600;font-size:.92rem;}
-  .ask-ph .ask-sub{flex:1;font-size:.7rem;color:rgba(234,244,216,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .ask-ph .ask-ib{width:30px;height:30px;}
-  .ask-log{overflow:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;font-size:.88rem;line-height:1.55;}
-  .ask-me{align-self:flex-end;max-width:80%;background:var(--green-dark);color:#fff;padding:8px 12px;border-radius:12px 12px 4px 12px;}
-  .ask-ai{max-width:100%;color:var(--ink);}
-  .ask-ai p{margin:0 0 6px;} .ask-ai p.h{font-weight:700;color:var(--green-darkest);margin-top:4px;}
-  .ask-ai ul,.ask-ai ol{margin:2px 0 8px 20px;} .ask-ai li{margin:2px 0;}
-  .ask-ai a{color:var(--green);font-weight:600;text-decoration:underline;text-underline-offset:2px;}
-  .ask-ai code{font-size:.82em;background:var(--panel-2);padding:1px 4px;border-radius:4px;}
-  .ask-ai.off{padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px dashed var(--line);}
-  .ask-step{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--faint);}
-  .ask-step .ico{width:12px;height:12px;color:var(--green-bright);}
-  .ask-note{font-size:.76rem;color:var(--amber);}
-  .ask-show{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;}
+  .ask-ph{display:flex;align-items:center;gap:10px;padding:14px 12px 10px 16px;border-bottom:1px solid rgba(183,217,122,.12);}
+  .ask-ti{flex:1;min-width:0;display:flex;align-items:center;gap:10px;}
+  .ask-ti .ico{width:16px;height:16px;color:var(--lime);flex:none;}
+  .ask-ti h4{font-family:var(--display);font-weight:600;font-size:.98rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ask-x{width:30px;height:30px;border-radius:8px;border:0;background:none;color:rgba(234,244,216,.7);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
+  .ask-x:hover{color:#fff;background:rgba(255,255,255,.06);}
+  .ask-log{overflow:auto;padding:12px 16px 14px;font-size:.88rem;line-height:1.6;}
+  .ask-q{font-size:.74rem;color:rgba(234,244,216,.5);margin-bottom:8px;}
+  .ask-ai p{margin:0 0 6px;} .ask-ai p.h{font-weight:700;color:#fff;margin-top:6px;}
+  .ask-ai ul,.ask-ai ol{margin:2px 0 8px 18px;} .ask-ai li{margin:2px 0;}
+  .ask-ai b{color:#fff;}
+  .ask-ai a{color:var(--lime);font-weight:600;text-decoration:underline;text-underline-offset:2px;}
+  .ask-ai code{font-size:.82em;background:rgba(255,255,255,.08);padding:1px 4px;border-radius:4px;}
+  .ask-note{font-size:.74rem;color:rgba(234,244,216,.5);margin-top:8px;}
+  .ask-show{border-radius:10px;padding:12px;background:#fff;color:var(--ink);margin:8px 0 10px;}
   .ask-sh{font-family:var(--display);font-weight:600;font-size:.86rem;color:var(--green-darkest);margin-bottom:8px;}
-  .ask-tbl{max-height:280px;overflow:auto;} .ask-tbl table.bb{font-size:.8rem;} .ask-tbl table.bb th,.ask-tbl table.bb td{padding:7px 10px;}
+  .ask-tbl{max-height:260px;overflow:auto;} .ask-tbl table.bb{font-size:.8rem;} .ask-tbl table.bb th,.ask-tbl table.bb td{padding:7px 10px;}
   .ask-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;} .ask-stats .stat{box-shadow:none;padding:10px 12px;} .ask-stats .stat .v{font-size:1.15rem;}
-  .ask-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--amber-bg);border:1px solid #f0d9ac;font-size:.82rem;color:#6b4708;}
-  .ask-confirm > .ico{width:16px;height:16px;color:var(--amber);}
-  .ask-confirm span{flex:1;min-width:180px;} .ask-confirm em{font-style:normal;font-weight:600;}
-  .ask-empty{font-size:.84rem;color:var(--muted);}
-  .ask-busy{display:flex;gap:4px;padding:4px 0;} .ask-busy i{width:6px;height:6px;border-radius:50%;background:var(--green-bright);animation:bbpulse 1s infinite;}
+  .ask-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;margin:8px 0;border-radius:10px;background:rgba(199,125,23,.14);border:1px solid rgba(199,125,23,.45);font-size:.82rem;color:#f6dfb4;}
+  .ask-confirm > .ico{width:16px;height:16px;color:#e7a948;}
+  .ask-confirm span{flex:1;min-width:180px;} .ask-confirm b{color:#fff;} .ask-confirm em{font-style:normal;font-weight:600;}
+  .ask-confirm .btn.ghost{background:none;color:#eaf4d8;border-color:rgba(183,217,122,.3);}
+  .ask-empty{font-size:.84rem;color:rgba(234,244,216,.65);}
+  .ask-busy{display:flex;align-items:center;gap:10px;font-size:.8rem;color:rgba(234,244,216,.65);padding:4px 0;}
+  .ask-busy .dots{display:inline-flex;gap:4px;} .ask-busy i{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:bbpulse 1s infinite;}
   .ask-busy i:nth-child(2){animation-delay:.15s;} .ask-busy i:nth-child(3){animation-delay:.3s;}
+  .ask-ft{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 14px;}
+  .ask-ft a{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid rgba(183,217,122,.25);color:#eaf4d8;}
+  .ask-ft a:hover{border-color:var(--lime);color:#fff;}
+  .ask-ft a.pri{background:var(--lime);border-color:var(--lime);color:#13260c;}
+  .ask-ft a .ico{width:14px;height:14px;}
   @media(max-width:900px){
     .askdock{left:10px;right:10px;width:auto;transform:none;bottom:calc(72px + env(safe-area-inset-bottom));}
     .askdock.min{left:auto;right:12px;}
