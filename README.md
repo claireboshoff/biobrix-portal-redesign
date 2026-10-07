@@ -19,6 +19,29 @@ in one place, built by **FreedomHub** for BioBrix (Pty) Ltd, Tzaneen. "The Biolo
   live session off. Seed/reset a seat: `worker/setup.sh` (passwords kept in memory-private). Demo mode
   (shared code + tap-a-seat) is `AUTH:'demo'` — never with real data.
 
+## BioBrix Intelligence (the Ask bar)
+A bar at the bottom of every staff page (not the farmer portal). People ask about their business in
+plain language; it reads the page they're on, queries their seat's own data and the Sage snapshot,
+navigates (and carries on on the next page), switches filters and tabs, and answers with tables and
+charts. Buttons that change data or send something wait for the person to confirm.
+
+- `ask-worker/` — Cloudflare Worker **fh-biobrix-ask**: holds the Anthropic key, checks the session
+  against fh-biobrix `/me`, owns the system prompt and tool definitions, one Claude call per turn
+  (`claude-opus-5-5`, effort medium, prompt caching, server-side fallback on refusals).
+- `bb-ask.js` — the browser side: the loop, every tool, the panel. Tools run as the seat, so Claude
+  only sees what that seat may see.
+- `bb-intel.js` — the built-in rules (alerts, reorder forecast, farm health, simple Q&A). Used by Home
+  and as the Ask bar's answer when the Worker can't be reached.
+
+Switch it on:
+```
+cd ask-worker && npm install
+wrangler secret put ANTHROPIC_API_KEY
+wrangler deploy                      # → https://fh-biobrix-ask.claire-boshoff.workers.dev (bb-config.js ASK_API)
+```
+Local: put `ANTHROPIC_API_KEY=…` in `ask-worker/.dev.vars`, then `wrangler dev --port 8788 --var AUTH_MODE:demo`.
+Until it is deployed, the bar answers from the built-in rules and says so.
+
 ## What it does (from the discovery call with Rudie)
 - **Voice order capture** — a rep in front of a farmer speaks the order; it prepopulates and flows
   straight to Operations, killing the week-long lag. Works offline in the field.

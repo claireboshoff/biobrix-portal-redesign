@@ -1,0 +1,7 @@
+{
+  "name": "fh-biobrix-ask",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "wrangler dev --port 8788", "deploy": "wrangler deploy" },
+  "dependencies": { "@anthropic-ai/sdk": "latest" }
+}

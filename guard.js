@@ -126,7 +126,7 @@
     'operations.html':'ops','stock.html':'stock','depots.html':'depots','suppliers.html':'suppliers','deliveries.html':'deliveries',
     'bioservices.html':'bioservices','farms.html':'farms','farm-detail.html':'farms','bioanalyze-soil.html':'bioanalyze',
     'bioanalyze-leaf.html':'bioanalyze','biowatch.html':'biowatch','bioconsult.html':'bioconsult','products-library.html':'products',
-    'farm-files.html':'files','client-portal.html':'client','team.html':'team','labels.html':'labels','intelligence.html':'intelligence',
+    'farm-files.html':'files','client-portal.html':'client','team.html':'team','labels.html':'labels',
     'finance.html':'finance','jobs.html':'jobs','dispatch.html':'dispatch','showcase.html':'showcase',
     'forecast-plan.html':'plan','sales-report.html':'salesreport','commission.html':'commission'
   };

@@ -6,5 +6,7 @@
 window.BB_CONFIG = {
   // Local preview runs the self-contained demo (no Worker needed); production stays on real accounts.
   AUTH: (location.hostname==='localhost'||location.hostname==='127.0.0.1') ? 'demo' : 'live',
-  API: (location.hostname==='localhost'||location.hostname==='127.0.0.1') ? 'http://localhost:8787' : 'https://fh-biobrix.claire-boshoff.workers.dev'
+  API: (location.hostname==='localhost'||location.hostname==='127.0.0.1') ? 'http://localhost:8787' : 'https://fh-biobrix.claire-boshoff.workers.dev',
+  // The Ask bar's brain (ask-worker/). Until it is deployed with a key, questions fall back to the built-in rules.
+  ASK_API: (location.hostname==='localhost'||location.hostname==='127.0.0.1') ? 'http://localhost:8788' : 'https://fh-biobrix-ask.claire-boshoff.workers.dev'
 };

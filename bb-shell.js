@@ -283,6 +283,78 @@
   .bbc-table summary{font-size:.74rem;color:var(--faint);cursor:pointer;margin-top:8px;}
   .bbc-table table{margin-top:6px;}
 
+
+  /* ── Ask bar (bb-ask.js): BioBrix Intelligence, docked at the bottom of every page ── */
+  body.has-ask main.wrap{padding-bottom:150px;}
+  .askdock{position:fixed;z-index:85;bottom:20px;left:calc(var(--nav) + (100vw - var(--nav)) / 2);transform:translateX(-50%);
+    width:min(780px, calc(100vw - var(--nav) - 48px));display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+  .askdock > *{pointer-events:auto;}
+  .ask-sugs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 4px;}
+  .ask-sugs::-webkit-scrollbar{display:none;}
+  .ask-sugs:empty{display:none;}
+  .askdock.open .ask-sugs{display:none;}
+  .ask-sug{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(183,217,122,.22);background:rgba(18,33,12,.9);backdrop-filter:blur(8px);
+    color:rgba(234,244,216,.88);font:inherit;font-size:.76rem;font-weight:500;padding:6px 10px 6px 12px;border-radius:8px;cursor:pointer;transition:border-color .15s,color .15s;}
+  .ask-sug:hover{border-color:var(--lime);color:#fff;}
+  .ask-sug .ico{width:13px;height:13px;color:var(--lime);}
+  .ask-bar{display:flex;align-items:center;gap:8px;padding:8px;border-radius:14px;background:rgba(15,28,10,.95);backdrop-filter:saturate(1.3) blur(12px);
+    border:1px solid rgba(183,217,122,.18);box-shadow:0 18px 44px -10px rgba(10,20,6,.55),0 2px 6px rgba(10,20,6,.2);}
+  .ask-bar .spark{width:40px;height:40px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,var(--green-bright),var(--lime));color:#13260c;}
+  .ask-bar .spark .ico{width:20px;height:20px;}
+  .ask-bar input{flex:1;min-width:0;background:none;border:0;outline:none;color:#fff;font:inherit;font-size:.95rem;padding:10px 4px;}
+  .ask-bar input::placeholder{color:rgba(234,244,216,.55);}
+  .ask-ib{width:38px;height:38px;border-radius:9px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(183,217,122,.18);background:rgba(255,255,255,.04);
+    color:rgba(234,244,216,.8);cursor:pointer;transition:border-color .15s,color .15s;font:inherit;font-size:1.1rem;line-height:1;}
+  .ask-ib:hover{border-color:var(--lime);color:#fff;}
+  .ask-ib .ico{width:17px;height:17px;}
+  .ask-ib.go{background:var(--lime);border-color:var(--lime);color:#13260c;}
+  .ask-ib.go:hover{background:#a9cf68;color:#13260c;}
+  .ask-ib.minb{width:30px;border-color:transparent;background:none;}
+  .ask-fab{display:none;align-items:center;gap:8px;align-self:flex-end;padding:10px 16px 10px 12px;border-radius:999px;border:1px solid rgba(183,217,122,.25);background:rgba(15,28,10,.95);
+    color:#eaf4d8;font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;box-shadow:0 12px 30px -8px rgba(10,20,6,.5);}
+  .ask-fab .ico{width:18px;height:18px;color:var(--lime);}
+  .askdock.min{left:auto;right:24px;transform:none;width:auto;}
+  .askdock.min .ask-bar,.askdock.min .ask-sugs,.askdock.min .ask-panel{display:none !important;}
+  .askdock.min .ask-fab{display:inline-flex;}
+  body.has-ask .toast{bottom:120px;}
+  .ask-panel{display:none;flex-direction:column;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 22px 50px -12px rgba(10,20,6,.4);max-height:min(58vh,560px);overflow:hidden;}
+  .askdock.open .ask-panel{display:flex;}
+  .ask-ph{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;background:var(--rail);color:#eaf4d8;}
+  .ask-ph > .ico{width:16px;height:16px;color:var(--lime);}
+  .ask-ph b{font-family:var(--display);font-weight:600;font-size:.92rem;}
+  .ask-ph .ask-sub{flex:1;font-size:.7rem;color:rgba(234,244,216,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ask-ph .ask-ib{width:30px;height:30px;}
+  .ask-log{overflow:auto;padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;font-size:.88rem;line-height:1.55;}
+  .ask-me{align-self:flex-end;max-width:80%;background:var(--green-dark);color:#fff;padding:8px 12px;border-radius:12px 12px 4px 12px;}
+  .ask-ai{max-width:100%;color:var(--ink);}
+  .ask-ai p{margin:0 0 6px;} .ask-ai p.h{font-weight:700;color:var(--green-darkest);margin-top:4px;}
+  .ask-ai ul,.ask-ai ol{margin:2px 0 8px 20px;} .ask-ai li{margin:2px 0;}
+  .ask-ai a{color:var(--green);font-weight:600;text-decoration:underline;text-underline-offset:2px;}
+  .ask-ai code{font-size:.82em;background:var(--panel-2);padding:1px 4px;border-radius:4px;}
+  .ask-ai.off{padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px dashed var(--line);}
+  .ask-step{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--faint);}
+  .ask-step .ico{width:12px;height:12px;color:var(--green-bright);}
+  .ask-note{font-size:.76rem;color:var(--amber);}
+  .ask-show{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;}
+  .ask-sh{font-family:var(--display);font-weight:600;font-size:.86rem;color:var(--green-darkest);margin-bottom:8px;}
+  .ask-tbl{max-height:280px;overflow:auto;} .ask-tbl table.bb{font-size:.8rem;} .ask-tbl table.bb th,.ask-tbl table.bb td{padding:7px 10px;}
+  .ask-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;} .ask-stats .stat{box-shadow:none;padding:10px 12px;} .ask-stats .stat .v{font-size:1.15rem;}
+  .ask-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--amber-bg);border:1px solid #f0d9ac;font-size:.82rem;color:#6b4708;}
+  .ask-confirm > .ico{width:16px;height:16px;color:var(--amber);}
+  .ask-confirm span{flex:1;min-width:180px;} .ask-confirm em{font-style:normal;font-weight:600;}
+  .ask-empty{font-size:.84rem;color:var(--muted);}
+  .ask-busy{display:flex;gap:4px;padding:4px 0;} .ask-busy i{width:6px;height:6px;border-radius:50%;background:var(--green-bright);animation:bbpulse 1s infinite;}
+  .ask-busy i:nth-child(2){animation-delay:.15s;} .ask-busy i:nth-child(3){animation-delay:.3s;}
+  @media(max-width:900px){
+    .askdock{left:10px;right:10px;width:auto;transform:none;bottom:calc(72px + env(safe-area-inset-bottom));}
+    .askdock.min{left:auto;right:12px;}
+    body.has-ask main.wrap{padding-bottom:170px;}
+    .ask-ib.minb{display:none;}
+    .ask-panel{max-height:62vh;}
+    body.has-ask .toast{bottom:150px;}
+  }
+  @media print{ .askdock{display:none !important;} }
+
   /* ── Phone / tablet ───────────────────────────────────────────────────── */
   #bbOverlay{display:none;}
   @media(max-width:900px){
@@ -387,7 +459,6 @@
   var RAIL = [
     { key:'home', icon:'home', label:'Home', items:[
       { href:'index.html', icon:'home', label:'Today' },
-      { href:'intelligence.html', icon:'sparkles', label:'BioBrix Intelligence', kw:'ai ask insights alerts' },
       { href:'team.html', icon:'message', label:'Team feed', kw:'chat updates' },
       { href:'showcase.html', icon:'monitor', label:'Device showcase' } ]},
     { key:'sales', icon:'sales', label:'Sales', items:[
@@ -450,6 +521,9 @@
     for(var i=0;i<bs.length;i++) for(var j=0;j<bs[i].items.length;j++) if(isHere(bs[i].items[j].href)) return { cat:bs[i], item:bs[i].items[j] };
     return null;
   }
+
+  // Every page this seat can open, flat (the Ask bar uses it to navigate and to list pages).
+  function railPages(){ var out=[]; railBuckets().forEach(function(b){ b.items.forEach(function(it){ out.push({ href:it.href, label:it.label, cat:b.label }); }); }); return out; }
 
   function navInnerHtml(){
     var u = (window.BB && BB.user) || { name:'BioBrix', role:'—' };
@@ -567,7 +641,7 @@
       { id:'voice', href:'voice-order.html', icon:'mic', label:'Capture' },
       { id:'tech',  href:'bioservices.html', icon:'sprout', label:'BioServices' },
       { id:'farms', href:'farms.html',       icon:'farm', label:'Farms' },
-      { id:'intel', href:'intelligence.html',icon:'sparkles', label:'Insights' } ],
+      { id:'sales', href:'orders.html',      icon:'receipt', label:'Orders' } ],
     operations: [ HOME,
       { id:'sales', href:'orders.html',      icon:'receipt', label:'Orders' },
       { id:'ops',   href:'operations.html',  icon:'board', label:'Board' },
@@ -672,6 +746,15 @@
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRail(); toggleNav(false); } });
     refreshSync();
     setTimeout(markSamplePage, 0);
+    setTimeout(loadAsk, 0);
+  }
+  // The Ask bar on every staff page: bb-intel.js (built-in rules, also the offline fallback) then bb-ask.js.
+  var SHELL_V = (function(){ try{ var s=document.currentScript; return s && s.src.indexOf('?')>=0 ? s.src.split('?')[1] : ''; }catch(e){ return ''; } })();
+  function loadScript(src, done){ var s=document.createElement('script'); s.src=src+(SHELL_V?'?'+SHELL_V:''); s.onload=done; s.onerror=function(){}; document.head.appendChild(s); }
+  function loadAsk(){
+    var rk = window.BB.user && window.BB.user.roleKey; if(!rk || rk==='farmer') return;
+    var go=function(){ if(!window.BB.ask) loadScript('bb-ask.js'); };
+    if(window.BB.intel) go(); else loadScript('bb-intel.js', go);
   }
 
   // ---- What is real, and what is still sample --------------------
@@ -686,7 +769,7 @@
     'products-library.html':'the product library','bioservices.html':'BioServices','farm-files.html':'farm files',
     'biowatch.html':'BioWatch visits','bioconsult.html':'BioConsult programmes','bioanalyze-soil.html':'soil results',
     'bioanalyze-leaf.html':'leaf results','labels.html':'labels','team.html':'the team feed','jobs.html':'jobs',
-    'client-portal.html':'the farmer view','intelligence.html':'the farm health scores, and the stock and sample alerts'
+    'client-portal.html':'the farmer view'
   };
   // How old is the accounting data, and is the connection currently failing? A figure that is
   // silently stale is worse than no figure — say it on the page, everywhere it is shown.
@@ -718,7 +801,7 @@
   // sections below it are demonstration data. The note goes above the first of those sections.
   var PARTLY_LIVE = {
     'operations.html':{ after:'.grid', what:'the sections below — orders, stock, blending and deliveries' },
-    'intelligence.html':{ after:'#alerts', what:'the farm health scores below, and the stock and sample alerts' }
+    'index.html':{ after:'#insights', what:'the farm health scores and the stock and sample alerts above' }
   };
   function markSamplePage(){
     if(!sageLive()) return;                                  // in pure demo mode the whole thing is a demo
@@ -940,7 +1023,7 @@
     monthName:monthName, statusBadge:statusBadge, initials:initials,
     renderHeader:renderHeader, refreshSync:refreshSync, icon:icon,
     toggleRail:toggleRail, closeRail:closeRail, filterNav:filterNav, navSearchActive:navSearchActive, navSearchKey:navSearchKey,
-    toggleNav:toggleNav, toggleUser:toggleUser, PAL:PAL, delta:delta,
+    toggleNav:toggleNav, toggleUser:toggleUser, PAL:PAL, delta:delta, railPages:railPages,
     chart:{ bar:bar, line:line, hbar:hbar, donut:donut, spark:spark, compact:compact, moneyCompact:moneyCompact },
     sageLive:sageLive, isSample:isSample, sampleNote:sampleNote, sageAge:sageAge, staleNote:staleNote,
     sampleChip:function(rec){ return isSample(rec) && sageLive() ? '<span class="chip-sample">Sample</span>' : ''; },

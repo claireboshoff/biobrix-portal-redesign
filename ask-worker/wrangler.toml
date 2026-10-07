@@ -1,0 +1,13 @@
+name = "fh-biobrix-ask"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Sessions are checked against the portal's own sign-in Worker.
+AUTH_API = "https://fh-biobrix.claire-boshoff.workers.dev"
+ALLOWED_ORIGINS = "https://claireboshoff.github.io,http://localhost:8811,http://127.0.0.1:8811"
+AUTH_MODE = "live"
+
+# Secret (never in this file):  wrangler secret put ANTHROPIC_API_KEY
+# Local preview:                 wrangler dev --port 8788 --var AUTH_MODE:demo   (key in .dev.vars)

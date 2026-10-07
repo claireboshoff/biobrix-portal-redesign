@@ -15,55 +15,18 @@
 <script src="bb-shell.js?v=redesign1"></script>
 <script src="bb-intel.js?v=redesign1"></script>
 <style>
-/* ── Ask bar: BioBrix Intelligence, docked at the bottom of Home ── */
-main.wrap.has-ask{padding-bottom:150px;}
-.askdock{position:fixed;z-index:85;bottom:22px;left:calc(var(--nav) + (100vw - var(--nav)) / 2);transform:translateX(-50%);
-  width:min(760px, calc(100vw - var(--nav) - 48px));display:flex;flex-direction:column;gap:8px;pointer-events:none;}
-.askdock > *{pointer-events:auto;}
-.ask-sugs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:0 4px;}
-.ask-sugs::-webkit-scrollbar{display:none;}
-.ask-sug{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(183,217,122,.22);background:rgba(18,33,12,.88);backdrop-filter:blur(8px);
-  color:rgba(234,244,216,.85);font:inherit;font-size:.76rem;font-weight:500;padding:6px 10px 6px 12px;border-radius:8px;cursor:pointer;transition:border-color .15s,color .15s;}
-.ask-sug:hover{border-color:var(--lime);color:#fff;}
-.ask-sug .ico{width:13px;height:13px;color:var(--lime);}
-.ask-bar{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;background:rgba(15,28,10,.94);backdrop-filter:saturate(1.3) blur(12px);
-  border:1px solid rgba(183,217,122,.18);box-shadow:0 18px 44px -10px rgba(10,20,6,.55),0 2px 6px rgba(10,20,6,.2);}
-.ask-bar .spark{width:40px;height:40px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,var(--green-bright),var(--lime));color:#13260c;}
-.ask-bar .spark .ico{width:20px;height:20px;}
-.ask-bar input{flex:1;min-width:0;background:none;border:0;outline:none;color:#fff;font:inherit;font-size:.95rem;padding:10px 4px;}
-.ask-bar input::placeholder{color:rgba(234,244,216,.55);}
-.ask-bar .ib{width:38px;height:38px;border-radius:9px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(183,217,122,.18);background:rgba(255,255,255,.04);color:rgba(234,244,216,.8);cursor:pointer;transition:border-color .15s,color .15s;}
-.ask-bar .ib:hover{border-color:var(--lime);color:#fff;}
-.ask-bar .ib .ico{width:17px;height:17px;}
-.ask-bar .go{background:var(--lime);border-color:var(--lime);color:#13260c;}
-.ask-bar .go:hover{background:#a9cf68;color:#13260c;}
-.ask-out{display:none;border-radius:14px;background:rgba(15,28,10,.96);backdrop-filter:blur(12px);border:1px solid rgba(183,217,122,.18);color:#eaf4d8;
-  box-shadow:0 18px 44px -10px rgba(10,20,6,.55);max-height:min(52vh,460px);overflow:auto;}
-.askdock.open .ask-out{display:block;}
-.ask-out .hd{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;border-bottom:1px solid rgba(183,217,122,.12);position:sticky;top:0;background:rgba(15,28,10,.98);}
-.ask-out .hd .ico{width:16px;height:16px;color:var(--lime);}
-.ask-out .hd h4{flex:1;font-family:var(--display);font-weight:600;font-size:.98rem;color:#fff;}
-.ask-out .x{width:30px;height:30px;border-radius:8px;border:0;background:none;color:rgba(234,244,216,.7);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
-.ask-out .x:hover{color:#fff;background:rgba(255,255,255,.06);}
-.ask-out .bd{padding:12px 16px 14px;font-size:.88rem;line-height:1.6;}
-.ask-out .bd .ln1{white-space:pre-line;margin-bottom:6px;}
-.ask-out .bd .q{font-size:.74rem;color:rgba(234,244,216,.5);margin-bottom:8px;}
-.ask-out .ft{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 14px;}
-.ask-out .ft a{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid rgba(183,217,122,.25);color:#eaf4d8;}
-.ask-out .ft a:hover{border-color:var(--lime);color:#fff;}
-.ask-out .ft a.pri{background:var(--lime);border-color:var(--lime);color:#13260c;}
-.ask-out .ft a .ico{width:14px;height:14px;}
-.ask-out .pages a{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#eaf4d8;font-size:.88rem;}
-.ask-out .pages a:hover,.ask-out .pages a.on{background:rgba(183,217,122,.08);color:#fff;}
-.ask-out .pages a .ico{width:16px;height:16px;color:var(--lime);}
-.ask-out .pages a small{margin-left:auto;font-size:.66rem;letter-spacing:.5px;text-transform:uppercase;color:rgba(234,244,216,.45);}
-.ask-out .lbl{padding:10px 16px 4px;font-size:.62rem;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(234,244,216,.42);}
-@media(max-width:900px){
-  .askdock{left:12px;right:12px;width:auto;transform:none;bottom:calc(74px + env(safe-area-inset-bottom));}
-  main.wrap.has-ask{padding-bottom:170px;}
-  .ask-bar .ib.open-intel{display:none;}
-}
-@media print{ .askdock{display:none !important;} }
+/* ── Insights (moved from the Intelligence page) ── */
+.alert-list{max-height:440px;overflow:auto;}
+.alert{display:flex;align-items:flex-start;gap:10px;padding:11px 20px;border-top:1px solid var(--line-soft);color:inherit;transition:background .12s;}
+.alert:first-child{border-top:0;}
+.alert:hover{background:#fafcf7;}
+.alert .sv{width:8px;height:8px;border-radius:50%;flex:none;margin-top:7px;}
+.alert .tx{flex:1;min-width:0;font-size:.86rem;line-height:1.45;}
+.alert .badge{flex:none;}
+.health-list{max-height:440px;overflow:auto;}
+.cover .bar-cell{min-width:150px;}
+.cover .bar-cell span{font-size:.8rem;white-space:nowrap;min-width:64px;text-align:right;}
+@media(max-width:560px){ .alert{padding:11px 14px;} }
 </style>
 </head>
 <body>
@@ -128,46 +91,9 @@ var PULSE = {
 };
 var pulse = PULSE[u.roleKey] || PULSE.director;
 
-// ---- all modules (collapsed grid — "everything, but tucked away") ----
-var MODULES = [
-  {sec:'Sales', items:[
-    {t:'Forecast & actual', s:'Plan the year in litres and kilograms', ic:'🎯', href:'forecast-plan.html', key:'plan'},
-    {t:'Sales — weekly & monthly', s:'By agent, by customer, against budget', ic:'📊', href:'sales-report.html', key:'salesreport'},
-    {t:'Commission', s:'Set a rate once, worked out every month', ic:'💰', href:'commission.html', key:'commission'},
-    {t:'Voice order capture', s:'Speak the order in the field', ic:'🎙', href:'voice-order.html', key:'voice'},
-    {t:'Sales forecast', s:isAdvisor?'Your pipeline by month':'Rep pipeline by month', ic:'📈', href:'forecast.html', key:'forecast'},
-    {t:'Territory potential', s:'Where the next farmer is', ic:'🗺', href:'territory.html', key:'territory'},
-    {t:'Orders', s:isAdvisor?'Your orders — where each one is':'Full order pipeline', ic:'📋', href:'orders.html', key:'orders'}
-  ]},
-  {sec:'Operations', items:[
-    {t:'Operations board', s:'Whole-business live view', ic:'⬡', href:'operations.html', key:'ops'},
-    {t:'Stock', s:isWh?'Count and confirm your depot':'Inventory across 3 depots', ic:'📦', href:'stock.html', key:'stock'},
-    {t:'Depots', s:isWh?'Your depot, live':'George · Ballito · Tzaneen', ic:'🏭', href:'depots.html', key:'depots'},
-    {t:'Suppliers & POs', s:'13 suppliers · raise purchase orders', ic:'🔗', href:'suppliers.html', key:'suppliers'},
-    {t:'Deliveries', s:'Logistics & dispatch', ic:'🚚', href:'deliveries.html', key:'deliveries'},
-    {t:'Labels', s:'Product · blend · delivery — print-ready', ic:'🏷', href:'labels.html', key:'labels'},
-    {t:'Finance & reconciliation', s:'Invoices · Pastel sync · reported vs actual · reminders', ic:'🧾', href:'finance.html', key:'finance'}
-  ]},
-  {sec:'Intelligence', items:[
-    {t:'BioBrix Intelligence', s:'Ask a question · farm health · reorder forecast · alerts', ic:'✦', href:'intelligence.html', key:'intelligence'},
-    {t:'Team feed', s:'One team, four provinces — talk & hand over', ic:'📣', href:'team.html', key:'team'},
-    {t:'Jobs to FreedomHub', s:'Ask for a change, a fix or a new button — the team builds it', ic:'✉', href:'jobs.html', key:'jobs'}
-  ]},
-  {sec:'BioServices · RenewAg', items:[
-    {t:'BioServices hub', s:'The four brackets', ic:'✦', href:'bioservices.html', key:'bioservices'},
-    {t:'Farms & farmers', s:isAdvisor?'Your farmers — call or WhatsApp them':'Farm → block → data', ic:'🌾', href:'farms.html', key:'farms'},
-    {t:'BioAnalyze — Soil', s:'Soil diagnostics', ic:'🧪', href:'bioanalyze-soil.html', key:'bioanalyze'},
-    {t:'BioAnalyze — Leaf', s:'Leaf-sap analysis', ic:'🍃', href:'bioanalyze-leaf.html', key:'bioanalyze'},
-    {t:'BioWatch', s:'Season monitoring', ic:'🌱', href:'biowatch.html', key:'biowatch'},
-    {t:'BioConsult', s:'Programmes & recommendations', ic:'📑', href:'bioconsult.html', key:'bioconsult'},
-    {t:'Product library', s:'Data sheets · 13 suppliers', ic:'📚', href:'products-library.html', key:'products'},
-    {t:'Farm files', s:'One place for every document', ic:'🗂', href:'farm-files.html', key:'files'}
-  ]}
-];
-
 // ---- render ----
 // Layout: greeting, then the KPI strip, then a chart beside the work queue. The rail carries every
-// page, so Home has no shortcut buttons; BioBrix Intelligence sits in the Ask bar docked at the bottom.
+// page, so Home has no shortcut buttons; the Ask bar (bb-ask.js, loaded by the shell) sits at the bottom of every page.
 var html = '';
 var today = new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'long'});
 html += '<div class="page-head">'+
@@ -316,6 +242,56 @@ if(ledgerPulse){
   }
 }
 
+
+// ---- Insights: what used to be the Intelligence page — alerts, farm health, reorder forecast ----
+// Seats with the 'intelligence' section see them; the engine is bb-intel.js (shared with the Ask bar).
+var insightJobs = [];
+if(BB.intel && BB.auth.can('intelligence')){
+  var al=BB.intel.alerts(), rf=BB.intel.reorderForecast();
+  // Every accounting customer is a farmer record, and most have no agronomy captured — rank only the
+  // farms we actually know something about, worst first.
+  var scored=d.all('farmers').map(function(f){ return {f:f, h:BB.intel.farmHealth(f.id), known:(d.where('soil',function(s){return s.farmer===f.id;}).length + d.where('leaf',function(l){return l.farmer===f.id;}).length + d.where('watch',function(w){return w.farmer===f.id;}).length)}; });
+  var ranked=scored.filter(function(x){ return x.known>0; }).sort(function(a,b){ return a.h.score-b.h.score; });
+  var notCaptured=scored.length-ranked.length;
+  var nHigh=al.filter(function(a){return a.sev==='high';}).length;
+  var avgH=ranked.length? Math.round(ranked.reduce(function(t,x){return t+x.h.score;},0)/ranked.length) : null;
+  var urgent=rf.filter(function(r){return r.urgent;}).length;
+  var scoreCol=function(v){ return v>=75?'#2b7d39':v>=55?'#c77d17':'#b8382a'; };
+  var SEV = { high:{b:'b-bad',c:'var(--red)',t:'High'}, med:{b:'b-warn',c:'var(--amber)',t:'Medium'}, low:{b:'b-grey',c:'var(--faint)',t:'Low'} };
+  // 67 alerts is not attention, it is noise: show what needs a person now.
+  var alShown = al.slice(0,12), alRest = al.length - alShown.length;
+  // id="insights" — the shell hangs its sample note here on a live seat (farm health and stock alerts are demo data)
+  html += '<div class="split" id="insights" style="margin-top:16px;">'+
+    '<div class="card"><div class="card-h"><div><h3>What needs you today</h3><div class="sub">most urgent first · across money, stock, samples and the field</div></div>'+
+      '<span class="badge '+(nHigh?'b-bad':al.length?'b-warn':'b-ok')+'">'+(nHigh?nHigh+' high · ':'')+al.length+' total</span></div>'+
+      (al.length? '<div class="alert-list">'+alShown.map(function(a){ var s=SEV[a.sev]||SEV.low;
+        return '<a href="'+a.to+'" class="alert"><span class="sv" style="background:'+s.c+';"></span><span class="tx">'+BB.esc(a.txt)+'</span><span class="badge '+s.b+'">'+s.t+'</span></a>'; }).join('')+'</div>'+
+        (alRest>0?'<div class="card-f">and '+alRest+' more of lower priority.</div>':'')
+      : '<div class="empty">Nothing needs you right now.</div>')+
+    '</div>'+
+    '<div class="card"><div class="card-h"><div><h3>Farm health</h3><div class="sub">lowest first · from soil, leaf and monitoring</div></div>'+(avgH==null?'':'<span class="badge '+(avgH>=75?'b-ok':avgH>=55?'b-warn':'b-bad')+'">avg '+avgH+'/100</span>')+'</div>'+
+      '<div class="card-p health-list"><div id="health"></div></div>'+
+      (notCaptured?'<div class="card-f">'+notCaptured+' customer'+(notCaptured===1?'':'s')+' have no agronomy captured yet, so they are not scored.</div>':'')+'</div>'+
+  '</div>';
+  var maxCover=Math.max.apply(null, rf.map(function(r){ return r.daysCover; }).concat([1]));
+  html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Reorder forecast</h3><div class="sub">days of cover against supplier lead time</div></div>'+
+    (urgent?'<span class="badge b-bad">'+urgent+' to order now</span>':'<span class="badge b-ok">cover is healthy</span>')+'</div>'+
+    '<div class="scroll"><table class="bb cover"><thead><tr><th>Product</th><th>Depot</th><th>Cover</th><th class="num">Lead</th><th>Supplier</th><th class="right">Action</th></tr></thead><tbody>'+
+    (rf.length? rf.map(function(r){
+      return '<tr><td style="white-space:nowrap;"><b style="color:var(--green-darkest);">'+BB.esc(r.p.name)+'</b></td>'+
+      '<td class="muted">'+BB.esc(r.depot.name)+'</td>'+
+      '<td><div class="bar-cell"><div class="trk"><i style="width:'+Math.max(3,Math.round(r.daysCover/maxCover*100))+'%;background:'+(r.urgent?'#b8382a':'#c77d17')+';"></i></div><span>~'+r.daysCover+' days</span></div></td>'+
+      '<td class="num muted">'+r.lead+' days</td><td class="muted">'+BB.esc(r.sup.name)+'</td>'+
+      '<td class="right">'+(r.urgent?'<span class="badge b-bad">Order now</span>':'<span class="badge b-warn">Watch</span>')+'</td></tr>';
+    }).join('') : '<tr><td colspan="6"><div class="empty">All stock lines have healthy cover.</div></td></tr>')+
+    '</tbody></table></div></div>';
+  insightJobs.push(function(){
+    if(ranked.length) BB.chart.hbar('#health',{ max:100, fmt:function(v){ return v+'/100'; },
+      rows:ranked.map(function(x){ return { label:x.f.farm, sub:(x.h.drivers.length? x.h.drivers.join(' · ') : 'healthy, on programme'), value:x.h.score, color:scoreCol(x.h.score), href:'farm-detail.html?farmer='+x.f.id }; }) });
+    else document.getElementById('health').innerHTML='<div class="empty">No soil, leaf or monitoring captured yet, so no farm is scored.</div>';
+  });
+}
+
 // The chase list — the oldest money, with the customer's own number to call. All from the ledger.
 if(sage && sage.live && (BB.auth.can('finance') || isDir)){
   var sinv3 = sage.invoices||[], scust3 = sage.customers||[];
@@ -389,78 +365,8 @@ html += '<div class="divider" style="margin-top:28px;"></div>'+
   '</div>';
 
 document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
-chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
+chartJobs.concat(insightJobs).forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 
-// ---- Ask BioBrix: the Intelligence engine as a bar docked at the bottom of Home ----------------
-// Type a question and the answer opens above the bar; type a page name and it offers to jump there.
-// Only for seats that may open Intelligence — the answer links lead there.
-(function(){
-  if(!(BB.intel && BB.auth && BB.auth.canPage && BB.auth.canPage('intelligence.html'))) return;
-  var main=document.querySelector('main.wrap'); if(main) main.classList.add('has-ask');
-  var sugs = BB.intel.suggest.map(function(q){ return '<button type="button" class="ask-sug" data-q="'+BB.esc(q)+'">'+BB.esc(q)+BB.icon('plus')+'</button>'; }).join('');
-  document.body.insertAdjacentHTML('beforeend',
-    '<div class="askdock" id="askdock" role="search">'+
-      '<div class="ask-out" id="askOut" aria-live="polite"></div>'+
-      '<div class="ask-sugs" id="askSugs">'+sugs+'</div>'+
-      '<form class="ask-bar" id="askForm" autocomplete="off">'+
-        '<span class="spark" aria-hidden="true">'+BB.icon('sparkles')+'</span>'+
-        '<input id="askQ" type="text" placeholder="Ask BioBrix anything, or search for a page" aria-label="Ask BioBrix anything, or search for a page">'+
-        '<a class="ib open-intel" href="intelligence.html" title="Open BioBrix Intelligence" aria-label="Open BioBrix Intelligence">'+BB.icon('board')+'</a>'+
-        '<button class="ib go" type="submit" title="Ask" aria-label="Ask">'+BB.icon('chevron')+'</button>'+
-      '</form>'+
-    '</div>');
-  var dock=document.getElementById('askdock'), out=document.getElementById('askOut'), q=document.getElementById('askQ');
-  function close(){ dock.classList.remove('open'); out.innerHTML=''; }
-  function show(html){ out.innerHTML=html; dock.classList.add('open'); out.scrollTop=0; }
-  function head(icon, title){ return '<div class="hd">'+BB.icon(icon)+'<h4>'+BB.esc(title)+'</h4><button type="button" class="x" aria-label="Close">×</button></div>'; }
-  // pages this seat can open, straight from the rail
-  function pageHits(t){
-    t=t.toLowerCase(); if(t.length<2) return [];
-    var seen={};
-    return [].slice.call(document.querySelectorAll('#bbNav #nav-items a[href]')).filter(function(a){
-      var h=a.getAttribute('href'); if(seen[h]) return false; seen[h]=1;
-      return a.textContent.toLowerCase().indexOf(t)>=0;
-    }).slice(0,4).map(function(a){
-      var cat=a.closest('.rail-tab'), cl=cat&&cat.querySelector('.rt-label');
-      return { href:a.getAttribute('href'), label:a.textContent.trim(), cat:cl?cl.textContent:'' };
-    });
-  }
-  function ask(text){
-    text=(text||'').trim(); if(!text) return;
-    var a=BB.intel.answer(text) || BB.intel.answer('at a glance');
-    var pages=pageHits(text);
-    show(head('sparkles', a.title)+
-      '<div class="bd"><div class="q">You asked: “'+BB.esc(text)+'”</div>'+a.lines.map(function(l){ return '<div class="ln1">'+BB.esc(l)+'</div>'; }).join('')+'</div>'+
-      (pages.length?'<div class="lbl">Pages</div><div class="pages">'+pages.map(function(p){ return '<a href="'+p.href+'">'+BB.icon('chevron')+BB.esc(p.label)+'<small>'+BB.esc(p.cat)+'</small></a>'; }).join('')+'</div>':'')+
-      '<div class="ft"><a class="pri" href="'+a.to+'">Open the detail'+BB.icon('chevron')+'</a><a href="intelligence.html">'+BB.icon('sparkles')+'BioBrix Intelligence</a></div>');
-  }
-  // While typing, a page name offers a jump before anything is asked.
-  q.addEventListener('input', function(){
-    var t=q.value.trim(), hits=pageHits(t);
-    if(!t){ close(); return; }
-    if(hits.length) show(head('search','Go to')+'<div class="pages">'+hits.map(function(p,i){ return '<a href="'+p.href+'"'+(p.label.toLowerCase()===t.toLowerCase()?' class="on"':'')+'>'+BB.icon('chevron')+BB.esc(p.label)+'<small>'+BB.esc(p.cat)+'</small></a>'; }).join('')+
-      '</div><div class="ft"><a class="pri" href="#" data-ask="1">'+BB.icon('sparkles')+'Ask “'+BB.esc(t)+'” instead</a></div>');
-    else close();
-  });
-  document.getElementById('askForm').addEventListener('submit', function(e){
-    e.preventDefault();
-    // An exact page name ("Stock") goes there; anything else is a question.
-    var exact=pageHits(q.value.trim()).filter(function(p){ return p.label.toLowerCase()===q.value.trim().toLowerCase(); })[0];
-    if(exact){ location.href=exact.href; return; }
-    ask(q.value);
-  });
-  q.addEventListener('keydown', function(e){ if(e.key==='Escape'){ q.value=''; close(); q.blur(); } });
-  out.addEventListener('click', function(e){
-    if(e.target.closest('.x')){ close(); return; }
-    var aa=e.target.closest('[data-ask]'); if(aa){ e.preventDefault(); ask(q.value); }
-  });
-  document.getElementById('askSugs').addEventListener('click', function(e){
-    var b=e.target.closest('.ask-sug'); if(!b) return; q.value=b.getAttribute('data-q'); ask(q.value);
-  });
-  document.addEventListener('click', function(e){ if(dock.classList.contains('open') && !e.target.closest('#askdock')) close(); });
-  // "/" focuses the bar from anywhere on Home
-  document.addEventListener('keydown', function(e){ if(e.key==='/' && !/input|textarea|select/i.test((document.activeElement||{}).tagName||'')){ e.preventDefault(); q.focus(); } });
-})();
 
 
 Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
