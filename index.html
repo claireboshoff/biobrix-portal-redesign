@@ -171,22 +171,21 @@ var MODULES = [
 ];
 
 // ---- render ----
+// Layout: greeting + the seat's primary actions in one row; then the KPI strip; then a chart
+// beside the work queue. The rail carries every other page, so there is no "everything else" drawer.
+var BIG_IC = { 'intelligence.html':'sparkles','sales-report.html':'sales','operations.html':'board','forecast-plan.html':'target','forecast.html':'chart',
+  'voice-order.html':'mic','bioservices.html':'sprout','biowatch.html':'eye','orders.html':'receipt','stock.html':'package','suppliers.html':'link',
+  'finance.html':'wallet','depots.html':'warehouse','deliveries.html':'truck','farms.html':'farm','dispatch.html':'moving','commission.html':'percent','jobs.html':'wrench' };
 var html = '';
-html += '<section class="hero-band" style="margin-top:16px;">'+
-  '<div class="eyebrow" style="color:var(--lime);">'+greet+'</div>'+
-  '<h1 style="font-family:var(--display);font-size:1.6rem;font-weight:600;margin:2px 0 4px;">'+BB.esc(first)+' — here\'s what needs you.</h1>'+
-  '<p style="opacity:.85;font-size:.9rem;">'+BB.esc(u.role)+(u.region?' · '+BB.esc(u.region):'')+' · Everything below is saved on this device and syncs when you have signal.</p>'+
-'</section>';
-
-// 3 big buttons
-html += '<div class="grid g3" style="margin-top:16px;">';
-big.forEach(function(b){
-  html += '<a class="tile" href="'+b.href+'" style="border-top:3px solid '+b.c+';">'+
-    '<div class="ic" style="background:'+b.c+';color:#eaf4d8;">'+b.ic+'</div>'+
-    '<h3>'+b.t+'</h3><p>'+BB.esc(b.s)+'</p>'+
-    '<div class="meta"><b>Open ›</b></div></a>';
-});
-html += '</div>';
+var today = new Date().toLocaleDateString('en-ZA',{weekday:'long', day:'numeric', month:'long'});
+html += '<div class="page-head row between" style="gap:16px;">'+
+  '<div><div class="eyebrow">'+greet+' · '+BB.esc(today)+'</div>'+
+  '<h1>'+BB.esc(first)+', here\'s what needs you.</h1>'+
+  '<p>'+BB.esc(u.role)+(u.region?' · '+BB.esc(u.region):'')+'. Everything is saved on this device and syncs when you have signal.</p></div>'+
+  '<div class="row" style="gap:8px;">'+big.map(function(b,i){
+    return '<a class="btn '+(i?'ghost':'')+'" href="'+b.href+'" title="'+BB.esc(b.s)+'">'+BB.icon(BIG_IC[b.href.split('?')[0]]||'chevron')+BB.esc(b.t)+'</a>';
+  }).join('')+'</div>'+
+'</div>';
 
 // ---- From the accounting system (only when it is actually connected) ----
 // Without this the home screen still reads as a demo even after Sage is live, because every tile
@@ -279,9 +278,53 @@ html += '<div class="sec"><h2>'+(ledgerPulse?'This month':(movePulse?'What has m
   (ledgerPulse? 'from your accounting system' : (movePulse? 'from your own invoices' : 'updates as you work'))+'</span>'+((ledgerPulse||movePulse)?BB.liveChip():'')+'</div>';
 html += '<div class="grid g4">';
 pulseSet.forEach(function(p){
-  html += '<div class="stat'+(p.warn?' warn':'')+(p.ok?'':'')+'"><div class="l">'+p.l+'</div><div class="v">'+p.v+'</div><div class="s">'+BB.esc(p.s)+'</div></div>';
+  html += '<div class="stat'+(p.warn?' warn':'')+'"><div class="l">'+p.l+'</div><div class="v">'+p.v+'</div><div class="s">'+BB.esc(p.s)+'</div>'+(p.spark?'<div class="spark">'+BB.chart.spark(p.spark,{color:p.warn?'#b06d0f':'#68a53e'})+'</div>':'')+'</div>';
 });
 html += '</div>';
+}
+
+// ---- The picture: a trend beside a breakdown ----------------------------------------------
+// Ledger seats see six months of invoiced vs received; demo/portal seats see the order book by
+// delivery month (confirmed vs still forecast) beside the rep split. Nothing drawn that isn't counted.
+var chartJobs = [];
+var MONTHS6 = (function(){ var out=[], t=new Date(); t.setDate(1); for(var k=5;k>=0;k--){ var x=new Date(t.getFullYear(), t.getMonth()-k, 1); out.push({ ym:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'), l:BB.monthName(x.getMonth()) }); } return out; })();
+if(ledgerPulse){
+  var invByM = MONTHS6.map(function(m){ return (sage.invoices||[]).filter(function(i){ return (i.date||'').slice(0,7)===m.ym; }).reduce(function(t,i){ return t+(i.amount||0); },0); });
+  var payByM = MONTHS6.map(function(m){ return (sage.payments||[]).filter(function(x){ return (x.date||'').slice(0,7)===m.ym; }).reduce(function(t,x){ return t+(x.amount||0); },0); });
+  html += '<div class="split" style="margin-top:16px;">'+
+    '<div class="card"><div class="card-h"><div><h3>Invoiced vs received</h3><div class="sub">last six months · from your accounting system</div></div>'+BB.liveChip()+'</div><div class="card-p"><div id="chTrend"></div></div></div>'+
+    '<div class="card"><div class="card-h"><div><h3>What is owed, by age</h3><div class="sub">open invoices</div></div></div><div class="card-p"><div id="chAge"></div></div></div>'+
+  '</div>';
+  var t0a = new Date(new Date().toISOString().slice(0,10)), openA=function(i){ return i.outstanding!=null ? i.outstanding : (i.status==='Paid'?0:(i.amount||0)); };
+  var ageB = [{label:'Current',value:0,color:'#3f6b28'},{label:'1–30 days',value:0,color:'#8fbf5a'},{label:'31–60 days',value:0,color:'#c77d17'},{label:'61–90 days',value:0,color:'#a3533f'},{label:'90+ days',value:0,color:'#b8382a'}];
+  (sage.invoices||[]).forEach(function(i){ var v=openA(i); if(v<=0.5) return; var dd=i.dueDate?Math.round((t0a-new Date(i.dueDate))/86400000):0;
+    ageB[dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4].value+=v; });
+  chartJobs.push(function(){ BB.chart.bar('#chTrend',{ labels:MONTHS6.map(function(m){return m.l;}), money:true, height:230, table:true,
+    series:[{name:'Invoiced',values:invByM,color:'#3f6b28'},{name:'Received',values:payByM,color:'#8fbf5a'}] }); });
+  chartJobs.push(function(){ BB.chart.donut('#chAge',{ rows:ageB, money:true, centreLabel:'owed' }); });
+} else if(showPortalPulse && (isDir || isFin || isOps || isAdvisor)){
+  var scopeOrders = isAdvisor ? orders.filter(function(o){ return o.rep===u.rep; }) : orders;
+  var mIdx = []; for(var mi=0; mi<12; mi++) mIdx.push(mi);
+  var used = mIdx.filter(function(mi){ return scopeOrders.some(function(o){ return o.deliverMonth===mi; }); });
+  var lo = used.length?Math.min.apply(null,used):new Date().getMonth(), hi = used.length?Math.max.apply(null,used):lo+5;
+  if(hi-lo<5) hi=Math.min(11, lo+5);
+  var span = mIdx.slice(lo, hi+1);
+  var sumWhere = function(test){ return span.map(function(mi){ return scopeOrders.filter(function(o){ return o.deliverMonth===mi && test(o); }).reduce(function(t,o){ return t+d.orderValue(o); },0); }); };
+  var won = function(o){ return o.status==='Confirmed'||o.status==='Delivered'; };
+  html += '<div class="split" style="margin-top:16px;">'+
+    '<div class="card"><div class="card-h"><div><h3>Order book by delivery month</h3><div class="sub">'+(isAdvisor?'your orders':'all reps')+' · confirmed and still in the pipeline</div></div><a class="btn ghost sm" href="'+(BB.auth.canPage('forecast.html')?'forecast.html':'orders.html')+'">Open '+BB.icon('chevron')+'</a></div>'+
+      '<div class="card-p"><div id="chBook"></div></div></div>'+
+    '<div class="card"><div class="card-h"><div><h3>'+(isAdvisor?'Your orders by status':'Season sales by rep')+'</h3><div class="sub">order value</div></div></div><div class="card-p"><div id="chSplit"></div></div></div>'+
+  '</div>';
+  chartJobs.push(function(){ BB.chart.bar('#chBook',{ labels:span.map(BB.monthName), money:true, stacked:true, height:230, table:true,
+    series:[{name:'Confirmed',values:sumWhere(won),color:'#22431a'},{name:'Pipeline',values:sumWhere(function(o){ return !won(o); }),color:'#68a53e'}] }); });
+  if(isAdvisor){
+    var st={}; scopeOrders.forEach(function(o){ st[o.status]=(st[o.status]||0)+d.orderValue(o); });
+    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'your book', rows:Object.keys(st).map(function(k){ return {label:k, value:st[k]}; }) }); });
+  } else {
+    var reps = d.all('reps').map(function(r){ return { label:r.name, value:orders.filter(function(o){ return o.rep===r.id; }).reduce(function(t,o){ return t+d.orderValue(o); },0), color:r.colour }; });
+    chartJobs.push(function(){ BB.chart.donut('#chSplit',{ money:true, centreLabel:'season', rows:reps }); });
+  }
 }
 
 // The chase list — the oldest money, with the customer's own number to call. All from the ledger.
@@ -293,23 +336,23 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
   var chase = sinv3.filter(function(i){ return i.status==='Overdue' && open3(i)>0.5; })
     .map(function(i){ return {i:i, c:byId3[i.customer]||{name:'—'}, d:i.dueDate? Math.round((t0-new Date(i.dueDate))/86400000):0, v:open3(i)}; })
     .sort(function(a,b){ return b.d-a.d || b.v-a.v; }).slice(0,6);
-  html += '<div class="sec"><h2>Chase these first</h2><span class="ln"></span><span class="cnt">oldest money owed · straight from your accounts</span>'+BB.liveChip()+'</div>';
-  if(!chase.length){ html += '<div class="card card-p"><div class="empty">Nothing overdue. Every account is inside its terms.</div></div>'; }
+  html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>Chase these first</h3><div class="sub">oldest money owed · straight from your accounts</div></div>'+BB.liveChip()+'</div>';
+  if(!chase.length){ html += '<div class="empty">Nothing overdue. Every account is inside its terms.</div></div>'; }
   else{
-    html += '<div class="card">';
+    html += '<div>';
     chase.forEach(function(x, ix){
       var tel = String(x.c.phone||'').replace(/\D/g,'').replace(/^0/,'27');
       var msg = encodeURIComponent('Good day '+(x.c.name||'')+', a friendly reminder from BioBrix about invoice '+(x.i.ref||'')+'. May we arrange payment?');
-      html += '<div class="row between" style="padding:12px 16px;gap:12px;align-items:flex-start;'+(ix?'border-top:1px solid var(--line-soft);':'')+'">'+
+      html += '<div class="row between" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(ix?'border-top:1px solid var(--line-soft);':'')+'">'+
         '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge b-bad">'+x.d+' days over</span><b style="font-size:.92rem;">'+BB.esc(x.c.name)+'</b></div>'+
           '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(x.i.label||x.i.ref)+(x.i.kind==='opening'?' <span class="faint">(carried over from your previous system)</span>':'')+' · <b>'+BB.money(x.v)+'</b> outstanding · due '+BB.date(x.i.dueDate)+'</div>'+
           '<div class="faint" style="font-size:.74rem;margin-top:2px;">'+BB.esc(x.i.kind==='opening'?'':(x.i.description||''))+(x.c.creditLimit? (x.i.kind==='opening'?'':' · ')+'limit '+BB.money(x.c.creditLimit):'')+'</div></div>'+
         '<div class="row" style="gap:6px;flex:none;">'+
-          (tel? '<a class="btn ghost sm" href="tel:+'+tel+'">Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+tel+'?text='+msg+'">WhatsApp</a>' : '<span class="faint" style="font-size:.74rem;">no number on the account</span>')+
-          '<a class="btn sm" href="finance.html?show=overdue">Open ›</a></div>'+
+          (tel? '<a class="btn ghost sm" href="tel:+'+tel+'">'+BB.icon('phone')+'Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+tel+'?text='+msg+'">'+BB.icon('message')+'WhatsApp</a>' : '<span class="faint" style="font-size:.74rem;">no number on the account</span>')+
+          '<a class="btn sm" href="finance.html?show=overdue">Open</a></div>'+
       '</div>';
     });
-    html += '</div>';
+    html += '</div></div>';
   }
 }
 // follow-ups: programme timing turned into dated reminders (advisor sees own; director sees all).
@@ -318,50 +361,32 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
 if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && BB.auth.can('finance'))){
   var fups = d.all('followups').filter(function(x){ return x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); }).slice(0,5);
   var today0 = new Date(new Date().toISOString().slice(0,10));
-  html += '<div class="sec"><h2>Follow-ups due</h2><span class="ln"></span><span class="cnt">farmer gets an email + WhatsApp nudge 3 days before, with the weather window</span></div>';
-  if(!fups.length){ html += '<div class="card card-p"><div class="empty">Nothing due — every programme step is on track.</div></div>'; }
+  html += '<div class="card" style="margin-top:16px;" id="fuCard"><div class="card-h"><div><h3>Follow-ups due</h3><div class="sub">the farmer gets an email + WhatsApp nudge 3 days before, with the weather window</div></div><span class="badge b-warn">'+fups.length+' open</span></div>';
+  if(!fups.length){ html += '<div class="empty">Nothing due. Every programme step is on track.</div></div>'; }
   else {
-    html += '<div class="card" id="fuCard">';
+    html += '<div>';
     fups.forEach(function(fu, i){
       var f=d.farmer(fu.farmer), r=d.rep(fu.rep), pd=d.product(fu.prod), blk=d.by('blocks',fu.block)||{name:''};
       var days=Math.round((new Date(fu.due)-today0)/86400000);
       var cell=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27');
-      html += '<div class="row between" style="padding:12px 16px;gap:12px;align-items:flex-start;'+(i?'border-top:1px solid var(--line-soft);':'')+'">'+
+      html += '<div class="row between" style="padding:12px 20px;gap:12px;align-items:flex-start;'+(i?'border-top:1px solid var(--line-soft);':'')+'">'+
         '<div style="min-width:0;"><div class="row" style="gap:8px;"><span class="badge '+(days<=3?'b-warn':'b-lime')+'">'+(days<0?'overdue':days===0?'today':'in '+days+' day'+(days===1?'':'s'))+'</span><b>'+BB.esc(f.name)+'</b><span class="faint" style="font-size:.78rem;">'+BB.esc(f.farm)+'</span></div>'+
           '<div style="font-size:.86rem;margin-top:2px;">'+BB.esc(fu.what)+' · '+BB.esc(blk.name)+(fu.rate&&fu.rate!=='—'?' · '+BB.esc(fu.rate):'')+' · <span class="faint">'+BB.date(fu.due)+'</span></div>'+
           '<div class="faint" style="font-size:.74rem;margin-top:2px;">Farmer nudge '+(fu.farmerNudge?BB.date(fu.farmerNudge):'3 days before')+' · email + WhatsApp · automated'+(isDir?' · '+BB.esc(r.name):'')+'</div></div>'+
         '<div class="row" style="gap:6px;flex:none;">'+
-          (cell?'<a class="btn ghost sm" href="tel:+'+cell+'">Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+cell+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', reminder from BioBrix: '+fu.what+' on '+blk.name+' is due '+BB.date(fu.due)+'. Shall I bring the product through?')+'">WhatsApp</a>':'')+
-          '<button class="btn sm" data-fudone="'+fu.id+'">Done ✓</button></div>'+
+          (cell?'<a class="btn ghost sm" href="tel:+'+cell+'">'+BB.icon('phone')+'Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/'+cell+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', reminder from BioBrix: '+fu.what+' on '+blk.name+' is due '+BB.date(fu.due)+'. Shall I bring the product through?')+'">'+BB.icon('message')+'WhatsApp</a>':'')+
+          '<button class="btn sm" data-fudone="'+fu.id+'">'+BB.icon('check')+'Done</button></div>'+
       '</div>';
     });
-    html += '</div>';
+    html += '</div></div>';
   }
 }
 
-// collapsed everything
-// A seat whose whole job is two pages must not be shown an empty drawer called "everything else".
-var anyMore = MODULES.some(function(g){ return g.items.some(function(it){ return BB.auth.can(it.key); }); });
-if(anyMore){
-html += '<div class="sec"><h2>Everything else</h2><span class="ln"></span>'+
-  '<button class="btn ghost sm" id="tog">Show all tools</button></div>';
-html += '<div id="allmods" style="display:none;">';
-MODULES.forEach(function(group){
-  var visible = group.items.filter(function(it){ return BB.auth.can(it.key); });
-  if(!visible.length) return;
-  html += '<div class="sec"><h2 style="font-size:.92rem;color:var(--green-mid);">'+group.sec+'</h2><span class="ln"></span></div>';
-  html += '<div class="grid g3">';
-  visible.forEach(function(it){
-    html += '<a class="tile" href="'+it.href+'"><div class="ic">'+it.ic+'</div><h3>'+it.t+'</h3><p>'+BB.esc(it.s)+'</p></a>';
-  });
-  html += '</div>';
-});
-html += '</div>';
-}
+// The rail holds every page this seat can open, so Home no longer repeats them as tiles.
 
 // footer row: switch seat + reset
-html += '<div class="divider"></div>'+
-  '<div class="row between" style="padding-bottom:20px;">'+
+html += '<div class="divider" style="margin-top:28px;"></div>'+
+  '<div class="row between">'+
     '<div class="faint" style="font-size:.78rem;">Signed in as <b>'+BB.esc(u.name)+'</b> · '+BB.esc(u.role)+'</div>'+
     '<div class="row">'+
       ((BB.auth.canPage&&BB.auth.canPage('client-portal.html'))?'<a class="btn ghost sm" href="client-portal.html">Farmer portal preview</a>':'')+((BB.auth.canPage&&BB.auth.canPage('showcase.html'))?'<a class="btn ghost sm" href="showcase.html">Desktop &amp; phone view</a>':'')+
@@ -375,15 +400,11 @@ html += '<div class="divider"></div>'+
   '</div>';
 
 document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } });
 
 Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
   b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Follow-up done · '+d.farmer(fu.farmer).name); location.reload(); };
 });
-var togBtn = document.getElementById('tog');
-if(togBtn) togBtn.onclick=function(){
-  var m=document.getElementById('allmods'); var shown=m.style.display!=='none';
-  m.style.display=shown?'none':'block'; this.textContent=shown?'Show all tools':'Hide tools';
-};
 // These two only exist on a demonstration seat — a live client seat gets a plain Sign out instead.
 var swBtn = document.getElementById('switch');
 if(swBtn) swBtn.onclick=function(){ BB.auth.logout(); };

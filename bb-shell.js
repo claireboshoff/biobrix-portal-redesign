@@ -272,9 +272,9 @@
   .hbar .top .val{font-weight:700;color:var(--green-darkest);white-space:nowrap;}
   .hbar .trk{height:8px;border-radius:4px;background:var(--line-soft);overflow:hidden;display:flex;}
   .hbar .trk i{display:block;height:100%;}
-  .donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap;}
+  .donut-wrap{display:flex;align-items:center;justify-content:center;gap:18px 24px;flex-wrap:wrap;}
   .donut-wrap svg{flex:none;}
-  .donut-legend{flex:1;min-width:160px;display:flex;flex-direction:column;gap:8px;font-size:.82rem;}
+  .donut-legend{flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:.82rem;}
   .donut-legend .r{display:flex;align-items:center;gap:8px;}
   .donut-legend .r i{width:10px;height:10px;border-radius:3px;flex:none;}
   .donut-legend .r span{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
