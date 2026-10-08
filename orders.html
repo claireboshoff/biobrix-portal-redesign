@@ -21,22 +21,15 @@ var canAdvance = u.roleKey==='director' || u.roleKey==='operations';
 
 var css=''+
 '.chips{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 4px;}'+
-'.exp td{background:#f7faf1;}'+
-'.exp .inner{padding:4px 0;}'+
-'.src{font-size:.64rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 8px;border-radius:6px;}'+
-'.src-voice{background:#fdf3e0;color:var(--amber);}'+
-'.src-portal{background:var(--blue-bg);color:var(--blue);}'+
-'.advsel{padding:6px 8px;font-size:.78rem;border:1.5px solid var(--line);border-radius:8px;background:#fff;}'+
+'.op-badges{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;}'+
+'.op-meta{display:flex;gap:8px 18px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:12px 0 2px;font-size:.8rem;color:var(--faint);}'+
+'.op-adv{display:flex;align-items:center;gap:8px;} .op-adv .bb-sel{min-width:170px;}'+
+'.op-hold{font-size:.8rem;color:var(--red);margin:-4px 0 10px;}'+
 '.qp{margin-top:12px;padding:12px 14px;border-radius:11px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--green-bright);}'+
 '.qp .row.between{gap:12px;} .qp .btn{white-space:nowrap;}'+
 '.card-h .chips{margin:0;gap:6px;}'+
 '.rep{display:inline-flex;align-items:center;gap:7px;font-size:.84rem;white-space:nowrap;} .rep i{width:8px;height:8px;border-radius:50%;flex:none;}'+
-'tr.click .caret .ico{width:14px;height:14px;color:var(--faint);transition:transform .15s;} tr.click.open .caret .ico{transform:rotate(90deg);color:var(--green-dark);}'+
-'tr.click.open td{background:#f3f8ec;}'+
-'.exp > td{padding:6px 20px 16px 38px;}'+
-'table.bb.lines{background:#fff;border:1px solid var(--line);border-radius:10px;}'+
-'table.bb.lines th{background:var(--panel-2);} table.bb.lines{max-width:760px;}'+
-'@media(max-width:700px){#ordMain table.bb tbody td{white-space:nowrap;} #ordMain .exp > td{white-space:normal;padding:6px 14px 14px;} #ordMain .exp .qp{max-width:340px;}}';
+'@media(max-width:700px){#ordMain table.bb tbody td{white-space:nowrap;}}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 var STATUSES = ['Forecast','Pending','Confirmed','Awaiting stock','Delivered'];
@@ -124,18 +117,8 @@ function allOrders(){
   return o;
 }
 
-var expanded = {};
-
-// ---- popups: the orders behind a figure or a chart part ----
-// Each row in a popup opens that order in the list below (expanded), without leaving the page.
-function showOrder(id){
-  BB.closePopup(); expanded[id]=true; render();
-  setTimeout(function(){
-    var tr=document.querySelector('#ordMain tr.click[data-id="'+id+'"]'); if(!tr) return;
-    if(tr.style.display==='none'){ BB.toast(tr.querySelector('b').textContent+' is hidden by a filter on the table'); return; }
-    tr.scrollIntoView({ behavior:'smooth', block:'center' });
-  }, 120);
-}
+// Each order opens in its own popup: lines, status, quote and invoice — the list stays where it was.
+function showOrder(id){ BB.closePopup(); setTimeout(function(){ openOrder(id); }, 160); }
 function toList(){ BB.closePopup(); var el=document.getElementById('ordList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 function orderDetail(list, opts){
   opts=opts||{};
@@ -149,10 +132,10 @@ function orderDetail(list, opts){
   if(list.length>1) rows.push({ cells:[{ html:'<b style="white-space:nowrap">'+list.length+' orders</b>' }].concat(cols.slice(1,-1).map(function(){ return ''; })).concat([{ html:'<b>'+BB.money(tot)+'</b>' }]) });
   return {
     wide:!isAdvisor, table:{ columns:cols, rows:rows, num:[cols.length-1] },
-    note: list.length? 'Tap an order to open it in the list.' : null,
+    note: list.length? 'Tap an order to open it.' : null,
     onOpen:function(body){
       body.querySelectorAll('tbody tr').forEach(function(tr,i){ var o=list[i]; if(!o) return;
-        tr.classList.add('click'); tr.title='Open '+o.ref+' in the list'; tr.onclick=function(){ showOrder(o.id); }; });
+        tr.classList.add('click'); tr.title='Open '+o.ref; tr.onclick=function(){ showOrder(o.id); }; });
     },
     total:tot, count:list.length
   };
@@ -195,22 +178,17 @@ function statBar(orders){
   return html;
 }
 
-function srcBadge(s){
-  var cls = s==='Voice'?'src-voice':'src-portal';
-  return '<span class="src '+cls+'">'+BB.esc(s)+'</span>';
-}
-
 var STATUS_COL = { 'Forecast':'#68a53e', 'Pending':'#c77d17', 'Confirmed':'#3f6b28', 'Awaiting stock':'#a3533f', 'Delivered':'#2f6f9e' };
 
 function render(){
   var orders = allOrders();
   var shown = orders.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  var cols = isAdvisor?6:7;
+  var cols = isAdvisor?5:6;
 
   var html='';
   html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Orders</h1><p>'+
     (isAdvisor?'Every order you have captured, and where each one is.'
-              :'The full pipeline across every rep. Open a row for the products; advance the status as it moves.')+'</p></div>'+
+              :'The full pipeline across every rep. Click an order for its products; advance the status as it moves.')+'</p></div>'+
     '<div class="row" style="gap:8px;"><a class="btn" href="voice-order.html">'+BB.icon('mic')+'Capture an order</a><a class="btn ghost" href="forecast.html">'+BB.icon('chart')+'Forecast</a></div></div>';
 
   html += statBar(orders);
@@ -222,11 +200,11 @@ function render(){
   '</div>';
 
   // the work: every order (filter by status, rep, month… with the funnel on each column)
-  html += '<div class="card" id="ordList" style="margin-top:16px;"><div class="card-h"><div><h3>'+(isAdvisor?'Your orders':'All orders')+'</h3><div class="sub">newest first · open a row for the products, quote and invoice</div></div>'+
+  html += '<div class="card" id="ordList" style="margin-top:16px;"><div class="card-h"><div><h3>'+(isAdvisor?'Your orders':'All orders')+'</h3><div class="sub">newest first · click an order for its products, quote and invoice</div></div>'+
     '<span class="badge b-grey">'+orders.length+'</span></div>';
 
   html += '<div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Ref</th><th>Farmer</th>'+(isAdvisor?'':'<th>Rep</th>')+'<th>Delivery</th><th>Source</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>';
+    '<th>Ref</th><th>Farmer</th>'+(isAdvisor?'':'<th>Rep</th>')+'<th>Delivery</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>';
 
   if(!shown.length){
     html += '<tr><td colspan="'+cols+'"><div class="empty">No orders here yet.</div></td></tr>';
@@ -236,47 +214,14 @@ function render(){
   shown.forEach(function(o){
     var f=d.farmer(o.farmer), r=d.rep(o.rep);
     var val = d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o); shownTot += val;
-    html += '<tr class="click'+(expanded[o.id]?' open':'')+'" data-id="'+o.id+'">'+
-      '<td><div class="row" style="gap:6px;flex-wrap:nowrap;"><span class="caret">'+BB.icon('chevron')+'</span><b>'+BB.esc(o.ref)+'</b></div></td>'+
+    html += '<tr class="click" data-id="'+o.id+'" title="Open '+BB.esc(o.ref)+'">'+
+      '<td><b style="white-space:nowrap;">'+BB.esc(o.ref)+'</b></td>'+
       '<td>'+BB.esc(f.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(f.farm)+'</div></td>'+
       (isAdvisor?'':'<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>')+
       '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'delivered ':BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
-      '<td>'+srcBadge(o.source)+'</td>'+
       '<td class="num"><b>'+BB.money(val)+'</b>'+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;font-weight:400;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
-      '<td><div class="row" style="gap:5px;">'+BB.statusBadge(o.status)+quoteChip(o)+invoiceBadge(o)+holdBadge(o)+'</div></td>'+
+      '<td>'+BB.statusBadge(o.status)+'</td>'+
     '</tr>';
-    // expanded row
-    if(expanded[o.id]){
-      html += '<tr class="exp"><td colspan="'+cols+'"><div class="inner">';
-      html += '<div class="scroll"><table class="bb lines"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Line value</th></tr></thead><tbody>';
-      (o.lines||[]).forEach(function(l){
-        var p=d.product(l.prod);
-        html += '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>';
-      });
-      html += '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>';
-      html += '<div class="row between" style="margin-top:10px;">'+
-        '<div class="faint" style="font-size:.78rem;">Captured '+BB.date(o.date)+' · depot '+BB.esc(d.depot(o.depot).name)+'</div>';
-      if(canAdvance){
-        html += '<div class="row" style="gap:8px;"><span class="faint" style="font-size:.76rem;">Advance status</span>'+
-          '<select class="advsel" data-adv="'+o.id+'">'+
-          STATUSES.map(function(s){ return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>'; }).join('')+
-          '</select></div>';
-      }
-      html += '</div>';
-      html += quotePanel(o);
-      // Invoicing: turn a counted-but-uninvoiced sale into actual revenue.
-      if(canInvoiceRole && d.quoteStatus(o)!=='Farmer approved'){
-        if(d.orderInvoiced(o.id)){
-          html += '<div class="row" style="margin-top:8px;gap:8px;"><span class="badge b-ok">Invoiced</span>'+
-            '<span class="faint" style="font-size:.76rem;">This order counts as actual revenue.</span></div>';
-        } else if(o.status==='Delivered' || o.status==='Confirmed'){
-          html += '<div class="row between" style="margin-top:8px;">'+
-            '<span class="faint" style="font-size:.76rem;">Counted as a sale but not yet invoiced. Invoice it to count as actual revenue.</span>'+
-            '<button class="btn sm" data-inv="'+o.id+'">'+BB.icon('receipt')+'Generate invoice</button></div>';
-        }
-      }
-      html += '</div></td></tr>';
-    }
   });
 
   html += '</tbody>';
@@ -319,72 +264,85 @@ function drawCharts(orders){
 function bind(){
   var main=document.getElementById('ordMain');
   Array.prototype.forEach.call(main.querySelectorAll('tr.click[data-id]'), function(row){
-    row.onclick=function(){ var id=this.dataset.id; expanded[id]=!expanded[id]; render(); };
-  });
-  Array.prototype.forEach.call(main.querySelectorAll('select[data-adv]'), function(sel){
-    sel.onclick=function(e){ e.stopPropagation(); };
-    sel.onchange=function(e){
-      e.stopPropagation();
-      var id=this.dataset.adv, val=this.value;
-      d.update('orders', id, { status:val });
-      BB.toast('Status updated to '+val);
-      render();
-    };
-  });
-  Array.prototype.forEach.call(main.querySelectorAll('button[data-inv]'), function(btn){
-    btn.onclick=function(e){
-      e.stopPropagation();
-      var o=d.by('orders', this.dataset.inv);
-      if(!o || d.orderInvoiced(o.id)) return;
-      d.add('invoices', {
-        ref:'INV-'+(1046+Math.floor(Math.random()*900)),
-        farmer:o.farmer,
-        order:o.id,
-        date:new Date().toISOString().slice(0,10),
-        dueDate:nextMonth25(),
-        description:'Order '+o.ref,
-        amount:d.quoteTotal(o),
-        status:'Outstanding',
-        paidDate:null
-      });
-      BB.toast('Invoice generated — now counts as actual');
-      render();
-    };
-  });
-  // ---- quote chain actions ----
-  Array.prototype.forEach.call(main.querySelectorAll('input[data-pct]'), function(inp){
-    inp.onclick=function(e){ e.stopPropagation(); };
-    inp.oninput=function(){
-      var o=d.by('orders', this.dataset.pct); if(!o) return;
-      var pct=Math.max(0,Math.min(50,Number(this.value)||0)); var list=d.orderValue(o); var tot=Math.round(list*(1+pct/100));
-      var t=main.querySelector('b[data-tot="'+o.id+'"]'), m=main.querySelector('b[data-margin="'+o.id+'"]');
-      if(t) t.textContent=BB.money(tot); if(m) m.textContent=BB.money(tot-list);
-    };
-  });
-  Array.prototype.forEach.call(main.querySelectorAll('button[data-q]'), function(btn){
-    btn.onclick=function(e){
-      e.stopPropagation();
-      var o=d.by('orders', this.dataset.oid); if(!o) return;
-      var act=this.dataset.q, f=d.farmer(o.farmer), r=d.rep(o.rep), today=new Date().toISOString().slice(0,10);
-      var q=Object.assign({}, o.quote||{});
-      if(act==='create'){ q={ status:'Awaiting approval', markupPct:(r.markupPct!=null?r.markupPct:0), createdBy:u.rep||u.id, createdAt:today }; BB.toast('Quote created — sent to Rudie for approval'); }
-      if(act==='approve'){ q.status='Approved'; q.approvedBy=u.name; q.approvedAt=today; BB.toast('Quote approved — back to '+String(r.name).split(' ')[0]+' to send'); }
-      if(act==='decline'){ q.status='Declined'; q.declinedBy=u.name; BB.toast('Quote declined'); }
-      if(act==='send'){ var inp=main.querySelector('input[data-pct="'+o.id+'"]'); if(inp){ q.markupPct=Math.max(0,Math.min(50,Number(inp.value)||0)); } q.status='Sent to farmer'; q.sentAt=today; BB.toast('Quote sent — '+String(f.name).split(' ')[0]+' sees it in the portal'); }
-      if(act==='farmerok'){ q.status='Farmer approved'; q.farmerApprovedAt=today; BB.toast(String(f.name).split(' ')[0]+' approved — ready to invoice'); }
-      var patch={ quote:q };
-      if(act==='farmerok' && (o.status==='Forecast'||o.status==='Pending')) patch.status='Confirmed';
-      d.update('orders', o.id, patch);
-      if(act==='create') d.add('feed', { from:u.rep||u.id, date:today, kind:'Order', farmer:o.farmer, ref:o.ref, text:'Quote for '+f.farm+' ('+BB.money(d.quoteTotal(Object.assign({},o,{quote:q})))+') needs approval.' });
-      render();
-    };
+    row.onclick=function(){ openOrder(this.dataset.id); };
   });
 }
 
+// ---- the actions: status, invoice, quote chain. Each one saves, redraws the list and refreshes the popup.
+function afterAction(id){ render(); if(BB.closePopup) BB.closePopup(); setTimeout(function(){ openOrder(id); }, 170); }
+function doAdvance(id, val){ d.update('orders', id, { status:val }); BB.toast('Status updated to '+val); afterAction(id); }
+function doInvoice(id){
+  var o=d.by('orders', id);
+  if(!o || d.orderInvoiced(o.id)) return;
+  d.add('invoices', { ref:'INV-'+(1046+Math.floor(Math.random()*900)), farmer:o.farmer, order:o.id, date:new Date().toISOString().slice(0,10),
+    dueDate:nextMonth25(), description:'Order '+o.ref, amount:d.quoteTotal(o), status:'Outstanding', paidDate:null });
+  BB.toast('Invoice generated — now counts as actual');
+  afterAction(id);
+}
+function doQuote(id, act, root){
+  var o=d.by('orders', id); if(!o) return;
+  var f=d.farmer(o.farmer), r=d.rep(o.rep), today=new Date().toISOString().slice(0,10);
+  var q=Object.assign({}, o.quote||{});
+  if(act==='create'){ q={ status:'Awaiting approval', markupPct:(r.markupPct!=null?r.markupPct:0), createdBy:u.rep||u.id, createdAt:today }; BB.toast('Quote created — sent to Rudie for approval'); }
+  if(act==='approve'){ q.status='Approved'; q.approvedBy=u.name; q.approvedAt=today; BB.toast('Quote approved — back to '+String(r.name).split(' ')[0]+' to send'); }
+  if(act==='decline'){ q.status='Declined'; q.declinedBy=u.name; BB.toast('Quote declined'); }
+  if(act==='send'){ var inp=root && root.querySelector('input[data-pct="'+o.id+'"]'); if(inp){ q.markupPct=Math.max(0,Math.min(50,Number(inp.value)||0)); } q.status='Sent to farmer'; q.sentAt=today; BB.toast('Quote sent — '+String(f.name).split(' ')[0]+' sees it in the portal'); }
+  if(act==='farmerok'){ q.status='Farmer approved'; q.farmerApprovedAt=today; BB.toast(String(f.name).split(' ')[0]+' approved — ready to invoice'); }
+  var patch={ quote:q };
+  if(act==='farmerok' && (o.status==='Forecast'||o.status==='Pending')) patch.status='Confirmed';
+  d.update('orders', o.id, patch);
+  if(act==='create') d.add('feed', { from:u.rep||u.id, date:today, kind:'Order', farmer:o.farmer, ref:o.ref, text:'Quote for '+f.farm+' ('+BB.money(d.quoteTotal(Object.assign({},o,{quote:q})))+') needs approval.' });
+  afterAction(id);
+}
+
+// ---- one order, in a popup ----
+function openOrder(id){
+  var o=d.by('orders', id); if(!o) return;
+  var f=d.farmer(o.farmer), r=d.rep(o.rep), dep=d.depot(o.depot);
+  var val=d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o);
+  var dl=d.where('deliveries',function(x){return x.order===o.id;})[0];
+  var hold=d.deliveryHold(o);
+  var inv=d.orderInvoiced(o.id);
+  var lines='<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Line value</th></tr></thead><tbody>'+
+    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
+    '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>';
+  var badges=[quoteChip(o), invoiceBadge(o), holdBadge(o)].filter(Boolean).join('');
+  var html=(badges?'<div class="op-badges">'+badges+'</div>':'')+
+    (hold?'<div class="op-hold">'+BB.icon('alert')+' '+BB.esc(hold.reason)+'</div>':'')+
+    lines+
+    '<div class="op-meta"><span>Captured '+BB.date(o.date)+' · '+BB.esc(o.source||'Portal')+' · depot '+BB.esc(dep.name)+'</span>'+
+      (canAdvance? '<span class="op-adv"><span>Status</span><select data-adv="'+o.id+'" aria-label="Order status">'+STATUSES.map(function(st){ return '<option value="'+st+'"'+(o.status===st?' selected':'')+'>'+st+'</option>'; }).join('')+'</select></span>' : '')+
+    '</div>'+
+    quotePanel(o)+
+    (canInvoiceRole && d.quoteStatus(o)!=='Farmer approved' && !inv && (o.status==='Delivered'||o.status==='Confirmed')
+      ? '<div class="qp"><div class="row between"><span style="font-size:.86rem;">Counted as a sale but not yet invoiced. Invoice it to count as actual revenue.</span><button class="btn sm" data-inv="'+o.id+'">'+BB.icon('receipt')+'Generate invoice</button></div></div>' : '')+
+    (inv? '<div class="qp"><span class="badge b-ok">Invoiced</span> <span class="faint" style="font-size:.8rem;">This order counts as actual revenue.</span></div>' : '');
+  var acts=[];
+  if(canGo('farm-detail.html')) acts.push({ label:'Farm record', href:'farm-detail.html?farmer='+encodeURIComponent(o.farmer) });
+  BB.popup({ wide:true, eyebrow:'Order · '+BB.esc(o.source||'Portal'), title:o.ref, sub:f.name+' · '+f.farm+(isAdvisor?'':' · '+r.name),
+    stats:[
+      { l:'Value', v:BB.money(val), s:(d.quoteStatus(o)&&d.quotePct(o)? 'incl. '+d.quotePct(o)+'% margin' : 'list value') },
+      { l:'Status', html:BB.statusBadge(o.status) },
+      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.date(dl.eta):dl.status+' · ETA '+BB.date(dl.eta)) : (o.status==='Delivered'?'delivered':'no delivery booked') },
+      { l:'Invoice', v:inv?'Invoiced':((o.status==='Delivered'||o.status==='Confirmed')?'Not yet':'—') }
+    ],
+    html:html, actions:acts,
+    onOpen:function(body){
+      body.querySelectorAll('select[data-adv]').forEach(function(sel){ sel.addEventListener('change', function(){ doAdvance(sel.dataset.adv, sel.value); }); });
+      body.querySelectorAll('button[data-inv]').forEach(function(b){ b.onclick=function(){ doInvoice(b.dataset.inv); }; });
+      body.querySelectorAll('button[data-q]').forEach(function(b){ b.onclick=function(){ doQuote(b.dataset.oid, b.dataset.q, body); }; });
+      body.querySelectorAll('input[data-pct]').forEach(function(inp){ inp.oninput=function(){
+        var pct=Math.max(0,Math.min(50,Number(this.value)||0)), list=d.orderValue(o), tot=Math.round(list*(1+pct/100));
+        var t=body.querySelector('b[data-tot="'+o.id+'"]'), m=body.querySelector('b[data-margin="'+o.id+'"]');
+        if(t) t.textContent=BB.money(tot); if(m) m.textContent=BB.money(tot-list); }; });
+    } });
+}
+
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="ordMain"></div></main>');
-// ?open=<order id>: another page's popup sent you to one order — open it in the list
+// ?open=<order id>: another page sent you to one order — open it in its popup
 var openId = new URLSearchParams(location.search).get('open');
-if(openId && d.by('orders', openId)){ showOrder(openId); } else render();
+render();
+if(openId && d.by('orders', openId)) setTimeout(function(){ openOrder(openId); }, 200);
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
