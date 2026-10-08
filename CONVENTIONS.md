@@ -89,3 +89,29 @@ sort; totals rows follow the filter; filters survive redraws. Consequences for p
   period pickers, `?show=` URL presets), and anything the Ask bar or another page links to (`?show=overdue`).
 - Don't give tables their own max-height / inner scroll; the page scrolls (`.scroll.tall` is now a no-op).
 - Opt a table out with `data-nofilter="1"` only if it isn't a data list (e.g. a form laid out as a table).
+
+## Record popups: the card pattern (Oct 2026)
+The order popup on `orders.html` (`openOrder`) is the reference. A popup about **one record** (an
+order, a farm, a delivery, an invoice, a sample, a programme, a stock line, a supplier, a job…) reads:
+
+- **Title = the record's name or ref.** `eyebrow` = its kind (`Order · Voice`, `Farm`, `Invoice`). No
+  `sub` line restating what's below.
+- **`meta`: the identity fields, one per line, with an icon** — dates (`calendar`), depot (`warehouse`),
+  farmer (`user`), farm (`farm`), rep (`initials` + `color` = rep.colour), phone (`phone`), region/town
+  (`map`), supplier (`link`), product (`package`), block (`leaf`), crop (`sprout`). `tip` = the field's
+  name (shown on hover). Use `href` for a field that links to its own record. Skip empty fields.
+- **`stats`: at most four, concise** (short label, the value, a few words of `s`). They render as one
+  tidy strip. If the page lets this person change the record's status, make the Status stat clickable:
+  `onClick:function(el){ BB.pick(el, {title:'Move to', items:[{label, value, html:BB.statusBadge(s), on}], onPick}) }`
+  and drop the old dropdown.
+- **`layout:'split'`** when the record has content of its own (lines, readings, invoices): meta + stats
+  on the left, content (`html` / `table`) on the right. Single-column (no layout) when there's little.
+- **Warnings** as one `bbp-alert` line (`<div class="bbp-alert">`, `.warn` for amber) at the top of the
+  content, not as big panels or repeated tags.
+- **Actions in the footer** (`actions`): the record page ("Open full record"/"Farm record") and the one
+  main action (primary). In-content action blocks shrink to a single `bbp-bar` row.
+- **Tags** (quote stage, invoice, HOLD) appear once — where they're acted on, not in two places.
+
+Popups that list **many** records (a chart column, a figure tile) keep their table, but follow the same
+economy: ≤4 concise stats, no redundant `sub`, actions in the footer, rows that open the record's own
+card popup where one exists on the page.
