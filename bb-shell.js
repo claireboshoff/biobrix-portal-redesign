@@ -456,6 +456,7 @@
   /* two columns: details + figures on the left, the record's content on the right */
   .bbp-split{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr);gap:20px;align-items:start;}
   .bbp-split > .side .bbp-stats{grid-template-columns:1fr 1fr;margin-bottom:0;}
+  .bbp-split > .side .bbp-stats > .stat:last-child:nth-child(odd){grid-column:span 2;}
   .bbp-split > .main > :first-child{margin-top:0;}
   .bbp-split > .main .bbp-tt:first-child{margin-top:0;}
   @media(max-width:760px){ .bbp-split{grid-template-columns:minmax(0,1fr);} }
@@ -1342,7 +1343,10 @@
   function closePopup(){ if(!popOpen) return; var p=popOpen; popOpen=null; document.documentElement.classList.remove('bbp-lock'); p.classList.remove('show'); setTimeout(function(){ p.remove(); }, 150); document.removeEventListener('keydown', popKey); }
   function popKey(e){ if(e.key==='Escape') closePopup(); }
   function popup(o){
-    closePopup(); o=o||{};
+    var swap=!!popOpen, keepScroll=0;
+    if(swap){ var ob=popOpen.querySelector('.bbp-b'); keepScroll=ob? ob.scrollTop : 0; popOpen.remove(); popOpen=null; document.removeEventListener('keydown', popKey); }
+    else closePopup();
+    o=o||{};
     // o.table, or o.tables:[{title, columns, rows:[{cells, href, onClick}], num:[i], foot:[cells]}]
     var rowFns=[];
     var cell=function(c,i,nc){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:esc(c==null||c===''?'—':c))+'</td>'; };
@@ -1351,7 +1355,7 @@
         (t.rows.length? t.rows.map(function(r){ var cells=r.cells||r, k=-1; if(typeof r.onClick==='function'){ rowFns.push(r.onClick); k=rowFns.length-1; }
           return '<tr'+(k>=0?' class="click" data-row="'+k+'"':r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+cells.map(function(c,i){ return cell(c,i,nc); }).join('')+'</tr>'; }).join('')
           : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody>'+
-        (t.foot? '<tfoot><tr>'+t.foot.map(function(c,i){ return cell(c,i,nc); }).join('')+'</tr></tfoot>' : '')+'</table></div>'; };
+        (t.foot? '<tfoot><tr>'+t.foot.map(function(c,i){ return c===''? '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'></td>' : cell(c,i,nc); }).join('')+'</tr></tfoot>' : '')+'</table></div>'; };
     var tbl=(o.tables||(o.table&&o.table.rows?[o.table]:[])).map(oneTable).join('');
     // figures; one with onClick becomes a button (e.g. the order's status)
     var stats = (o.stats&&o.stats.length) ? '<div class="bbp-stats">'+o.stats.map(function(x,i){ var act=typeof x.onClick==='function';
@@ -1374,9 +1378,11 @@
       '<div class="bbp-f">'+acts.map(function(a,i){ return (a.href && !a.scrollTo && !a.onClick) ? '<a class="btn '+(a.primary?'':'ghost')+'" href="'+esc(a.href)+'">'+esc(a.label)+icon('chevron')+'</a>'
         : '<button type="button" class="btn '+(a.primary?'':'ghost')+'" data-act="'+i+'">'+esc(a.label)+'</button>'; }).join('')+'</div></div>';
     var sbw=window.innerWidth-document.documentElement.clientWidth;
-    document.documentElement.style.setProperty('--sbw', Math.max(0,sbw)+'px'); document.documentElement.classList.add('bbp-lock');
+    if(!document.documentElement.classList.contains('bbp-lock')) document.documentElement.style.setProperty('--sbw', Math.max(0,sbw)+'px');   // already locked: keep the first measurement
+    document.documentElement.classList.add('bbp-lock');
     document.body.appendChild(el); popOpen=el;
-    requestAnimationFrame(function(){ el.classList.add('show'); });
+    if(swap){ el.style.transition='none'; el.querySelector('.bbp').style.transition='none'; el.classList.add('show'); var nb=el.querySelector('.bbp-b'); if(nb && o.keepScroll!==false) nb.scrollTop=keepScroll; requestAnimationFrame(function(){ el.style.transition=''; el.querySelector('.bbp').style.transition=''; }); }
+    else requestAnimationFrame(function(){ el.classList.add('show'); });
     el.addEventListener('click', function(e){
       if(e.target===el || e.target.closest('.bbp-x')){ closePopup(); return; }
       var st=e.target.closest('[data-stat]'); if(st){ var x=o.stats[+st.getAttribute('data-stat')]; if(x&&x.onClick) x.onClick(st, e); return; }

@@ -28,6 +28,8 @@ table.bb tr.detail-row td{padding-top:0;background:#f3f8ec;}
 .card .empty{padding:26px 20px;}
 .fld:last-of-type{margin-bottom:12px;}
 .bbp .interp{margin-top:0;}
+.bbp-meta .mwa{margin-left:10px;display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:20px;background:#e9f9ef;color:#128C4A !important;border:1px solid #bfe8cf;font-size:.72rem;font-weight:600;}
+.bbp-meta .mwa .ico{width:12px;height:12px;}
 </style>
 </head>
 <body>
@@ -76,36 +78,64 @@ function showSample(id){
     if(tr.style.display==='none'){ BB.toast('That sample is hidden by a filter on the table'); return; }
     tr.scrollIntoView({ behavior:'smooth', block:'center' }); }, 120);
 }
-function samplePopup(s){
-  var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'}, adv=d.rep(s.advisor), isI=s.status==='Interpreted';
-  var acts=[{ label:'Open full record', primary:true, onClick:function(){ showSample(s.id); } }];
-  if(isI && canGo('bioconsult.html')) acts.push({ label:'Create BioConsult recommendation', href:'bioconsult.html?farmer='+encodeURIComponent(s.farmer)+'&block='+encodeURIComponent(s.block) });
-  if(canGo('biowatch.html')) acts.push({ label:'Monitor this block', href:'biowatch.html?block='+encodeURIComponent(s.block) });
-  return { eyebrow:'Soil sample · '+(f.farm||f.name), title:b.name, sub:f.name+' · sampled '+BB.date(s.date)+' · advisor '+adv.name,
-    stats: isI ? [{ l:'pH', v:s.ph!=null?String(s.ph):'—' }, { l:'Organic matter', v:s.om||'—' }, { l:'Ca:Mg', v:s.ca_mg||'—' }, { l:'Microbial', v:s.microbial||'—' }, { l:'Phosphorus', v:s.p||'—' }]
-               : [{ l:'Status', html:BB.statusBadge(s.status) }, { l:'Sampled', v:BB.date(s.date) }],
-    html:'<div class="interp'+(isI&&interpOk(s)?' ok':'')+'"><b>'+(isI?'Interpretation':'Status')+':</b> '+esc(s.flag||(isI?'—':'Awaiting laboratory results — readings appear once interpreted.'))+'</div>',
-    actions:acts };
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") ----
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+function byDateDesc(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); }
+function daysSince(iso){ return Math.max(0, Math.round((Date.now()-new Date(iso))/86400000)); }
+function phoneMeta(f){
+  if(!f.cell) return null;
+  var wa='https://wa.me/'+String(f.cell).replace(/\D/g,'').replace(/^0/,'27')+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ');
+  return { icon:'phone', tip:'Phone', html:'<a href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'">'+esc(f.cell)+'</a><a class="mwa" target="_blank" rel="noopener" href="'+esc(wa)+'">'+BB.icon('message')+'WhatsApp</a>' };
 }
+// the block's last walk, which also links to its monitoring
+function walkMeta(bid){
+  var w=d.where('watch', function(x){ return x.block===bid; }).sort(byDateDesc)[0];
+  return { icon:'eye', tip:'BioWatch', text:w? 'Walked '+BB.shortDate(w.date)+' · vigour '+String(w.vigour||'—').toLowerCase() : 'Not walked yet', muted:!w, href:canGo('biowatch.html')?'biowatch.html?block='+encodeURIComponent(bid):null };
+}
+function markInterp(id){ d.update('soil', id, { status:'Interpreted' }); BB.toast('Marked as interpreted'); BB.closePopup(); render(); var s=d.by('soil', id); if(s) setTimeout(function(){ BB.popup(samplePopup(s)); }, 180); }
+// one sample as a card: who, where and when on the left with its key readings; the full read on the right
+function samplePopup(s){
+  var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'}, isI=s.status==='Interpreted', adv=s.advisor && !(isAdvisor && s.advisor===u.rep) ? d.rep(s.advisor) : null;
+  var low=isI && /low/i.test(s.microbial||''), lowNote=low && !/biology/i.test(s.flag||''), wait=daysSince(s.date), canMark=(u.roleKey==='director'||u.roleKey==='advisor');
+  var acts=[{ label:'Show in list', onClick:function(){ showSample(s.id); } }];
+  if(isI && canGo('bioconsult.html')) acts.push({ label:'Create recommendation', primary:true, href:'bioconsult.html?farmer='+encodeURIComponent(s.farmer)+'&block='+encodeURIComponent(s.block) });
+  if(!isI && canMark) acts.push({ label:'Mark as interpreted', primary:true, onClick:function(){ markInterp(s.id); } });
+  var html;
+  if(isI){
+    html=(lowNote?'<div class="bbp-alert warn">'+BB.icon('alert')+'Low biology — feed the soil life first</div>':'')+
+      '<div class="bbp-tt">Readings</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>pH</th><th>Organic matter</th><th>Ca:Mg</th><th>Microbial</th><th>Phosphorus</th></tr></thead><tbody><tr>'+
+      [s.ph, s.om, s.ca_mg, s.microbial, s.p].map(function(v){ return '<td>'+(v!=null&&v!==''? esc(v) : '—')+'</td>'; }).join('')+'</tr></tbody></table></div>'+
+      '<div class="interp'+(interpOk(s)?' ok':'')+'" style="margin-top:12px;"><b>Interpretation:</b> '+esc(s.flag||'—')+'</div>';
+  } else {
+    html=(wait>21?'<div class="bbp-alert warn">'+BB.icon('alert')+'Waiting '+wait+' days — chase the lab</div>':'')+
+      '<div class="bbp-bar" style="margin-top:0;"><span class="faint">'+esc(s.flag||'Awaiting laboratory results — readings appear once interpreted.')+'</span></div>';
+  }
+  return { wide:isI, layout:isI?'split':null, color:null, sub:null, eyebrow:'Soil sample', title:b.name,
+    meta:[ { icon:'calendar', text:'Sampled '+BB.date(s.date), tip:'Sampled' },
+      { icon:'farm', text:f.farm||f.name, tip:'Farm', href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(s.farmer):null },
+      { icon:'user', text:f.name, tip:'Farmer' }, phoneMeta(f), b.crop? { icon:'sprout', text:b.crop, tip:'Crop' } : null, walkMeta(s.block),
+      adv? { initials:initialsOf(adv.name), color:adv.colour, text:adv.name, tip:'Advisor' } : null ],
+    stats: isI ? [{ l:'Status', html:BB.statusBadge(s.status) }, { l:'pH', v:s.ph!=null?String(s.ph):'—' }, { l:'Microbial', v:s.microbial||'—', cls:low?'warn':'' }, { l:'Ca:Mg', v:s.ca_mg||'—' }]
+               : [{ l:'Status', html:BB.statusBadge(s.status) }, { l:'Waiting', v:wait+' day'+(wait===1?'':'s'), s:'since sampling', cls:wait>21?'warn':'' }],
+    html:html, actions:acts };
+}
+// the samples behind a figure or a chart part; a row opens that sample's card
 function sampleDetail(list){
   list=list.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
-  return { table:{ columns:['Date','Farmer / block','pH','Status','Reading'], rows:list.map(function(s){ var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'};
-      return [BB.shortDate(s.date), { html:'<b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div>' }, s.status==='Interpreted'&&s.ph!=null?String(s.ph):'—', { html:BB.statusBadge(s.status) }, { html:'<span style="font-size:.78rem;">'+esc(s.flag||'—')+'</span>' }]; }), num:[2] },
-    note: list.length? 'Tap a sample to open it in the list.' : null,
-    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var s=list[i]; if(!s) return; tr.classList.add('click'); tr.onclick=function(){ showSample(s.id); }; }); } };
+  return { color:null, sub:null, table:{ columns:['Date','Farmer / block','pH','Status','Reading'], rows:list.map(function(s){ var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'};
+      return { cells:[{ html:'<span style="white-space:nowrap;">'+BB.shortDate(s.date)+'</span>' }, { html:'<b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div>' }, s.status==='Interpreted'&&s.ph!=null?String(s.ph):'—', { html:BB.statusBadge(s.status) }, { html:'<span style="font-size:.78rem;">'+esc(s.flag||'—')+'</span>' }],
+        onClick:function(){ BB.popup(samplePopup(s)); } }; }), num:[2] } };
 }
 function toSamples(){ BB.closePopup(); var el=document.getElementById('sampleList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 var TILE={};
-BB.statDetail('soilAwait', function(){ return Object.assign(sampleDetail(TILE.await||[]), { sub:'collected or at the lab, waiting to be read', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
-BB.statDetail('soilInterp', function(){ return Object.assign(sampleDetail(TILE.interp||[]), { sub:'read and interpreted', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+BB.statDetail('soilAwait', function(){ return Object.assign(sampleDetail(TILE.await||[]), { actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+BB.statDetail('soilInterp', function(){ return Object.assign(sampleDetail(TILE.interp||[]), { actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
 BB.statDetail('soilBlocks', function(){
   var rows=TILE.all||[], ids=rows.map(function(s){ return s.block; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
   var go=canGo('farm-detail.html');
-  return { sub:'blocks with at least one soil sample',
-    table:{ columns:['Block','Farmer','Samples','Latest'], rows:ids.map(function(bid){ var b=d.by('blocks',bid)||{name:'—'}, mine=rows.filter(function(s){ return s.block===bid; }), last=mine[0], f=d.farmer(b.farmer||(last&&last.farmer));
+  return { table:{ columns:['Block','Farmer','Samples','Latest'], rows:ids.map(function(bid){ var b=d.by('blocks',bid)||{name:'—'}, mine=rows.filter(function(s){ return s.block===bid; }), last=mine[0], f=d.farmer(b.farmer||(last&&last.farmer));
       return { cells:[{ html:'<b>'+esc(b.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.crop||'')+'</div>' }, f.name, String(mine.length), { html:last? BB.statusBadge(last.status)+' <span class="faint" style="font-size:.74rem;">'+BB.shortDate(last.date)+'</span>' : '—' }],
         href:'bioanalyze-soil.html?block='+encodeURIComponent(bid) }; }), num:[2] },
-    note: ids.length? 'Tap a block for its soil results.' : null,
     actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] };
 });
 
@@ -314,6 +344,8 @@ function bind(){
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="soilMain"></div></main>');
 render();
+// ?open=<sample id>: another page sent you to one sample — open its card (only one this seat may see)
+(function(){ var oid=new URLSearchParams(location.search).get('open'), s=oid && baseRows().filter(function(x){ return x.id===oid; })[0]; if(s) setTimeout(function(){ BB.popup(samplePopup(s)); }, 200); })();
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>

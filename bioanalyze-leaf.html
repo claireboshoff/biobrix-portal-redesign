@@ -27,6 +27,8 @@
 .flagl .f::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;margin-top:6px;}
 .flagl .f b{color:var(--ink);font-weight:600;}
 table.bb tr.open td{background:#f3f8ec;}
+.bbp-meta .mwa{margin-left:10px;display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:20px;background:#e9f9ef;color:#128C4A !important;border:1px solid #bfe8cf;font-size:.72rem;font-weight:600;}
+.bbp-meta .mwa .ico{width:12px;height:12px;}
 table.bb tr.detail-row td{padding-top:0;background:#f3f8ec;}
 .empty .big .ico{width:30px;height:30px;color:var(--faint);}
 .card .empty{padding:26px 20px;}
@@ -78,29 +80,49 @@ function showSample(id){
     if(tr.style.display==='none'){ BB.toast('That sample is hidden by a filter on the table'); return; }
     tr.scrollIntoView({ behavior:'smooth', block:'center' }); }, 120);
 }
-// the block's full reading and what it means
-function sampleInfo(l){
-  var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'}, adv=d.rep(l.advisor), isI=l.status==='Interpreted';
-  var acts=[{ label:'Open full record', primary:true, onClick:function(){ showSample(l.id); } }];
-  if(isI && canGo('bioconsult.html')) acts.push({ label:'Create BioConsult recommendation', href:'bioconsult.html?farmer='+encodeURIComponent(l.farmer)+'&block='+encodeURIComponent(l.block) });
-  if(canGo('biowatch.html')) acts.push({ label:'Monitor this block', href:'biowatch.html?block='+encodeURIComponent(l.block) });
-  return { eyebrow:'Leaf-sap sample · '+(f.farm||f.name), title:b.name, sub:[f.name, l.crop, 'sampled '+BB.date(l.date), 'advisor '+adv.name].filter(Boolean).join(' · '),
-    stats: isI ? [{ l:'Nitrogen (N)', v:l.n||'—' }, { l:'Potassium (K)', v:l.k||'—' }, { l:'Calcium (Ca)', v:l.ca||'—' }]
-               : [{ l:'Status', html:BB.statusBadge(l.status) }, { l:'Sampled', v:BB.date(l.date) }],
-    html:'<div class="interp'+(isI&&interpOk(l)?' ok':'')+'"><b>'+(isI?'Interpretation':'Status')+':</b> '+esc(l.flag||(isI?'—':'Sap collected — readings appear once interpreted.'))+'</div>',
-    actions:acts };
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") ----
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+function byDateDesc(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); }
+function daysSince(iso){ return Math.max(0, Math.round((Date.now()-new Date(iso))/86400000)); }
+function phoneMeta(f){
+  if(!f.cell) return null;
+  var wa='https://wa.me/'+String(f.cell).replace(/\D/g,'').replace(/^0/,'27')+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ');
+  return { icon:'phone', tip:'Phone', html:'<a href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'">'+esc(f.cell)+'</a><a class="mwa" target="_blank" rel="noopener" href="'+esc(wa)+'">'+BB.icon('message')+'WhatsApp</a>' };
 }
+function walkMeta(bid){
+  var w=d.where('watch', function(x){ return x.block===bid; }).sort(byDateDesc)[0];
+  return { icon:'eye', tip:'BioWatch', text:w? 'Walked '+BB.shortDate(w.date)+' · vigour '+String(w.vigour||'—').toLowerCase() : 'Not walked yet', muted:!w, href:canGo('biowatch.html')?'biowatch.html?block='+encodeURIComponent(bid):null };
+}
+function markInterp(id){ d.update('leaf', id, { status:'Interpreted' }); BB.toast('Marked as interpreted'); BB.closePopup(); render(); var l=d.by('leaf', id); if(l) setTimeout(function(){ BB.popup(sampleInfo(l)); }, 180); }
+// one leaf-sap sample as a card: the three readings as its figures, the interpretation as one line
+function sampleInfo(l){
+  var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'}, isI=l.status==='Interpreted', adv=l.advisor && !(isAdvisor && l.advisor===u.rep) ? d.rep(l.advisor) : null;
+  var wait=daysSince(l.date), canMark=(u.roleKey==='director'||u.roleKey==='advisor');
+  var acts=[{ label:'Show in list', onClick:function(){ showSample(l.id); } }];
+  if(isI && canGo('bioconsult.html')) acts.push({ label:'Create recommendation', primary:true, href:'bioconsult.html?farmer='+encodeURIComponent(l.farmer)+'&block='+encodeURIComponent(l.block) });
+  if(!isI && canMark) acts.push({ label:'Mark as interpreted', primary:true, onClick:function(){ markInterp(l.id); } });
+  var html = isI ? '<div class="interp'+(interpOk(l)?' ok':'')+'"><b>Interpretation:</b> '+esc(l.flag||'—')+'</div>'
+    : (wait>21?'<div class="bbp-alert warn">'+BB.icon('alert')+'Waiting '+wait+' days — chase the lab</div>':'')+'<div class="bbp-bar" style="margin-top:0;"><span class="faint">'+esc(l.flag||'Sap collected — readings appear once interpreted.')+'</span></div>';
+  return { color:null, sub:null, eyebrow:'Leaf-sap sample', title:b.name,
+    meta:[ { icon:'calendar', text:'Sampled '+BB.date(l.date), tip:'Sampled' },
+      { icon:'farm', text:f.farm||f.name, tip:'Farm', href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(l.farmer):null },
+      { icon:'user', text:f.name, tip:'Farmer' }, phoneMeta(f), (l.crop||b.crop)? { icon:'sprout', text:l.crop||b.crop, tip:'Crop' } : null, walkMeta(l.block),
+      adv? { initials:initialsOf(adv.name), color:adv.colour, text:adv.name, tip:'Advisor' } : null ],
+    stats: isI ? [{ l:'Status', html:BB.statusBadge(l.status) }, { l:'Nitrogen', v:l.n||'—' }, { l:'Potassium', v:l.k||'—' }, { l:'Calcium', v:l.ca||'—' }]
+               : [{ l:'Status', html:BB.statusBadge(l.status) }, { l:'Waiting', v:wait+' day'+(wait===1?'':'s'), s:'since sampling', cls:wait>21?'warn':'' }],
+    html:html, actions:acts };
+}
+// the samples behind a figure or a chart part; a row opens that sample's card
 function sampleDetail(list){
   list=list.slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
-  return { table:{ columns:['Date','Farmer / block','Crop','Status','Reading'], rows:list.map(function(l){ var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'};
-      return [BB.shortDate(l.date), { html:'<b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div>' }, l.crop||'—', { html:BB.statusBadge(l.status) }, { html:'<span style="font-size:.78rem;">'+esc(l.flag||'—')+'</span>' }]; }) },
-    note: list.length? 'Tap a sample to open it in the list.' : null,
-    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var l=list[i]; if(!l) return; tr.classList.add('click'); tr.onclick=function(){ showSample(l.id); }; }); } };
+  return { color:null, sub:null, table:{ columns:['Date','Farmer / block','Crop','Status','Reading'], rows:list.map(function(l){ var f=d.farmer(l.farmer), b=d.by('blocks',l.block)||{name:'—'};
+      return { cells:[{ html:'<span style="white-space:nowrap;">'+BB.shortDate(l.date)+'</span>' }, { html:'<b>'+esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(b.name)+'</div>' }, l.crop||'—', { html:BB.statusBadge(l.status) }, { html:'<span style="font-size:.78rem;">'+esc(l.flag||'—')+'</span>' }],
+        onClick:function(){ BB.popup(sampleInfo(l)); } }; }) } };
 }
 function toSamples(){ BB.closePopup(); var el=document.getElementById('sampleList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 var TILE={};
-BB.statDetail('leafAwait', function(){ return Object.assign(sampleDetail(TILE.await||[]), { sub:'collected or at the lab, waiting to be read', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
-BB.statDetail('leafInterp', function(){ return Object.assign(sampleDetail(TILE.interp||[]), { sub:'read and interpreted', actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+BB.statDetail('leafAwait', function(){ return Object.assign(sampleDetail(TILE.await||[]), { actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
+BB.statDetail('leafInterp', function(){ return Object.assign(sampleDetail(TILE.interp||[]), { actions:[{ label:'Open the full list', primary:true, onClick:toSamples }] }); });
 
 function statBar(rows){
   var awaitL = rows.filter(function(l){ return l.status!=='Interpreted'; }), awaiting = awaitL.length;
@@ -308,6 +330,8 @@ function bind(){
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"><div id="leafMain"></div></main>');
 render();
+// ?open=<sample id>: another page sent you to one sample — open its card (only one this seat may see)
+(function(){ var oid=new URLSearchParams(location.search).get('open'), l=oid && baseRows().filter(function(x){ return x.id===oid; })[0]; if(l) setTimeout(function(){ BB.popup(sampleInfo(l)); }, 200); })();
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>

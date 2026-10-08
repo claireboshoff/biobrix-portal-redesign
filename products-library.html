@@ -66,21 +66,47 @@ function showProduct(id){
   if(!filtered().some(function(p){ return p.id===id; })){ state.lever='All'; state.supplier=''; state.q=''; render(); } else refreshCards();
   setTimeout(function(){ var c=document.querySelector('.pcard[data-prod="'+id+'"]'); if(c) c.scrollIntoView({ behavior:'smooth', block:'center' }); }, 80);
 }
-function prodDetail(list){
-  list=list.slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
-  return { table:{ columns:['Product','Lever','Supplier','Pack','Price'], rows:list.map(function(p){ var sup=d.supplier(p.supplier)||{name:'—'};
-      return [{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.cat||'')+'</div>' }, { html:'<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever||'—')+'</span>' }, sup.name+(sup.lead!=null?' · '+sup.lead+' days':''), p.pack||'—', BB.money(p.price)+' / '+(p.unit||'unit')]; }), num:[4] },
-    note: list.length? 'Tap a product for its data sheet.' : null,
-    onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=list[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ showProduct(p.id); }; }); } };
+function canGo(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } }
+function countryName(c){ return ({ ZA:'South Africa', US:'United States', DE:'Germany', NL:'Netherlands', IL:'Israel', ES:'Spain', AU:'Australia' })[c]||c; }
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") ----
+// one product: what it is and who supplies it; the data sheet and the programmes that use it
+function productCard(p){
+  var sup=d.supplier(p.supplier)||{}, uses=d.all('programs').filter(function(g){ return (g.lines||[]).some(function(l){ return l.prod===p.id; }); });
+  var html=(sup.country && sup.country!=='ZA' ? '<div class="bbp-alert warn">'+BB.icon('alert')+'Imported — allow '+sup.lead+' days from order to depot</div>' : '')+
+    '<div class="bbp-tt">Application &amp; notes</div><div style="font-size:.86rem;line-height:1.6;color:var(--muted);">'+BB.esc(p.sheet||'No data sheet captured yet.')+'</div>';
+  return { color:null, sub:null, eyebrow:'Product · '+(p.lever||'Other'), title:p.name,
+    meta:[ { icon:'package', text:[p.code, p.pack].filter(Boolean).join(' · '), tip:'Code · pack' }, p.cat && p.cat!==p.lever? { icon:'tag', text:p.cat, tip:'Category' } : null,
+      sup.name? { icon:'link', tip:'Supplier', html:BB.esc(sup.name)+(sup.country?'<small>'+BB.esc(countryName(sup.country))+'</small>':'') } : null ],
+    stats:[{ l:'Price', v:BB.money(p.price), s:'per '+(p.unit||'unit') }, { l:'Lead time', v:sup.lead!=null? sup.lead+' days' : '—', s:'order to depot', cls:sup.country&&sup.country!=='ZA'?'warn':'' },
+      { l:'Programmes', v:String(uses.length), s:'recommend it' }],
+    html:html,
+    actions:[{ label:'Show in catalogue', primary:true, onClick:function(){ showProduct(p.id); } }] };
 }
+function openProduct(id){ var p=d.product(id); if(p && p.id) BB.popup(productCard(p)); }
+// the products behind a figure or a chart part; a row opens that product's card
+function prodDetail(list, oneSupplier){
+  list=list.slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
+  return { color:null, sub:null, table:{ columns:['Product','Lever'].concat(oneSupplier?[]:['Supplier']).concat(['Pack','Price']), rows:list.map(function(p){ var sup=d.supplier(p.supplier)||{name:'—'};
+      return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+(p.cat&&p.cat!==p.lever?' · '+BB.esc(p.cat):'')+'</div>' }, { html:'<span class="ltag lv-'+BB.esc(p.lever)+'">'+BB.esc(p.lever||'—')+'</span>' }].concat(oneSupplier?[]:[sup.name]).concat([p.pack||'—', { html:'<span style="white-space:nowrap;">'+BB.money(p.price)+' / '+BB.esc(p.unit||'unit')+'</span>' }]),
+        onClick:function(){ openProduct(p.id); } }; }), num:[oneSupplier?3:4] } };
+}
+// one supplier: where from, how long it takes, and what we buy from them
+function supplierCard(id){
+  var s=d.supplier(id)||{}, list=products.filter(function(p){ return p.supplier===id; }), imp=s.country && s.country!=='ZA';
+  return Object.assign(prodDetail(list, true), { wide:true, layout:'split', eyebrow:'Supplier', title:s.name||'Supplier',
+    meta:[ s.country? { icon:'map', text:countryName(s.country), tip:'Country' } : null, s.note? { icon:'tag', text:s.note, tip:'Supplies' } : null ],
+    stats:[{ l:'Lead time', v:s.lead!=null? s.lead+' days' : '—', s:imp?'imported':'local', cls:imp?'warn':'' }, { l:'Products', v:String(list.length), s:'in this library' }],
+    html:'<div class="bbp-tt">Products</div>',
+    actions: canGo('suppliers.html') ? [{ label:'Suppliers', href:'suppliers.html' }, { label:'Show in catalogue', primary:true, onClick:function(){ toSupplier(id); } }] : [{ label:'Show in catalogue', primary:true, onClick:function(){ toSupplier(id); } }] });
+}
+function toSupplier(id){ BB.closePopup(); state.supplier=id; state.lever='All'; state.q=''; render(); var el=document.getElementById('catalogue'); if(el) setTimeout(function(){ el.scrollIntoView({ behavior:'smooth', block:'start' }); }, 60); }
 function toCatalogue(){ BB.closePopup(); var el=document.getElementById('catalogue'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 function isImported(p){ var s=d.supplier(p.supplier)||{}; return !!(s.country && s.country!=='ZA'); }
-BB.statDetail('plImported', function(){ return Object.assign(prodDetail(products.filter(isImported)), { sub:'supplied from outside South Africa — allow for the longer lead time', actions:[{ label:'Open the full list', primary:true, onClick:toCatalogue }] }); });
+BB.statDetail('plImported', function(){ return Object.assign(prodDetail(products.filter(isImported)), { actions:[{ label:'Open the full list', primary:true, onClick:toCatalogue }] }); });
 BB.statDetail('plSuppliers', function(){
   var ids=products.map(function(p){ return p.supplier; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
   var rows=ids.map(function(id){ var s=d.supplier(id)||{name:'—'}; return { s:s, n:products.filter(function(p){ return p.supplier===id; }).length }; }).sort(function(a,b){ return b.n-a.n; });
-  return { sub:'the suppliers behind the products in this library',
-    table:{ columns:['Supplier','From','Lead time','Products'], rows:rows.map(function(x){ return [{ html:'<b>'+BB.esc(x.s.name)+'</b>'+(x.s.note?'<div class="faint" style="font-size:.72rem;">'+BB.esc(x.s.note)+'</div>':'') }, x.s.country||'—', x.s.lead!=null? x.s.lead+' days' : '—', String(x.n)]; }), num:[3] },
+  return { table:{ columns:['Supplier','From','Lead time','Products'], rows:rows.map(function(x){ return { cells:[{ html:'<b>'+BB.esc(x.s.name)+'</b>'+(x.s.note?'<div class="faint" style="font-size:.72rem;">'+BB.esc(x.s.note)+'</div>':'') }, x.s.country||'—', x.s.lead!=null? x.s.lead+' days' : '—', String(x.n)], onClick:x.s.id? function(){ BB.popup(supplierCard(x.s.id)); } : null }; }), num:[3] },
     actions:[{ label:'Open the full list', primary:true, onClick:toCatalogue }] };
 });
 
@@ -184,9 +210,8 @@ function render(){
       products.forEach(function(p){ if(seen[p.supplier]) return; seen[p.supplier]=1; var s=d.supplier(p.supplier); if(s && s.lead!=null) rows.push({ id:p.supplier, label:s.name, sub:s.country||'', value:s.lead, color:(s.country&&s.country!=='ZA')?'#c77d17':'#3f6b28' }); });
       rows.sort(function(a,b){ return b.value-a.value; });
       BB.chart.hbar('#chLead',{ rows:rows, fmt:function(v){ return v+' days'; }, valueLabel:'Lead time', legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#c77d17'}],
-        // that supplier's products
-        detail:function(ctx){ var s=d.supplier(ctx.row.id)||{};
-          return Object.assign(prodDetail(products.filter(function(p){ return p.supplier===ctx.row.id; })), { sub:[s.note, s.country? 'from '+s.country : ''].filter(Boolean).join(' · ') }); } });
+        // that supplier as a card, with its products
+        detail:function(ctx){ return supplierCard(ctx.row.id); } });
     }catch(e){ console.warn('chart', e); }
   }
   wire();
@@ -228,6 +253,8 @@ function wire(){
 
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
 render();
+// ?open=<product id>: another page sent you to one product — open its card
+(function(){ var oid=new URLSearchParams(location.search).get('open'); if(oid && products.some(function(p){ return p.id===oid; })) setTimeout(function(){ openProduct(oid); }, 200); })();
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>

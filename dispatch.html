@@ -105,7 +105,7 @@ function render(){
       // the product lines invoiced that month
       detail:function(ctx){ var o=monthDetail(M12[ctx.index]); delete o.stats; delete o.title; delete o.eyebrow; return o; } });
     if(busiest.length) BB.chart.hbar('#chBusy', { fmt:qty, valueLabel:'Units out', rows:busiest.map(function(p){ return { label:p.name, sub:p.code||'', value:p.now, color:'#3f6b28', prod:p }; }),
-      detail:function(ctx){ var o=productDetail(ctx.row.prod); delete o.stats; delete o.title; delete o.eyebrow; return o; } });
+      detail:function(ctx){ var o=productDetail(ctx.row.prod); o.color=null; return o; } });
   }catch(e){ console.warn('chart', e); }
 }
 
@@ -117,18 +117,22 @@ function monthDetail(ym){
   var list=prods.map(function(x){ var m=x.months[ym]||{}, a=x.months[ago]||{}; return { p:x, q:m.qty||0, v:m.value||0, a:a.qty||0 }; })
     .filter(function(x){ return x.q>0; }).sort(function(a,b){ return b.q-a.q; });
   var tq=list.reduce(function(t,x){ return t+x.q; },0), tv=list.reduce(function(t,x){ return t+x.v; },0);
-  return { eyebrow:'What is moving', title:monthName(ym), sub:list.length+' product'+(list.length===1?'':'s')+' invoiced'+(ym===THIS?' so far':''), wide:true,
-    stats:[{l:'Units out', v:qty(tq)}, {l:'Products', v:list.length}].concat(showValue?[{l:'Invoiced', v:BB.money(Math.round(tv)), s:'excluding VAT'}]:[]),
+  return { eyebrow:'What is moving', title:monthName(ym), wide:true,
+    stats:[{l:'Units out', v:qty(tq), s:ym===THIS?'so far':null}, {l:'Products', v:list.length}].concat(showValue?[{l:'Invoiced', v:BB.money(Math.round(tv)), s:'excluding VAT'}]:[]),
     table:{ columns:['Product','Code',monthName(ym),monthName(ago)].concat(showValue?['Invoiced']:[]), num:showValue?[2,3,4]:[2,3],
-      rows:list.map(function(x){ return { cells:[x.p.name, x.p.code||'', qty(x.q), agoKnown?qty(x.a):'—'].concat(showValue?[BB.money(Math.round(x.v))]:[]) }; }) },
+      rows:list.map(function(x){ return { cells:[x.p.name, x.p.code||'', qty(x.q), agoKnown?qty(x.a):'—'].concat(showValue?[BB.money(Math.round(x.v))]:[]), onClick:function(){ BB.popup(productDetail(x.p)); } }; }) },
     actions:[] };
 }
-// One product: its last twelve months.
+// One product's movement — a card: its last twelve months beside the figures.
 function productDetail(pr){
   var rows=M12.slice().reverse().map(function(ym){ var m=pr.months[ym]||{}; return { cells:[monthName(ym), qty(m.qty||0)].concat(showValue?[BB.money(Math.round(m.value||0))]:[]) }; });
-  return { eyebrow:'What is moving', title:pr.name, sub:[pr.code, pr.pack].filter(Boolean).join(' · ')||null,
-    stats:[{l:monthName(THIS), v:qty(pr.now)}, {l:monthName(PREV), v:qty(pr.prev)}, {l:monthName(LASTYR), v:qty(pr.yr)}, {l:'All time', v:qty(pr.total)}],
-    table:{ columns:['Month','Quantity'].concat(showValue?['Invoiced']:[]), num:showValue?[1,2]:[1], rows:rows }, actions:[] };
+  var trend=pr.prev? (pr.now>pr.prev?'up on ':pr.now<pr.prev?'down on ':'level with ')+monthName(PREV) : null;
+  return { wide:true, layout:'split', eyebrow:'Product movement', title:pr.name,
+    meta:[pr.code? { icon:'package', text:pr.code+(pr.pack?' · '+pr.pack:''), tip:'Code · pack' } : (pr.pack? { icon:'package', text:pr.pack, tip:'Pack' } : null),
+      showValue && pr.nowV? { icon:'receipt', text:BB.money(Math.round(pr.nowV))+' invoiced in '+monthName(THIS), tip:'Invoiced this month' } : null],
+    stats:[{l:monthName(THIS), v:qty(pr.now), s:trend}, {l:monthName(PREV), v:qty(pr.prev)}, {l:monthName(LASTYR), v:qty(pr.yr), s:'a year ago'}, {l:'All time', v:qty(pr.total)}],
+    table:{ title:'Last twelve months', columns:['Month','Quantity'].concat(showValue?['Invoiced']:[]), num:showValue?[1,2]:[1], rows:rows },
+    actions:[] };
 }
 
 // Only the table redraws as you type; the charts above stay put.

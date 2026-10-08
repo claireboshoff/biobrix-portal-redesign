@@ -44,28 +44,55 @@ function panel(title, sub, actions, body, cls){
 }
 
 // ---- popups ----
+// A supplier or a purchase order opens as a card (CONVENTIONS.md, "Record popups: the card
+// pattern"); a list opens as a table whose rows open those cards.
+var COUNTRY = { ZA:'South Africa', US:'United States', DE:'Germany', AU:'Australia' };
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
 function isOpenPo(po){ return po.status!=='Delivered' && po.status!=='Received'; }
+function poValue(po){ return (po.lines||[]).reduce(function(t,l){ return t+(d.product(l.prod).price||0)*(l.qty||0); },0); }
 function poTable(list, withSup){
   return { columns:(withSup?['Supplier']:[]).concat(['Items','To','Raised','ETA','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(po){
       var items=(po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
-      return { cells:(withSup?[d.supplier(po.supplier).name]:[]).concat([items||'—', String(d.depot(po.depot).name).replace(/ Depot$/,''), BB.date(po.date), BB.date(po.eta), { html:BB.statusBadge(po.status) }]) }; }) };
-}
-function miniTable(title, t){
-  if(!t.rows.length) return '<div class="sub" style="margin:12px 0 4px;font-weight:600;">'+title+'</div><div class="faint" style="font-size:.84rem;">None.</div>';
-  return '<div class="sub" style="margin:12px 0 6px;font-weight:600;">'+title+'</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+
-    t.columns.map(function(c,i){ return '<th'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-    (t.rows.length? t.rows.map(function(r){ return '<tr>'+r.cells.map(function(c,i){ return '<td'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c))+'</td>'; }).join('')+'</tr>'; }).join('')
-      : '')+'</tbody></table></div>';
+      return { cells:(withSup?[d.supplier(po.supplier).name]:[]).concat([items||'—', String(d.depot(po.depot).name).replace(/ Depot$/,''), BB.date(po.date), BB.date(po.eta), { html:BB.statusBadge(po.status) }]),
+        onClick:function(){ BB.popup(poCard(po)); } }; }) };
 }
 function prodTable(list, withSup){
   return { columns:['Product','Code'].concat(withSup?['Supplier','Lead']:['Pack']).concat(['Price']), num:withSup?[3,4]:[3],
     rows:list.map(function(p){ var sp=d.supplier(p.supplier);
-      return { cells:[p.name, p.code||''].concat(withSup?[sp.name||'—', sp.lead!=null?sp.lead+' days':'—']:[p.pack||'']).concat([BB.money(p.price)+'/'+(p.unit||'')]) }; }) };
+      return { cells:[p.name, p.code||''].concat(withSup?[sp.name||'—', sp.lead!=null?sp.lead+' days':'—']:[p.pack||'']).concat([BB.money(p.price)+'/'+(p.unit||'')]),
+        onClick:withSup && sp && sp.id? function(){ BB.popup(supplierCard(sp)); } : null }; }) };
 }
 // select a supplier in the list on this page
-function openSupplier(id){ return { label:'Show it in the list', primary:true, onClick:function(){ BB.closePopup(); selected=id; render();
+function openSupplier(id, primary){ return { label:'Show it in the list', primary:primary!==false, onClick:function(){ BB.closePopup(); selected=id; render();
   var el=document.getElementById('supdetail'); if(el) el.scrollIntoView({ behavior:'smooth', block:'center' }); } }; }
+// One supplier: what it supplies, what is on order, and what is running low.
+function supplierCard(sup){
+  var mine=products.filter(function(p){ return p.supplier===sup.id; }), pos=d.all('purchaseOrders').filter(function(x){ return x.supplier===sup.id && isOpenPo(x); });
+  var low=inventory.filter(function(i){ return i.qty<i.reorder && d.product(i.prod).supplier===sup.id; });
+  var pt=prodTable(mine, false), ot=poTable(pos, false); pt.title='Products'; ot.title='Open purchase orders';
+  return { wide:true, layout:'split', eyebrow:'Supplier · '+(isLocal(sup.country)?'Local':'Imported'), title:sup.name, color:null,
+    meta:[{ icon:'map', text:(COUNTRY[sup.country]||sup.country||'—')+(sup.country?' ('+sup.country+')':''), tip:'Country' }, sup.note? { icon:'package', text:sup.note, tip:'Supplies' } : null],
+    stats:[{ l:'Lead time', v:sup.lead+' days', s:'order to arrival' }, { l:'Products', v:mine.length }, { l:'Open POs', v:pos.length },
+      { l:'Below reorder', v:low.length, s:low.length?'lines at the depots':null, cls:low.length?'bad':'' }],
+    tables:[pt].concat(pos.length? [ot] : []),
+    actions:[openSupplier(sup.id)] };
+}
+// One purchase order: what was ordered, for which depot, and when it lands.
+function poCard(po){
+  var sup=d.supplier(po.supplier)||{}, by=po.by? d.person(po.by) : null, n=(po.lines||[]).length;
+  var due=po.eta? Math.round((new Date(po.eta)-new Date(new Date().toISOString().slice(0,10)))/86400000) : null;
+  return { wide:true, layout:'split', eyebrow:'Purchase order', title:sup.name||'Purchase order',
+    meta:[{ icon:'calendar', text:'Raised '+BB.date(po.date), tip:'Raised' }, po.eta? { icon:'truck', text:'ETA '+BB.date(po.eta), tip:'ETA' } : null,
+      { icon:'warehouse', text:d.depot(po.depot).name, tip:'Delivers to' }, by&&by.name&&by.name!=='BioBrix'? { initials:initialsOf(by.name), color:by.colour, text:by.name, tip:'Raised by' } : null],
+    stats:[{ l:'Status', html:BB.statusBadge(po.status) }, { l:'Value', v:BB.money(Math.round(poValue(po))), s:'at list price' },
+      { l:'Lines', v:n, s:BB.num((po.lines||[]).reduce(function(t,l){ return t+(l.qty||0); },0))+' units' },
+      { l:'Lead', v:(sup.lead!=null?sup.lead+' days':'—'), s:isOpenPo(po)&&due!=null&&due>=0? due+' days to go' : null }],
+    html:isOpenPo(po)&&due!=null&&due<0? '<div class="bbp-alert warn">'+BB.icon('alert')+'Past its ETA by '+(-due)+' day'+(due===-1?'':'s')+'</div>' : '',
+    table:{ title:'Lines', columns:['Product','Code','Qty','Value'], num:[2,3], rows:(po.lines||[]).map(function(l){ var p=d.product(l.prod);
+      return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b>' }, p.code||'', BB.num(l.qty)+' '+(p.unit||''), BB.money((p.price||0)*(l.qty||0))] }; }) },
+    actions:[sup.id? { label:'Supplier', onClick:function(){ BB.closePopup(); setTimeout(function(){ BB.popup(supplierCard(sup)); }, 170); } } : null] };
+}
 
 function renderProducts(supId){
   var list = products.filter(function(p){ return p.supplier===supId; });
@@ -111,7 +138,7 @@ function render(){
     '<div class="stat"><div class="l">Avg lead time</div><div class="v">'+avgLead+' <span style="font-size:.9rem;">days</span></div><div class="s">order to arrival</div></div>'+
     '<a class="stat tap" href="#poCard" data-detail="sp-pos"><div class="l">Purchase orders open</div><div class="v">'+openPos.length+'</div><div class="s">with suppliers now ›</div></a>'+
   '</div>';
-  BB.statDetail('sp-pos', function(){ return { table:poTable(openPos, true), actions:[] }; });
+  BB.statDetail('sp-pos', function(){ return { table:poTable(openPos, true), actions:[] }; });   // rows open each PO's card
 
   // reorder radar
   var low = inventory.filter(function(i){ return i.qty<i.reorder; });
@@ -148,7 +175,7 @@ function render(){
     pos.slice().sort(function(a,b){return (b.date).localeCompare(a.date);}).forEach(function(po){
       var items = (po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
       var sup = d.supplier(po.supplier);
-      (poBody += '<div class="po">'+
+      (poBody += '<div class="po" role="button" tabindex="0" data-po="'+BB.esc(po.id)+'" style="cursor:pointer;">'+
         '<div style="min-width:0;"><div class="row" style="gap:6px;flex-wrap:nowrap;">'+flag(sup.country)+'<b>'+BB.esc(sup.name)+'</b></div>'+
           '<div style="font-size:.84rem;margin-top:2px;">'+BB.esc(items)+' <span class="faint">→ '+BB.esc(d.depot(po.depot).name)+'</span></div>'+
           '<div class="faint" style="font-size:.72rem;margin-top:1px;">Raised '+BB.date(po.date)+'</div></div>'+
@@ -198,12 +225,8 @@ function render(){
       legend:[{name:'Local',color:'#3f6b28'},{name:'Imported',color:'#2f6f9e'}],
       rows:suppliers.slice().sort(function(a,b){ return b.lead-a.lead; }).map(function(s){ return { label:s.name, value:s.lead, color:isLocal(s.country)?'#3f6b28':'#2f6f9e', supId:s.id }; }),
       valueLabel:'Lead time',
-      // that supplier's products and open purchase orders
-      detail:function(ctx){ var sup=d.supplier(ctx.row.supId), mine=products.filter(function(p){ return p.supplier===sup.id; }), po=pos.filter(function(x){ return x.supplier===sup.id && isOpenPo(x); });
-        return { sub:(isLocal(sup.country)?'Local':'Imported')+' · '+(sup.note||''), wide:true,
-          stats:[{l:'Lead time', v:sup.lead+' days'}, {l:'Products', v:mine.length}, {l:'Open POs', v:po.length}],
-          html:miniTable('Products', prodTable(mine, false))+miniTable('Open purchase orders', poTable(po, false)),
-          actions:[openSupplier(sup.id)] }; } });
+      // that supplier's card
+      detail:function(ctx){ return supplierCard(d.supplier(ctx.row.supId)); } });
     var locP = products.filter(function(p){ var sp=d.supplier(p.supplier); return sp && isLocal(sp.country); }).length;
     BB.chart.donut('#chSource', { centreLabel:'products', valueLabel:'Products', rows:[{label:'Local (ZA)', value:locP, color:'#3f6b28', local:true},{label:'Imported', value:products.length-locP, color:'#2f6f9e', local:false}],
       // the products from that source
@@ -220,6 +243,10 @@ function wire(){
       selected = (selected===id) ? null : id;
       render();
     };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-po]'), function(el){
+    var open=function(){ var po=d.by('purchaseOrders', el.getAttribute('data-po')); if(po) BB.popup(poCard(po)); };
+    el.onclick=open; el.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
   });
   var cl = document.querySelector('[data-sup-close]');
   if(cl) cl.onclick = function(){ selected = null; render(); };

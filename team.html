@@ -106,28 +106,42 @@ render();
 
 // ---- A farm or order named in a post opens a preview over the feed; its own page is one tap further ----
 var canGo = function(href){ try{ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }catch(e){ return true; } };
+var initialsOf = function(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); };
+var repMeta = function(r, tip){ return r && r.name && r.name!=='—' ? { initials:initialsOf(r.name), color:r.colour||'#3f6b28', text:r.name, tip:tip||'Rep' } : null; };
+var farmHref = function(id){ return id && canGo('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(id) : null; };
+// an order's own card (status, quote, invoice) lives on Orders: a row here opens it there
+var orderHref = function(o){ return canGo('orders.html') ? 'orders.html?open='+encodeURIComponent(o.id) : null; };
 function orderRows(list){
-  var tot=0, rows=list.map(function(o){ var v=d.orderValue(o); tot+=v; return { cells:[o.ref||'—', BB.date(o.date), BB.monthName(o.deliverMonth), { html:BB.statusBadge(o.status) }, BB.money(v)] }; });
-  if(list.length>1) rows.push({ cells:[{ html:'<b>Total · '+list.length+' orders</b>' },'','','',{ html:'<b>'+BB.money(tot)+'</b>' }] });
-  return { columns:['Order','Captured','Delivery','Status','Value'], rows:rows, num:[4] };
+  var tot=0, rows=list.map(function(o){ var v=d.orderValue(o); tot+=v; return { cells:[o.ref||'—', BB.date(o.date), BB.monthName(o.deliverMonth), { html:BB.statusBadge(o.status) }, BB.money(v)], href:orderHref(o) }; });
+  if(list.length>1) rows.push({ cells:[{ html:'<b>Total · '+list.length+' orders</b>' },{html:''},{html:''},{html:''},{ html:'<b>'+BB.money(tot)+'</b>' }] });
+  return { title:'Orders', columns:['Order','Captured','Delivery','Status','Value'], rows:rows, num:[4] };
 }
+// A farm named in a post, as its card: who and where on the left, its orders on the right.
 function farmPop(id){
   var f=d.farmer(id), os=d.where('orders',function(o){ return o.farmer===id; }).sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
-  var posts=d.where('feed',function(p){ return p.farmer===id; }).length, lim=d.creditLimit(id);
-  BB.popup({ eyebrow:'Farm', title:f.farm||f.name, sub:[f.name, f.town, f.region].filter(function(x){ return x && x!==f.farm; }).join(' · '),
-    stats:[{ l:'Advisor', v:d.rep(f.rep).name }, { l:'Crops', v:(f.crops||[]).join(', ')||'—', s:f.ha?BB.num(f.ha)+' ha':null }, { l:'Account balance', v:BB.money(d.accountBalance(id)), s:lim?'limit '+BB.money(lim):null }, { l:'In the feed', v:posts, s:'update'+(posts===1?'':'s') }],
-    html:'<div class="eyebrow" style="margin:0 0 6px;">Orders</div>', table:orderRows(os),
-    actions:[ canGo('farm-detail.html')?{ label:'Open full record', href:'farm-detail.html?farmer='+encodeURIComponent(id), primary:true }:null ].filter(Boolean) });
+  var posts=d.where('feed',function(p){ return p.farmer===id; }).length, lim=d.creditLimit(id), bal=d.accountBalance(id), rec=farmHref(id);
+  var tel=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27'), place=[f.town, f.region].filter(function(x,i,a){ return x && a.indexOf(x)===i; }).join(', ');
+  BB.popup({ eyebrow:'Farm', title:f.farm||f.name, wide:!!os.length, layout:os.length?'split':null,
+    meta:[ f.name&&f.name!==f.farm?{ icon:'user', text:f.name, tip:'Farmer' }:null, place?{ icon:'map', text:place, tip:'Town' }:null,
+      (f.crops||[]).length?{ icon:'sprout', text:f.crops.join(', ')+(f.ha?' · '+BB.num(f.ha)+' ha':''), tip:'Crops' }:null,
+      repMeta(d.rep(f.rep), 'Advisor'), tel?{ icon:'phone', tip:'Phone', html:'<a href="tel:+'+tel+'">'+BB.esc(f.cell)+'</a>' }:null ],
+    stats:[{ l:'Status', html:BB.statusBadge(f.status||'—') }, { l:'Balance', v:BB.money(bal), s:lim?'limit '+BB.money(lim):null, cls:lim&&bal>lim?'warn':'' },
+      { l:'Orders', v:BB.num(os.length), s:os.length?BB.money(os.reduce(function(t,o){ return t+d.orderValue(o); },0)):'none yet' }, { l:'In the feed', v:posts, s:'update'+(posts===1?'':'s') }],
+    table:os.length?orderRows(os):null,
+    actions:[ rec?{ label:'Farm record', href:rec, primary:true }:null ].filter(Boolean) });
 }
+// An order named in a post: the short version, with its full card on Orders one tap away.
 function orderPop(ref){
-  var o=d.where('orders',function(x){ return x.ref===ref; })[0], go=canGo('orders.html')?{ label:'Open orders', href:'orders.html', primary:true }:null;
-  if(!o){ BB.popup({ eyebrow:'Order', title:ref, sub:'This order is not on this device.', actions:[go].filter(Boolean) }); return; }
-  var f=d.farmer(o.farmer), tot=0, rows=(o.lines||[]).map(function(l){ var p=d.product(l.prod), v=(p.price||0)*(l.qty||0); tot+=v; return { cells:[p.name, BB.num(l.qty), BB.money(v)] }; });
-  if(rows.length>1) rows.push({ cells:[{ html:'<b>Total</b>' },'',{ html:'<b>'+BB.money(tot)+'</b>' }] });
-  BB.popup({ eyebrow:'Order', title:o.ref, sub:f.name+' · '+f.farm+' · '+d.depot(o.depot).name,
-    stats:[{ l:'Status', html:BB.statusBadge(o.status) }, { l:'Value', v:BB.money(d.orderValue(o)) }, { l:'Delivery', v:BB.monthName(o.deliverMonth) }, { l:'Rep', v:d.rep(o.rep).name, s:o.source?'captured by '+String(o.source).toLowerCase():null }],
-    table:{ columns:['Product','Qty','Value'], rows:rows, num:[1,2] },
-    actions:[go, canGo('farm-detail.html')&&o.farmer?{ label:'Farm record', href:'farm-detail.html?farmer='+encodeURIComponent(o.farmer) }:null].filter(Boolean) });
+  var o=d.where('orders',function(x){ return x.ref===ref; })[0];
+  if(!o){ BB.popup({ eyebrow:'Order', title:ref, html:'<div class="empty">This order is not on this device.</div>', actions:[canGo('orders.html')?{ label:'Open orders', href:'orders.html', primary:true }:null].filter(Boolean) }); return; }
+  var f=d.farmer(o.farmer), tot=0, rows=(o.lines||[]).map(function(l){ var p=d.product(l.prod), v=(p.price||0)*(l.qty||0); tot+=v; return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b>' }, p.pack||'—', BB.num(l.qty), BB.money(v)] }; });
+  BB.popup({ eyebrow:'Order'+(o.source?' · '+o.source:''), title:o.ref, wide:true, layout:'split',
+    meta:[ o.date?{ icon:'calendar', text:'Captured '+BB.date(o.date), tip:'Captured' }:null, { icon:'warehouse', text:d.depot(o.depot).name, tip:'Depot' },
+      { icon:'user', text:f.name, tip:'Farmer' }, { icon:'farm', text:f.farm, tip:'Farm', href:farmHref(o.farmer) }, repMeta(d.rep(o.rep)) ],
+    stats:[{ l:'Value', v:BB.money(d.orderValue(o)), s:'list' }, { l:'Status', html:BB.statusBadge(o.status) }, { l:'Delivery', v:BB.monthName(o.deliverMonth) },
+      { l:'Invoice', html:d.orderInvoiced(o.id)? '<span class="tag tag-inv">'+BB.icon('receipt')+'Invoiced</span>' : '<span class="faint">—</span>' }],
+    table:{ title:'Products', columns:['Product','Pack','Qty','Value'], rows:rows, num:[2,3], foot:rows.length>1?['List value',{html:''},{html:''},BB.money(tot)]:null },
+    actions:[ farmHref(o.farmer)?{ label:'Farm record', href:farmHref(o.farmer) }:null, orderHref(o)?{ label:'Open order', href:orderHref(o), primary:true }:null ].filter(Boolean) });
 }
 document.addEventListener('click', function(e){
   if(e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;

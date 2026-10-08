@@ -71,25 +71,66 @@ function levelCell(qty, reorder){
 }
 
 // ---- popups ----
+// A stock line or a depot opens as a card (CONVENTIONS.md, "Record popups: the card pattern");
+// a list of lines opens as a table whose rows open the line's card.
 function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
 function go(label, href, primary){ return href && can(href) ? { label:label, href:href, primary:!!primary } : null; }
 function lineVal(i){ return (i.qty||0)*(d.product(i.prod).price||0); }
+function findLine(depotId, prodId){ return d.store().inventory.find(function(r){ return r.depot===depotId && r.prod===prodId; }); }
 // lines as a popup table: lowest against reorder first, or biggest value first
 function lineTable(list, opts){ opts=opts||{}; var withDep=!scopeDepot && opts.depot!==false;
   var sorted=list.slice().sort(opts.byValue? function(a,b){ return lineVal(b)-lineVal(a); } : function(a,b){ return (a.qty/(a.reorder||1))-(b.qty/(b.reorder||1)); });
   var cols=['Product'].concat(withDep?['Depot']:[]).concat(['On hand','Reorder at']).concat(opts.byValue?['Value']:[]).concat(['Status']);
   var n=withDep?2:1, num=[n,n+1].concat(opts.byValue?[n+2]:[]);
-  return { columns:cols, num:num, rows:sorted.map(function(i){ var p=d.product(i.prod);
-    return { cells:[p.name].concat(withDep?[depotShort(i.depot)]:[]).concat([BB.num(i.qty)+' '+(p.unit||''), BB.num(i.reorder)]).concat(opts.byValue?[BB.money(Math.round(lineVal(i)))]:[]).concat([{ html:BB.statusBadge(statusOf(i)) }]) }; }) };
+  return { title:opts.title||null, columns:cols, num:num, rows:sorted.map(function(i){ var p=d.product(i.prod);
+    return { cells:[p.name].concat(withDep?[depotShort(i.depot)]:[]).concat([BB.num(i.qty)+' '+(p.unit||''), BB.num(i.reorder)]).concat(opts.byValue?[BB.money(Math.round(lineVal(i)))]:[]).concat([{ html:BB.statusBadge(statusOf(i)) }]),
+      onClick:function(){ openLine(i.depot, i.prod); } }; }) };
 }
-function linePreview(i){
-  var p=d.product(i.prod), sup=d.supplier(p.supplier)||{};
-  return { title:p.name+' · '+depotShort(i.depot), sub:[p.code,p.pack].filter(Boolean).join(' · '),
-    stats:[{l:'On hand', v:BB.num(i.qty)+' '+(p.unit||''), cls:i.qty<i.reorder?'bad':''}, {l:'Reorder at', v:BB.num(i.reorder)}, {l:'Value', v:BB.money(Math.round(lineVal(i))), s:'at list price'},
-      {l:'Supplier', v:sup.name||'—', s:sup.lead?sup.lead+' days lead time':null}],
-    html:scopeDepot?'':'<div class="sub" style="margin:4px 0 6px;">The same product at every depot</div>',
-    table:scopeDepot?null:lineTable(d.store().inventory.filter(function(x){ return x.prod===i.prod; })),
-    actions:[go('Suppliers & POs','suppliers.html',true)] };
+// the same as the table's Reorder button: a request to the product's supplier
+function reorder(prodId){ var sup=d.supplier(d.product(prodId).supplier)||{}; BB.toast('Reorder raised with '+(sup.name||'the supplier')); }
+// the same as typing a count in the table: save it, and queue it for the office
+function saveCount(depotId, prodId, value){
+  var row=findLine(depotId, prodId); if(!row) return;
+  row.qty=Math.max(0, Math.round(Number(value)||0)); d.save();
+  d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:row.qty });
+  BB.toast('Count saved · '+d.product(prodId).name);
+  render();
+}
+// the same product at the other depots (the product is the card's title, so no Product column)
+function otherDepots(list){
+  return { title:'At the other depots', columns:['Depot','On hand','Reorder at','Status'], num:[1,2], rows:list.map(function(x){ var u=d.product(x.prod).unit||'';
+    return { cells:[d.depot(x.depot).name, BB.num(x.qty)+' '+u, BB.num(x.reorder), { html:BB.statusBadge(x.qty<=0?'Out of stock':(x.qty<x.reorder?'Low stock':'In stock')) }], onClick:function(){ openLine(x.depot, x.prod); } }; }) };
+}
+// One stock line: a product at a depot — the count, the reorder level, and the same product elsewhere.
+function openLine(depotId, prodId){
+  var i=findLine(depotId, prodId); if(!i) return;
+  var p=d.product(i.prod), sup=d.supplier(p.supplier)||{}, u=p.unit||'', low=i.qty<i.reorder;
+  var others=scopeDepot? [] : d.store().inventory.filter(function(x){ return x.prod===i.prod && x.depot!==i.depot; });
+  var net=others.reduce(function(t,x){ return t+(x.qty||0); }, i.qty||0);
+  var alert=i.qty<=0 ? '<div class="bbp-alert">'+BB.icon('alert')+'Out of stock — reorder level is '+BB.num(i.reorder)+' '+BB.esc(u)+'</div>'
+    : low ? '<div class="bbp-alert warn">'+BB.icon('alert')+'Below reorder — '+BB.num(i.qty)+' of '+BB.num(i.reorder)+' '+BB.esc(u)+' on hand</div>' : '';
+  var count='<div class="bbp-tt">Stock take</div><div class="bbp-bar"><span class="faint">Counted on the floor</span><span class="sp"></span>'+
+    '<input type="number" min="0" value="'+i.qty+'" class="cnt-in" style="width:96px;flex:none;" data-linecount="1" aria-label="Count for '+BB.esc(p.name)+'"><span class="faint">'+BB.esc(u)+'</span>'+
+    '<button class="btn sm" data-linesave="1">'+BB.icon('check')+'Save count</button></div>';
+  var stats=[{ l:'On hand', v:BB.num(i.qty)+' '+u, cls:low?'bad':'' }, { l:'Reorder at', v:BB.num(i.reorder)+' '+u },
+    { l:'Value', v:BB.money(Math.round(lineVal(i))), s:'at list price' }];
+  stats.push(others.length? { l:'All depots', v:BB.num(net)+' '+u, s:(others.length+1)+' depots' } : { l:'Status', html:BB.statusBadge(statusOf(i)) });
+  BB.popup({ wide:true, layout:'split', eyebrow:'Stock line', title:p.name,
+    meta:[{ icon:'warehouse', text:d.depot(i.depot).name, tip:'Depot' }, { icon:'package', text:[p.code, p.pack].filter(Boolean).join(' · '), tip:'Code · pack' },
+      sup.name? { icon:'link', text:sup.name+(sup.lead?' · '+sup.lead+' days lead':''), tip:'Supplier', href:can('suppliers.html')?'suppliers.html':null } : null],
+    stats:stats,
+    html:alert+(others.length? '' : count),
+    table:others.length? otherDepots(others) : null,
+    note:null,
+    actions:[go('Suppliers & POs','suppliers.html'), low? { label:'Reorder', primary:true, onClick:function(){ reorder(i.prod); } } : null],
+    onOpen:function(body){
+      // with other depots listed, the count sits under them
+      if(others.length){ var m=body.querySelector('.bbp-split .main'); if(m) m.insertAdjacentHTML('beforeend', count); }
+      var inp=body.querySelector('input[data-linecount]'), btn=body.querySelector('button[data-linesave]');
+      var save=function(){ var dep=i.depot, pr=i.prod; saveCount(dep, pr, inp.value); BB.closePopup(); setTimeout(function(){ openLine(dep, pr); }, 170); };
+      if(btn) btn.onclick=save;
+      if(inp) inp.onkeydown=function(e){ if(e.key==='Enter') save(); };
+    } });
 }
 // narrow the Stock lines table to some statuses (the funnel does the work), across every depot
 function showInTable(statuses){
@@ -98,9 +139,15 @@ function showInTable(statuses){
   try{ BB.tableFilters.set('Stock lines', 'Status', { values:statuses }); }catch(e){ console.warn('filter', e); }
   var t=document.querySelector('[data-stock-table]'); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
 }
-function depotLines(depId){
-  var mine=scopedInventory().filter(function(i){ return i.depot===depId; });
-  return { title:d.depot(depId).name, table:lineTable(mine, { depot:false }),
+// One depot: its lines, lowest first (or by value), and a button that shows it on this page.
+function depotLines(depId, byValue){
+  var dep=d.depot(depId), mine=scopedInventory().filter(function(i){ return i.depot===depId; });
+  var low=mine.filter(function(i){ return i.qty<i.reorder; }).length, out=mine.filter(function(i){ return i.qty<=0; }).length;
+  return { wide:true, layout:'split', eyebrow:'Depot', title:dep.name, color:null, tags:dep.status?BB.statusBadge(dep.status):null,
+    meta:[dep.region? { icon:'map', text:dep.region, tip:'Region' } : null, dep.manager? { icon:'user', text:dep.manager, tip:'Warehouse manager' } : null],
+    stats:[{ l:'Stock lines', v:mine.length }, { l:'Below reorder', v:low, cls:low?'bad':'' }, { l:'Out of stock', v:out, cls:out?'bad':'' },
+      { l:'Value', v:BB.money(Math.round(mine.reduce(function(t,i){ return t+lineVal(i); },0))), s:'at list price' }],
+    table:lineTable(mine, { depot:false, byValue:!!byValue, title:byValue?'By value':'Lowest against reorder first' }),
     actions:[ (!scopeDepot && filter!==depId) ? { label:'Show this depot', primary:true, onClick:function(){ BB.closePopup(); filter=depId; render(); window.scrollTo({ top:0, behavior:'smooth' }); } } : null ] };
 }
 
@@ -187,7 +234,7 @@ function render(){
       var low = st!=='In stock';
       var rowCls = st==='Out of stock' ? 'r-out' : (st==='Low stock' ? 'r-low' : '');
       html += '<tr class="'+rowCls+'">'+
-        '<td><b style="color:var(--green-dark);">'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
+        '<td><a href="#" data-line="'+i.depot+'|'+i.prod+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(p.name)+'</a><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
         (scopeDepot?'':'<td class="muted">'+BB.esc(d.depot(i.depot).name)+'</td>')+
         '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
         '<td class="num muted">'+BB.num(i.reorder)+'</td>'+
@@ -201,7 +248,7 @@ function render(){
     });
   }
   html += '</tbody></table></div>'+
-    '<div class="card-f">Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier. The mark on each level bar is the reorder level.</div></div>';
+    '<div class="card-f">Tap a product for its card. Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier. The mark on each level bar is the reorder level.</div></div>';
   html += '<div style="height:24px;"></div>';
 
   var main = document.querySelector('main.wrap');
@@ -222,12 +269,12 @@ function drawCharts(all, oneDepot){
       if(mine.length) BB.chart.bar('#chStock', { labels:mine.map(function(i){ return shortName(d.product(i.prod).name); }), height:220, table:true,
         series:[{name:'On hand', values:mine.map(function(i){ return i.qty; }), color:'#3f6b28'},{name:'Reorder at', values:mine.map(function(i){ return i.reorder; }), color:'#c77d17'}],
         // that line, and the same product at the other depots
-        detail:function(ctx){ var o=linePreview(mine[ctx.index]); delete o.stats; return o; } });
+        detail:function(ctx){ var i=mine[ctx.index]; openLine(i.depot, i.prod); return false; } });
       var byP = mine.map(function(i){ return { label:shortName(d.product(i.prod).name), value:val(i), lines:[i] }; }).sort(function(a,b){ return b.value-a.value; });
       if(byP.length>6){ var rest = byP.slice(5); byP = byP.slice(0,5).concat([{label:'Everything else', value:rest.reduce(function(t,x){ return t+x.value; },0), color:'#6b7a5e', lines:rest.map(function(x){ return x.lines[0]; })}]); }
       if(document.getElementById('chValue')) BB.chart.donut('#chValue', { money:true, valueLabel:'On-hand value', centreLabel:'on hand', rows:byP,
         // the line(s) behind that slice
-        detail:function(ctx){ var ls=ctx.row.lines||[]; if(ls.length===1){ var o=linePreview(ls[0]); delete o.stats; return o; }
+        detail:function(ctx){ var ls=ctx.row.lines||[]; if(ls.length===1){ openLine(ls[0].depot, ls[0].prod); return false; }
           return { table:lineTable(ls, { byValue:true, depot:false }) }; } });
     } else {
       var deps = d.all('depots');
@@ -236,14 +283,13 @@ function drawCharts(all, oneDepot){
       var cMax = Math.max(4, Math.ceil(Math.max.apply(null, perDep.concat([0]))/4)*4);
       if(all.length) BB.chart.bar('#chStock', { labels:deps.map(function(x){ return depotShort(x.id); }), stacked:true, height:220, table:true, max:cMax,
         // that depot's lines, with on hand / reorder / status
-        detail:function(ctx){ var o=depotLines(deps[ctx.index].id); delete o.title; return o; },
+        detail:function(ctx){ return depotLines(deps[ctx.index].id); },
         series:[
           {name:'In stock', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty>=i.reorder; }).length; }), color:'#3f6b28'},
           {name:'Low', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty>0 && i.qty<i.reorder; }).length; }), color:'#c77d17'},
           {name:'Out', values:deps.map(function(x){ return all.filter(function(i){ return i.depot===x.id && i.qty<=0; }).length; }), color:'#b8382a'}] });
       if(document.getElementById('chValue')) BB.chart.donut('#chValue', { money:true, valueLabel:'On-hand value', centreLabel:'on hand',
-        detail:function(ctx){ var o=depotLines(ctx.row.depId); delete o.title;
-          o.table=lineTable(all.filter(function(i){ return i.depot===ctx.row.depId; }), { byValue:true, depot:false }); return o; },
+        detail:function(ctx){ return depotLines(ctx.row.depId, true); },
         rows:deps.map(function(x,k){ return { depId:x.id, label:depotShort(x.id), value:all.filter(function(i){ return i.depot===x.id; }).reduce(function(t,i){ return t+val(i); },0), color:['#3f6b28','#2f6f9e','#c77d17','#7d4f9a'][k%4] }; }) });
     }
   }catch(e){ console.warn('chart', e); }
@@ -314,6 +360,10 @@ function wire(){
     render();
     var vo2=document.getElementById('takeVoiceOut'); if(vo2){ vo2.style.display='block'; vo2.innerHTML='<b>'+BB.esc(p.name)+'</b> updated: '+BB.num(was)+' → <b>'+BB.num(best.qty)+'</b>. Say the next one, or tap <b>Nothing has changed</b> to close the take.'; }
   }
+  // a product opens its line's card
+  Array.prototype.forEach.call(document.querySelectorAll('a[data-line]'), function(a){
+    a.onclick = function(e){ e.preventDefault(); var k=a.getAttribute('data-line').split('|'); openLine(k[0], k[1]); };
+  });
   Array.prototype.forEach.call(document.querySelectorAll('.chip[data-depot]'), function(btn){
     btn.onclick = function(){ filter = btn.getAttribute('data-depot'); render(); };
   });

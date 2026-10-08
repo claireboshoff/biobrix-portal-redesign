@@ -108,9 +108,7 @@ function render(){
       rows:keys.map(function(k){ var r=rows[k]; return { label:agentName(k==='none'?null:k), sub:r.rate? r.rate+'%' : 'no rate', value:r.v,
         parts:[{name:'Commission',value:r.c,color:'#22431a'},{name:'Rest of the invoice',value:r.v-r.c,color:'#8fbf5a'}] }; }),
       legend:[{name:'Commission',color:'#22431a'},{name:'Rest of the invoice',color:'#8fbf5a'}],
-      detail:function(ctx){ var k=keys[ctx.index], r=rows[k], x=invoiceDetail(monthInv.filter(function(i){ return akeyOf(i)===k; }), false);
-        return merge(x, { sub:(r.rate? r.rate+'% on ' : 'no rate set · ')+r.n+' invoice'+(r.n===1?'':'s')+' this month'+(k==='none'?' · accounts with no agent':''),
-          stats:[{ l:'Invoiced', v:money(r.v) }, { l:'Rate', v:(r.rate||0)+'%', s:(k!=='none' && !(comm.byAgent&&comm.byAgent[k]!=null))? 'the house rate' : null }, { l:'Commission', v:r.rate? money(r.c) : '—' }] }); } }); };
+      detail:function(ctx){ var k=keys[ctx.index]; return k==='none'? noneDetail() : agentCard(k); } }); };
     else chartJob = function(){ var el=document.getElementById('chComm'); if(el) el.innerHTML='<div class="empty">Nothing invoiced yet this month.</div>'; };
     if(keys.length) html += '<div class="cm-note faint">Based on invoices, not on orders, so nobody earns commission on something that was never billed. Accounts with no agent are listed so they can be allocated in <a href="sales-report.html?view=customer" style="color:var(--green-dark);">Sales, by customer</a>.</div>';
   }
@@ -156,12 +154,32 @@ function render(){
     var out=list.map(function(i){ var k=akeyOf(i), c=(i.amount||0)*rateFor(k)/100; tv+=(i.amount||0); tc+=c;
       return { href:farmOf[i.customer]? 'farm-detail.html?farmer='+encodeURIComponent(farmOf[i.customer]) : null,
         cells:[BB.date(i.date), i.label||i.ref||'—', custOf(i).name||'—'].concat(withAgent?[agentName(k==='none'?null:k)]:[]).concat([money(i.amount||0), c? money(c) : '—']) }; });
-    if(list.length>1) out.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-2).map(function(){ return ''; })).concat([{ html:'<b>'+money(tv)+'</b>' }, { html:'<b>'+money(tc)+'</b>' }]) });
+    if(list.length>1) out.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-2).map(function(){ return {html:''}; })).concat([{ html:'<b>'+money(tv)+'</b>' }, { html:'<b>'+money(tc)+'</b>' }]) });
     return { wide:true, table:{ columns:cols, rows:out, num:[cols.length-2, cols.length-1] },
       note:'Worked out per invoice at the agent\u2019s rate, or the house rate when they have none.'+(Object.keys(farmOf).length? ' Tap an invoice to open the farm file.' : '') };
   }
+  // an agent, as its card: who they are and where they come from · the month in figures · the invoices it is worked out on
+  function agentCard(k){
+    var r=rows[k]||{v:0,n:0,rate:rateFor(k),c:0}, a=agentList.find(function(x){ return x.k===k; })||{t:agentName(k), from:'accounts'};
+    var pr=a.from==='portal'? d.rep(k) : null, list=monthInv.filter(function(i){ return akeyOf(i)===k; }), nc={};
+    list.forEach(function(i){ nc[i.customer]=1; });
+    var own=comm.byAgent&&comm.byAgent[k]!=null, x=invoiceDetail(list, false); x.table.title='Invoices this month';
+    var mon=new Date(); mon=BB.monthName(mon.getMonth())+' '+mon.getFullYear();
+    return merge(x, { eyebrow:'Agent · commission', title:a.t, color:null, layout:'split',
+      meta:[ { initials:String(a.t||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(), color:(pr&&pr.colour)||'#3f6b28', text:a.from==='portal'?'Set up in the portal':'From your accounting system', tip:'Where they come from' },
+        pr&&pr.region?{ icon:'map', text:pr.region, tip:'Region' }:null,
+        { icon:'calendar', text:mon+', so far', tip:'Period' } ],
+      stats:[{ l:'Invoiced', v:money(r.v), s:r.n+' invoice'+(r.n===1?'':'s') }, { l:'Rate', v:(r.rate||0)+'%', s:own?'their own rate':'the house rate' },
+        { l:'Commission', v:r.rate? money(r.c) : '—', s:'this month' }, { l:'Customers', v:BB.num(Object.keys(nc).length), s:'invoiced' }],
+      actions:[ { label:'Sales by agent', href:'sales-report.html?view=agent' },
+        canEdit? { label:'Change the rate', primary:true, onClick:function(){ BB.closePopup(); var el=host.querySelector('input[data-agent="'+String(k).replace(/"/g,'\\"')+'"]'); if(el){ el.scrollIntoView({ behavior:'smooth', block:'center' }); setTimeout(function(){ el.focus(); el.select(); }, 400); } } } : null ].filter(Boolean) });
+  }
+  // accounts with no agent: a list, not a person
+  function noneDetail(){ var r=rows.none||{v:0,n:0}, x=invoiceDetail(monthInv.filter(function(i){ return akeyOf(i)==='none'; }), false);
+    return merge(x, { title:'Not allocated', stats:[{ l:'Invoiced', v:money(r.v), s:r.n+' invoice'+(r.n===1?'':'s') }, { l:'Commission', v:'—', s:'no agent, no rate' }],
+      actions:[{ label:'Allocate them', href:'sales-report.html?view=customer', primary:true }] }); }
   if(live) BB.statDetail('cmMonth', function(){ var x=invoiceDetail(monthInv, true);
-    return merge(x, { sub:'every invoice this month, with what it earns', stats:[{ l:'Commission', v:money(total) }, { l:'Invoiced', v:money(invTotal), s:monthInv.length+' invoices' }],
+    return merge(x, { stats:[{ l:'Commission', v:money(total) }, { l:'Invoiced', v:money(invTotal), s:monthInv.length+' invoices' }],
       actions:[{ label:'Open the full list', href:'sales-report.html?view=agent', primary:true }] }); });
   host.innerHTML = html;
   if(chartJob){ try{ chartJob(); }catch(e){ console.warn('chart', e); } }

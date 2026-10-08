@@ -40,11 +40,7 @@ table.bb .bar-cell .trk{max-width:50px;}
 .stack{display:flex;flex-direction:column;gap:16px;min-width:0;}
 td.dt{white-space:nowrap;}
 /* popups */
-.pp-h{font-size:.66rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin:16px 0 6px;}
-.pp-h:first-child{margin-top:0;}
-.pp-flag{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);font-size:.84rem;}
-.pp-flag.ok{background:var(--ok-bg);color:var(--ok);}
-.pp-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.bbp .bbp-bar.interp{margin-top:8px;} .bbp .bbp-bar.interp.ok{background:var(--ok-bg);border-color:transparent;}
 </style>
 </head>
 <body>
@@ -256,7 +252,7 @@ if(!f){
         parts:[{name:'Owed', value:owedIn, color:'#3f6b28'},{name:'Over the limit', value:overBy, color:'#b8382a'},{name:'Credit still open', value:open, color:'#cfe0b8'}] }],
         legend:[{name:'Owed', color:'#3f6b28'},{name:'Over the limit', color:'#b8382a'},{name:'Still open', color:'#cfe0b8'}],
         // the account behind the bar: what is open, and what came in lately
-        detail:function(){ return { title:f.farm+' · account', sub:ti.verdict, html:invoicesHtml()+paymentsHtml(), actions:financeActs() }; } });
+        detail:function(){ return accountCard(); } });
     }
   }catch(e){ console.warn('chart', e); }
 
@@ -265,22 +261,26 @@ if(!f){
   function canGo(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } }
   function byDate(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); }
   function owingOf(i){ return i.outstanding!=null ? (+i.outstanding||0) : (+i.amount||0); }
-  function ppTable(cols, rows, num){
+  function ppTable(cols, rows, num, foot){
     num=num||[];
+    var td=function(c,i){ return '<td'+(num.indexOf(i)>=0?' class="num"':'')+'>'+c+'</td>'; };
     return '<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+cols.map(function(c,i){ return '<th'+(num.indexOf(i)>=0?' class="num"':'')+'>'+esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-      rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+r.cells.map(function(c,i){ return '<td'+(num.indexOf(i)>=0?' class="num"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')+
-      '</tbody></table></div>';
+      rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+esc(r.href)+'"':'')+'>'+r.cells.map(td).join('')+'</tr>'; }).join('')+
+      '</tbody>'+(foot?'<tfoot><tr>'+foot.map(td).join('')+'</tr></tfoot>':'')+'</table></div>';
   }
+  function nw(t){ return '<span style="white-space:nowrap;">'+t+'</span>'; }
+  function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+  function personMeta(rid, tip){ if(!rid || (u.roleKey==='advisor' && rid===u.rep)) return null; var rp=d.rep(rid); return rp&&rp.name? { initials:initialsOf(rp.name), color:rp.colour, text:rp.name, tip:tip } : null; }
   function openInv(){ return d.where('invoices', function(i){ return i.farmer===id && i.status!=='Paid' && owingOf(i)!==0; }).sort(byDate); }
   function invoicesHtml(){
     var inv=openInv();
-    if(!inv.length) return '<div class="pp-h">Open invoices</div><div class="faint" style="font-size:.82rem;">'+
+    if(!inv.length) return '<div class="bbp-tt">Open invoices</div><div class="faint" style="font-size:.82rem;">'+
       (f.sageBalance!=null && f.sageBalance>0 ? 'No open invoice lines here — the balance is as your accounting system reports it.' : 'No open invoices.')+'</div>';
     var tot=inv.reduce(function(t,i){ return t+owingOf(i); },0);
-    return '<div class="pp-h">Open invoices · '+inv.length+'</div>'+ppTable(['Invoice','Date','Due','Status','Owing'],
+    return '<div class="bbp-tt">Open invoices · '+inv.length+'</div>'+ppTable(['Invoice','Due','Status','Owing'],
       inv.slice(0,10).map(function(i){ return { cells:['<b style="white-space:nowrap;">'+esc(i.label||i.ref||'—')+'</b>'+(i.description && i.description!==(i.label||i.ref)?'<div class="faint" style="font-size:.72rem;">'+esc(i.description)+'</div>':''),
-        i.date?BB.shortDate(i.date):'—', i.dueDate?BB.shortDate(i.dueDate):'—', BB.statusBadge(i.status||'Outstanding'), BB.money(owingOf(i))] }; })
-      .concat(inv.length>1?[{ cells:['<b>'+(inv.length>10?'All '+inv.length:'Total')+'</b>','','','','<b>'+BB.money(tot)+'</b>'] }]:[]), [4]);
+        i.dueDate?nw(BB.shortDate(i.dueDate)):'—', BB.statusBadge(i.status||'Outstanding'), BB.money(owingOf(i))] }; }), [3],
+      inv.length>1? [inv.length>10?'All '+inv.length:'Total','','','<b>'+BB.money(tot)+'</b>'] : null);
   }
   // payments straight from the ledger when it is connected; otherwise the invoices marked paid
   function paymentsHtml(){
@@ -289,34 +289,42 @@ if(!f){
     if(!pays.length) pays=d.where('invoices', function(i){ return i.farmer===id && i.status==='Paid'; })
       .map(function(i){ return { date:i.paidDate||i.date, ref:(i.label||i.ref||'')+(i.description?' — '+i.description:''), amt:+i.amount||0 }; }).sort(byDate).slice(0,5);
     if(!pays.length) return '';
-    return '<div class="pp-h">Recently paid</div>'+ppTable(['Date','Reference','Amount'], pays.map(function(p){ return { cells:[p.date?BB.shortDate(p.date):'—', esc(p.ref), BB.money(p.amt)] }; }), [2]);
+    return '<div class="bbp-tt">Recently paid</div>'+ppTable(['Date','Reference','Amount'], pays.map(function(p){ return { cells:[p.date?nw(BB.shortDate(p.date)):'—', esc(p.ref), BB.money(p.amt)] }; }), [2]);
   }
   function financeActs(){ return canGo('finance.html') ? [{ label:'Open in Finance', href:'finance.html' }] : []; }
   function toCard(sel){ return function(){ BB.closePopup(); var el=document.getElementById(sel); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }; }
-  function sampleRows(list){
-    return list.slice().sort(byDate).map(function(x){ var b=d.by('blocks',x.block)||{name:'—'};
-      return { cells:[esc(x.kind), '<b>'+esc(b.name)+'</b>', x.date?BB.shortDate(x.date):'—', BB.statusBadge(x.status), '<span style="font-size:.78rem;">'+esc(x.flag||'—')+'</span>'],
-        href: canGo('bioanalyze-soil.html') ? (x.kind==='Soil'?'bioanalyze-soil.html':'bioanalyze-leaf.html')+'?block='+encodeURIComponent(x.block) : null }; });
-  }
-  BB.statDetail('fdOwed', function(){
+  // the farm's account as a card: four figures, the verdict as one line, then what is open and what came in
+  function accountCard(){
     var inv=openInv(), od=inv.filter(function(i){ return i.status==='Overdue'; });
-    return { eyebrow:f.farm, sub:ti.verdict, stats:[{ l:'Outstanding', v:BB.money(ti.balance), s:ti.limit?'of '+BB.money(ti.limit)+' limit':'no credit limit set', cls:ti.overdue?'bad':'' },
+    return { wide:true, layout:'split', color:null, sub:null, eyebrow:'Account', title:f.farm,
+      meta:[ f.name && f.name!==f.farm? { icon:'user', text:f.name, tip:'Farmer' } : null, f.cell? { icon:'phone', tip:'Phone', html:'<a href="tel:'+esc(tel)+'">'+esc(f.cell)+'</a>' } : null ],
+      stats:[{ l:'Outstanding', v:BB.money(ti.balance), s:ti.limit?'of '+BB.money(ti.limit)+' limit':'no credit limit set', cls:ti.overdue?'bad':(ti.sev==='warn'?'warn':'') },
         { l:'Overdue', v:BB.money(od.reduce(function(t,i){ return t+owingOf(i); },0)), s:od.length+' invoice'+(od.length===1?'':'s'), cls:od.length?'bad':'' },
-        { l:'Credit open', v:ti.limit?BB.money(Math.max(0,ti.available)):'—' }],
-      html:invoicesHtml()+paymentsHtml(), actions:[{ label:'Open the full list', primary:true, onClick:toCard('acct') }].concat(financeActs()) };
-  });
+        { l:'Credit open', v:ti.limit?BB.money(Math.max(0,ti.available)):'—', s:ti.limit? Math.min(999,Math.round(Math.max(0,ti.balance)/ti.limit*100))+'% used' : null },
+        { l:'Pipeline', v:BB.money(ti.openPipeline), s:'forecast + pending' }],
+      html:((ti.sev==='bad'||ti.sev==='warn')? '<div class="bbp-alert'+(ti.sev==='bad'?'':' warn')+'">'+BB.icon('alert')+esc(ti.verdict)+'</div>' : '')+invoicesHtml()+paymentsHtml(),
+      actions:financeActs().concat([{ label:'Before you drive', primary:true, onClick:toCard('acct') }]) };
+  }
+  BB.statDetail('fdOwed', function(){ return accountCard(); });
+  function orderHref(o){ return canGo('orders.html') ? 'orders.html?open='+encodeURIComponent(o.id) : null; }
   BB.statDetail('fdPipe', function(){
     var open=orders.filter(function(o){ return o.status==='Forecast'||o.status==='Pending'; });
-    return { eyebrow:f.farm, sub:'forecast and pending orders, not yet confirmed',
-      table:{ columns:['Ref','Date','Delivery','Status','Value'], rows:open.map(function(o){ return { cells:[{ html:'<b>'+esc(o.ref)+'</b>' }, BB.shortDate(o.date), BB.monthName(o.deliverMonth), { html:BB.statusBadge(o.status) }, BB.money(d.orderValue(o))] }; }), num:[4] },
-      actions:[{ label:'Open the full list', primary:true, onClick:toCard('ords') }].concat(canGo('orders.html')?[{ label:'All orders', href:'orders.html' }]:[]) };
+    return { color:null, stats:[{ l:'In the pipeline', v:BB.money(ti.openPipeline), s:open.length+' open order'+(open.length===1?'':'s') }],
+      table:{ columns:['Ref','Date','Delivery','Status','Value'], rows:open.map(function(o){ return { cells:[{ html:'<b>'+esc(o.ref)+'</b>' }, BB.shortDate(o.date), BB.monthName(o.deliverMonth), { html:BB.statusBadge(o.status) }, BB.money(d.orderValue(o))], href:orderHref(o) }; }), num:[4] },
+      actions:[{ label:'Recent orders', onClick:toCard('ords') }].concat(canGo('orders.html')?[{ label:'All orders', href:'orders.html', primary:true }]:[]) };
   });
+  // a sample row opens that sample's card on its own page
+  function sampleRows(list){
+    return list.slice().sort(byDate).map(function(x){ var b=d.by('blocks',x.block)||{name:'—'}, pg=x.kind==='Soil'?'bioanalyze-soil.html':'bioanalyze-leaf.html';
+      return { cells:[esc(x.kind), '<b>'+esc(b.name)+'</b>', x.date?nw(BB.shortDate(x.date)):'—', BB.statusBadge(x.status), '<span style="font-size:.78rem;">'+esc(x.flag||'—')+'</span>'].map(function(h){ return { html:h }; }),
+        href: canGo(pg) ? pg+'?open='+encodeURIComponent(x.id) : null }; });
+  }
   BB.statDetail('fdSamples', function(){
     var list=soil.map(function(s){ return Object.assign({ kind:'Soil' }, s); }).concat(leaf.map(function(l){ return Object.assign({ kind:'Leaf' }, l); }));
-    return { eyebrow:f.farm, sub:'soil and leaf samples on this farm, newest first',
+    var open=list.filter(function(x){ return x.status!=='Interpreted'; }).length;
+    return { color:null, stats:[{ l:'Samples', v:String(list.length), s:soil.length+' soil · '+leaf.length+' leaf' }, { l:'To interpret', v:String(open), cls:open?'warn':'' }],
       table:{ columns:['Type','Block','Sampled','Status','Reading'], rows:sampleRows(list) },
-      note: list.length? 'Tap a sample to open that block’s results.' : null,
-      actions:[{ label:'Open the full list', primary:true, onClick:toCard('blks') }] };
+      actions:[{ label:'Blocks', primary:true, onClick:toCard('blks') }] };
   });
   // a block: its latest soil and leaf readings, the last walk and the programme on it
   function blockPopup(bid){
@@ -324,47 +332,57 @@ if(!f){
     var s=soil.filter(function(x){ return x.block===bid; }).sort(byDate)[0], l=leaf.filter(function(x){ return x.block===bid; }).sort(byDate)[0];
     var w=d.where('watch', function(x){ return x.block===bid; }).sort(byDate)[0], pr=programs.filter(function(x){ return x.block===bid; })[0];
     var reading=function(x, kind, fields){
-      if(!x) return '<div class="pp-h">'+kind+'</div><div class="faint" style="font-size:.82rem;">No '+kind.toLowerCase()+' sample yet.</div>';
-      var h='<div class="pp-h">'+kind+' · sampled '+BB.date(x.date)+'</div>';
-      if(x.status!=='Interpreted') return h+'<div class="pp-flag">'+BB.statusBadge(x.status)+' '+esc(x.flag||'Readings appear once interpreted.')+'</div>';
+      if(!x) return '<div class="bbp-tt">'+kind+'</div><div class="faint" style="font-size:.82rem;">No '+kind.toLowerCase()+' sample yet.</div>';
+      var h='<div class="bbp-tt">'+kind+' · '+BB.date(x.date)+'</div>';
+      if(x.status!=='Interpreted') return h+'<div class="bbp-bar" style="margin-top:0;">'+BB.statusBadge(x.status)+'<span class="faint">'+esc(x.flag||'Readings appear once interpreted.')+'</span></div>';
       h+=ppTable(fields.map(function(q){ return q[0]; }), [{ cells:fields.map(function(q){ return x[q[1]]!=null? esc(x[q[1]]) : '—'; }) }]);
       var ok=/improv|maintain|balanced|good|hold/i.test(x.flag||'');
-      return h+'<div class="pp-flag'+(ok?' ok':'')+'"><b>Interpretation:</b> '+esc(x.flag||'—')+'</div>';
+      return h+'<div class="bbp-bar interp'+(ok?' ok':'')+'"><span><b>Interpretation:</b> '+esc(x.flag||'—')+'</span></div>';
     };
-    var html=reading(s,'Soil',[['pH','ph'],['Organic matter','om'],['Ca:Mg','ca_mg'],['Microbial','microbial'],['P','p']])+
+    var low=s && s.status==='Interpreted' && /low/i.test(s.microbial||'') && !/biology/i.test(s.flag||'');
+    var html=(low?'<div class="bbp-alert warn">'+BB.icon('alert')+'Low biology on the last soil read — feed the soil life first</div>':'')+
+      reading(s,'Soil',[['pH','ph'],['OM','om'],['Ca:Mg','ca_mg'],['Microbial','microbial'],['P','p']])+
       reading(l,'Leaf',[['N','n'],['K','k'],['Ca','ca']]);
-    if(w) html+='<div class="pp-h">Last field check · '+BB.date(w.date)+'</div><div style="font-size:.84rem;">'+esc(w.stage||'Field check')+' · vigour <b>'+esc(w.vigour||'—')+'</b>'+(w.pest?' · '+esc(w.pest):'')+(w.note?'<div class="faint" style="margin-top:3px;">'+esc(w.note)+'</div>':'')+'</div>';
-    if(pr) html+='<div class="pp-h">Programme</div><div style="font-size:.84rem;"><b>'+esc(pr.goal||'—')+'</b> · '+esc(pr.season||'')+' '+BB.statusBadge(pr.status)+'</div>';
+    if(w) html+='<div class="bbp-tt">Last field check · '+BB.date(w.date)+'</div><div style="font-size:.84rem;">'+esc(w.stage||'Field check')+(w.pest?' · '+esc(w.pest):'')+(w.note?'<div class="faint" style="margin-top:3px;">'+esc(w.note)+'</div>':'')+'</div>';
     var acts=[];
-    if(canGo('bioanalyze-soil.html')) acts.push({ label:'Soil results', href:'bioanalyze-soil.html?block='+encodeURIComponent(bid), primary:true }, { label:'Leaf results', href:'bioanalyze-leaf.html?block='+encodeURIComponent(bid) });
     if(canGo('biowatch.html')) acts.push({ label:'Monitor', href:'biowatch.html?block='+encodeURIComponent(bid) });
+    if(canGo('bioanalyze-soil.html')) acts.push({ label:'Soil & leaf results', href:'bioanalyze-soil.html?block='+encodeURIComponent(bid), primary:true });
     var nS=soil.filter(function(x){ return x.block===bid; }).length, nL=leaf.filter(function(x){ return x.block===bid; }).length;
-    BB.popup({ eyebrow:f.farm+' · block', title:b.name, sub:[b.crop, b.planted?'planted '+b.planted:''].filter(Boolean).join(' · '),
-      stats:[{ l:'Area', v:b.ha? BB.num(b.ha)+' ha' : '—' }, { l:'Samples', v:String(nS+nL), s:nS+' soil · '+nL+' leaf' }, { l:'Programme', v:pr? pr.status : 'None', s:pr? pr.season : 'not built yet' }],
+    var vig={Excellent:'',Good:'',Fair:'warn',Poor:'bad'};
+    BB.popup({ wide:true, layout:'split', eyebrow:'Block', title:b.name,
+      meta:[ { icon:'farm', text:f.farm, tip:'Farm' }, b.crop? { icon:'sprout', text:b.crop, tip:'Crop' } : null, b.planted? { icon:'calendar', text:'Planted '+b.planted, tip:'Planted' } : null,
+        pr? { icon:'clipboard', text:pr.goal||'Programme', tip:'Programme', href:canGo('bioconsult.html')?'bioconsult.html?open='+encodeURIComponent(pr.id):null } : { icon:'clipboard', text:'No programme yet', muted:true, tip:'Programme' } ],
+      stats:[{ l:'Area', v:b.ha? BB.num(b.ha)+' ha' : '—' }, { l:'Samples', v:String(nS+nL), s:nS+' soil · '+nL+' leaf' },
+        { l:'Programme', html:pr? BB.statusBadge(pr.status) : '<span class="faint">None</span>', s:pr? pr.season : null },
+        { l:'Vigour', v:w? (w.vigour||'—') : '—', s:w? 'walked '+BB.shortDate(w.date) : 'not walked yet', cls:w? (vig[w.vigour]||'') : '' }],
       html:html, actions:acts });
   }
   function progPopup(pid){
     var p=d.by('programs',pid); if(!p) return;
-    var b=d.by('blocks',p.block)||{name:'—'}, v=(p.lines||[]).reduce(function(t,l){ return t+(l.cost||0); },0), adv=d.rep(p.advisor);
-    BB.popup({ eyebrow:'BioConsult programme', title:p.goal||(p.crop+' programme'), sub:[b.name, p.crop, p.season, 'by '+adv.name].filter(Boolean).join(' · '),
-      stats:[{ l:'Status', html:BB.statusBadge(p.status) }, { l:'Programme value', v:BB.money(v) }, { l:'Per hectare', v:b.ha? BB.money(Math.round(v/b.ha)) : '—', s:b.ha? BB.num(b.ha)+' ha' : null }],
-      table:{ columns:['Product','Rate','Timing','Cost'], rows:(p.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.lever||'')+'</div>' }, l.rate||'—', l.timing||'—', BB.money(l.cost||0)]; }), num:[3] },
-      actions: canGo('bioconsult.html') ? [{ label:'Open full record', href:'bioconsult.html?open='+encodeURIComponent(p.id), primary:true }] : [] });
+    var b=d.by('blocks',p.block)||{name:'—'}, v=(p.lines||[]).reduce(function(t,l){ return t+(l.cost||0); },0);
+    BB.popup({ wide:true, layout:'split', eyebrow:'Programme', title:p.goal||(p.crop+' programme'),
+      meta:[ { icon:'leaf', text:b.name, tip:'Block' }, p.crop? { icon:'sprout', text:p.crop, tip:'Crop' } : null, p.season? { icon:'calendar', text:'Season '+p.season, tip:'Season' } : null, personMeta(p.advisor, 'Advisor') ],
+      stats:[{ l:'Status', html:BB.statusBadge(p.status) }, { l:'Value', v:BB.money(v), s:'the season' }, { l:'Per hectare', v:b.ha? BB.money(Math.round(v/b.ha)) : '—', s:b.ha? BB.num(b.ha)+' ha' : null }, { l:'Lines', v:String((p.lines||[]).length), s:'products' }],
+      html:'<div class="bbp-tt">Products</div>',
+      table:{ columns:['Product','Rate','Timing','Cost'], rows:(p.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.lever||'')+'</div>' }, l.rate||'—', l.timing||'—', BB.money(l.cost||0)]; }), num:[3], foot:['Total',{ html:'' },{ html:'' },BB.money(v)] },
+      actions: canGo('bioconsult.html') ? [{ label:'Open programme', href:'bioconsult.html?open='+encodeURIComponent(p.id), primary:true }] : [] });
   }
+  // an order opens its own card on the Orders page; a seat without Orders gets the order in brief here
   function orderPopup(oid){
     var o=d.by('orders',oid); if(!o) return;
-    var del=d.where('deliveries', function(x){ return x.order===o.id; })[0], inv=d.where('invoices', function(i){ return i.order===o.id; })[0];
-    var stats=[{ l:'Status', html:BB.statusBadge(o.status) }, { l:'Value', v:BB.money(d.orderValue(o)), s:d.quoteStatus(o)? 'quote '+BB.money(d.quoteTotal(o))+' · '+d.quoteStatus(o) : null }, { l:'Delivery', v:BB.monthName(o.deliverMonth), s:del? del.status+(del.eta?' · ETA '+BB.shortDate(del.eta):'') : 'no delivery booked' }];
-    if(inv) stats.push({ l:'Invoice', v:inv.label||inv.ref||'—', s:inv.status });
-    BB.popup({ eyebrow:'Order · '+f.farm, title:o.ref, sub:['captured '+BB.date(o.date), o.source? 'by '+String(o.source).toLowerCase() : '', d.rep(o.rep).name].filter(Boolean).join(' · '), stats:stats,
-      table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.pack||'')+'</div>' }, BB.num(l.qty)+' '+(pr.unit||''), BB.money((pr.price||0)*(l.qty||0))]; }), num:[1,2] },
-      actions: canGo('orders.html') ? [{ label:'Open full record', href:'orders.html', primary:true }] : [] });
+    if(canGo('orders.html')){ location.href='orders.html?open='+encodeURIComponent(o.id); return; }
+    var del=d.where('deliveries', function(x){ return x.order===o.id; })[0];
+    BB.popup({ eyebrow:'Order · '+(o.source||'Portal'), title:o.ref,
+      meta:[ { icon:'calendar', text:'Captured '+BB.date(o.date), tip:'Captured' }, personMeta(o.rep, 'Rep') ],
+      stats:[{ l:'Value', v:BB.money(d.quoteStatus(o)?d.quoteTotal(o):d.orderValue(o)) }, { l:'Status', html:BB.statusBadge(o.status) }, { l:'Delivery', v:BB.monthName(o.deliverMonth), s:del? del.status.toLowerCase() : 'not booked' }],
+      table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var pr=d.product(l.prod); return [{ html:'<b>'+esc(pr.name)+'</b><div class="faint" style="font-size:.72rem;">'+esc(pr.pack||'')+'</div>' }, BB.num(l.qty), BB.money((pr.price||0)*(l.qty||0))]; }), num:[1,2] } });
   }
   function filePopup(fid){
     var x=d.by('files',fid); if(!x) return;
     var docHref='document.html?farmer='+encodeURIComponent(farmerId)+'&kind='+encodeURIComponent(x.kind||'Document')+'&name='+encodeURIComponent(x.name||'');
-    BB.popup({ eyebrow:'Farm file · '+f.farm, title:x.name, stats:[{ l:'Kind', v:x.kind||'—' }, { l:'Filed', v:x.date?BB.date(x.date):'—' }, { l:'Size', v:x.size||'—' }],
-      actions:[{ label:'Open full record', href:docHref, primary:true }].concat(canGo('farm-files.html')?[{ label:'All files for this farm', href:'farm-files.html?farmer='+encodeURIComponent(farmerId) }]:[]) });
+    BB.popup({ eyebrow:'Farm file · '+(x.kind||'Document'), title:x.name,
+      meta:[ { icon:'farm', text:f.farm, tip:'Farm' }, x.date? { icon:'calendar', text:'Filed '+BB.date(x.date), tip:'Filed' } : null, x.size&&x.size!=='—'? { icon:'file', text:x.size, tip:'Size' } : null ],
+      actions:(canGo('farm-files.html')?[{ label:'All files for this farm', href:'farm-files.html?farmer='+encodeURIComponent(farmerId) }]:[]).concat([{ label:'Open document', href:docHref, primary:true }]) });
   }
   function rowClick(attr, fn){
     Array.prototype.forEach.call(document.querySelectorAll('tr['+attr+']'), function(row){

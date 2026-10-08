@@ -47,6 +47,8 @@
 .cov .v small{font-family:var(--body);font-size:.76rem;font-weight:500;color:var(--faint);}
 .cov .trk{height:6px;border-radius:3px;background:var(--line-soft);overflow:hidden;}
 .cov .trk i{display:block;height:100%;background:var(--green-bright);border-radius:3px;}
+.bbp-meta .mwa{margin-left:10px;display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:20px;background:#e9f9ef;color:#128C4A !important;border:1px solid #bfe8cf;font-size:.72rem;font-weight:600;}
+.bbp-meta .mwa .ico{width:12px;height:12px;}
 .renew{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:20px;align-items:center;margin-top:16px;}
 @media(max-width:860px){.renew{grid-template-columns:minmax(0,1fr);} }
 @media(max-width:560px){
@@ -116,42 +118,94 @@ var KIND = {
   watch: { label:'Visit',     list:watchRows, page:'biowatch.html',        open:function(r){ return r.vigour==='Fair'||r.vigour==='Poor'; } },
   prog:  { label:'Programme', list:programs,  page:'bioconsult.html',      open:function(r){ return r.status!=='Active'; } }
 };
-// one line per record: what it is, where, when, and where it stands
-function recRow(k, r, withType){
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") ----
+function esc(x){ return BB.esc(x); }
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+function phoneMeta(f){
+  if(!f.cell) return null;
+  var wa='https://wa.me/'+String(f.cell).replace(/\D/g,'').replace(/^0/,'27')+'?text='+encodeURIComponent('Hi '+String(f.name).split(' ')[0]+', it\'s '+String(u.name).split(' ')[0]+' from BioBrix — ');
+  return { icon:'phone', tip:'Phone', html:'<a href="tel:'+esc(String(f.cell).replace(/\s/g,''))+'">'+esc(f.cell)+'</a><a class="mwa" target="_blank" rel="noopener" href="'+esc(wa)+'">'+BB.icon('message')+'WhatsApp</a>' };
+}
+function personMeta(rid, tip){ if(!rid || (isAdvisor && rid===u.rep)) return null; var r=d.rep(rid); return r&&r.name? { initials:initialsOf(r.name), color:r.colour, text:r.name, tip:tip } : null; }
+function farmMeta(f){ return { icon:'farm', text:f.farm, tip:'Farm', href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(f.id):null }; }
+function daysAgo(iso){ return Math.max(0,Math.round((today-new Date(iso))/86400000)); }
+var READ = { soil:[['pH','ph'],['Organic matter','om'],['Ca:Mg','ca_mg'],['Microbial','microbial'],['Phosphorus','p']], leaf:[['Nitrogen (N)','n'],['Potassium (K)','k'],['Calcium (Ca)','ca']] };
+// one soil or leaf sample as a card
+function sampleCard(k, r){
+  var f=d.farmer(r.farmer), b=d.by('blocks',r.block)||{name:'—'}, isI=r.status==='Interpreted', K=KIND[k];
+  var ok=/improv|maintain|balanced|good|hold/i.test(r.flag||''), low=/low biology|low/i.test(r.microbial||'');
+  var html='';
+  if(isI){
+    if(low && !/biology/i.test(r.flag||'')) html+='<div class="bbp-alert warn">'+BB.icon('alert')+'Low biology — feed the soil life first</div>';
+    if(k==='soil') html+='<div class="bbp-tt">Readings</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+READ[k].map(function(q){ return '<th>'+esc(q[0])+'</th>'; }).join('')+'</tr></thead><tbody><tr>'+
+      READ[k].map(function(q){ return '<td>'+(r[q[1]]!=null&&r[q[1]]!==''? esc(r[q[1]]) : '—')+'</td>'; }).join('')+'</tr></tbody></table></div>';
+    html+='<div class="bbp-bar" style="'+(k==='soil'?'':'margin-top:0;')+'"><span><b>Interpretation:</b> '+esc(r.flag||'—')+'</span></div>';
+  } else html+=(daysAgo(r.date)>21? '<div class="bbp-alert warn">'+BB.icon('alert')+'Waiting '+daysAgo(r.date)+' days — chase the lab</div>' : '')+
+    '<div class="bbp-bar" style="margin-top:0;"><span class="faint">'+esc(r.flag||'Awaiting results — readings appear once interpreted.')+'</span></div>';
+  var acts=[];
+  if(canGo('farm-detail.html')) acts.push({ label:'Farm record', href:'farm-detail.html?farmer='+encodeURIComponent(r.farmer) });
+  if(canGo(K.page)) acts.push({ label:'Open sample', href:K.page+'?open='+encodeURIComponent(r.id), primary:true });
+  var split=isI && k==='soil';
+  return { wide:split, layout:split?'split':null, eyebrow:(k==='soil'?'Soil sample':'Leaf-sap sample'), title:b.name,
+    meta:[ { icon:'calendar', text:'Sampled '+BB.date(r.date), tip:'Sampled' }, farmMeta(f), { icon:'user', text:f.name, tip:'Farmer' }, phoneMeta(f),
+      (b.crop||r.crop)? { icon:'sprout', text:b.crop||r.crop, tip:'Crop' } : null, personMeta(r.advisor, 'Advisor') ],
+    stats: isI ? [{ l:'Status', html:BB.statusBadge(r.status) }, k==='soil'? { l:'pH', v:r.ph!=null?String(r.ph):'—' } : { l:'N', v:r.n||'—' }, k==='soil'? { l:'Microbial', v:r.microbial||'—', cls:low?'warn':'' } : { l:'K', v:r.k||'—' }, k==='soil'? { l:'Ca:Mg', v:r.ca_mg||'—' } : { l:'Ca', v:r.ca||'—' }]
+               : [{ l:'Status', html:BB.statusBadge(r.status) }, { l:'Waiting', v:daysAgo(r.date)+' days', s:'since sampling', cls:daysAgo(r.date)>21?'warn':'' }],
+    html:html, actions:acts };
+}
+function openRec(k, r){
+  if(k==='soil'||k==='leaf') return BB.popup(sampleCard(k, r));
+  var page=KIND[k].page; if(canGo(page)) location.href=page+'?open='+encodeURIComponent(r.id);
+}
+// one line per record: what it is, where, when, and where it stands — the row opens its card (samples) or its page
+function recRow(k, r, withType, oneFarm){
   var f=d.farmer(r.farmer), b=d.by('blocks',r.block)||{name:'—'}, K=KIND[k];
   var state = k==='watch' ? '<span class="badge '+({Excellent:'b-ok',Good:'b-lime',Fair:'b-warn',Poor:'b-bad'}[r.vigour]||'b-grey')+'">'+BB.esc(r.vigour||'—')+'</span>' : BB.statusBadge(r.status);
   var what = k==='watch' ? (r.stage||'Field check')+(r.pest&&!/^none$/i.test(r.pest)?' · '+r.pest:'') : k==='prog' ? (r.goal||'—')+' · '+(r.season||'') : (r.flag||'—');
-  var href = !canGo(K.page) ? null : k==='prog' ? 'bioconsult.html?open='+encodeURIComponent(r.id) : k==='watch' ? 'biowatch.html?open='+encodeURIComponent(r.id) : K.page+'?block='+encodeURIComponent(r.block);
-  return { cells:(withType?[BB.esc(K.label)]:[]).concat([{ html:'<b>'+BB.esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, r.date?BB.shortDate(r.date):(r.season||'—'), { html:state }, { html:'<span style="font-size:.78rem;">'+BB.esc(what)+'</span>' }]), href:href };
+  var go = (k==='soil'||k==='leaf'||canGo(K.page)) ? function(){ openRec(k, r); } : null;
+  return { cells:(withType?[BB.esc(K.label)]:[]).concat([oneFarm? { html:'<b>'+BB.esc(b.name)+'</b>' } : { html:'<b>'+BB.esc(f.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, { html:'<span style="white-space:nowrap;">'+(r.date?BB.shortDate(r.date):BB.esc(r.season||'—'))+'</span>' }, { html:state }, { html:'<span style="font-size:.78rem;">'+BB.esc(what)+'</span>' }]), onClick:go };
 }
-function recTable(k, list, withType){
-  return { columns: withType ? ['Type','Farmer / block','Date','Status','Detail']
+function recTable(k, list, withType, oneFarm){
+  return { columns: withType ? ['Type',oneFarm?'Block':'Farmer / block','Date','Status','Detail']
                             : ['Farmer / block', k==='prog'?'Season':'Date', k==='watch'?'Vigour':'Status', k==='watch'?'Stage · pest':k==='prog'?'Goal':'Reading'],
-    rows:list.map(function(r){ return recRow(r._k||k, r, withType); }) };
+    rows:list.map(function(r){ return recRow(r._k||k, r, withType, oneFarm); }) };
 }
 // open items first, then newest
 function sortOpen(k, list){ var K=KIND[k]; return list.slice().sort(function(a,b){ return (K.open(b)?1:0)-(K.open(a)?1:0) || byDate(a,b); }); }
 function bracketDetail(k){
-  var K=KIND[k], list=sortOpen(k, K.list);
-  return { table:recTable(k, list), note: list.length && canGo(K.page) ? 'Tap a record to open it.' : null };
+  var K=KIND[k], list=sortOpen(k, K.list), open=list.filter(K.open).length;
+  var OPEN={ soil:'To interpret', leaf:'To interpret', watch:'Fair or poor', prog:'Not yet active' }, ALL={ soil:'Samples', leaf:'Samples', watch:'Visits', prog:'Programmes' };
+  return { color:null, stats:[{ l:ALL[k], v:String(list.length) }, { l:OPEN[k], v:String(open), cls:open&&k!=='prog'?'warn':'' }], table:recTable(k, list) };
 }
-BB.statDetail('bsSoil',  function(){ return Object.assign(bracketDetail('soil'),  { sub:'soil samples, the ones still to interpret first' }); });
-BB.statDetail('bsLeaf',  function(){ return Object.assign(bracketDetail('leaf'),  { sub:'leaf-sap samples, the ones still to interpret first' }); });
-BB.statDetail('bsWatch', function(){ return Object.assign(bracketDetail('watch'), { sub:'monitoring visits, fair or poor vigour first' }); });
-BB.statDetail('bsProg',  function(){ return Object.assign(bracketDetail('prog'),  { sub:'programmes, drafts first' }); });
+BB.statDetail('bsSoil',  function(){ return bracketDetail('soil'); });
+BB.statDetail('bsLeaf',  function(){ return bracketDetail('leaf'); });
+BB.statDetail('bsWatch', function(){ return bracketDetail('watch'); });
+BB.statDetail('bsProg',  function(){ return bracketDetail('prog'); });
 // a farm's open items across the four brackets
 function farmItems(fid){
   var out=[];
   Object.keys(KIND).forEach(function(k){ KIND[k].list.forEach(function(r){ if(r.farmer===fid) out.push(Object.assign({ _k:k }, r)); }); });
   return out.sort(function(a,b){ return (KIND[b._k].open(b)?1:0)-(KIND[a._k].open(a)?1:0) || byDate(a,b); });
 }
-function queuePopup(q){
-  var r=q.r, f=d.farmer(r.farmer), b=d.by('blocks',r.block)||{name:'—'}, adv=d.rep(r.advisor);
-  BB.popup({ eyebrow:q.kind+' sample · waiting on you', title:b.name, sub:[f.name, f.farm, 'advisor '+adv.name].filter(Boolean).join(' · '),
-    stats:[{ l:'Status', html:BB.statusBadge(r.status) }, { l:'Sampled', v:BB.date(r.date), s:Math.max(0,Math.round((today-new Date(r.date))/86400000))+' days ago' }],
-    html:'<div style="font-size:.86rem;padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);">'+BB.esc(r.flag||'Awaiting results.')+'</div>',
-    actions:[{ label:'Open full record', href:q.href, primary:true }].concat(canGo('farm-detail.html')?[{ label:'Farm record', href:'farm-detail.html?farmer='+encodeURIComponent(r.farmer) }]:[]) });
+// a farm as a card: who and where, the account in brief, and its agronomy work
+function farmCard(fid){
+  var f=d.farmer(fid), ti=d.tripInsight(fid), items=farmItems(fid), open=items.filter(function(r){ return KIND[r._k].open(r); }).length;
+  var nBlocks=d.where('blocks', function(b){ return b.farmer===fid; }).length;
+  var place=[f.town, f.region].filter(function(x){ return x && String(x).trim(); }).join(', ');
+  return { wide:true, layout:'split', color:null, sub:null, eyebrow:'Farm', title:f.farm, tags:BB.statusBadge(f.status)+BB.sampleChip(f),
+    meta:[ f.name && f.name!==f.farm? { icon:'user', text:f.name, tip:'Farmer' } : null, phoneMeta(f), place? { icon:'map', text:place, tip:'Town · region' } : null,
+      (f.crops||[]).length? { icon:'sprout', text:f.crops.join(', '), tip:'Crops' } : null, personMeta(f.rep, 'Rep') ],
+    stats:[
+      { l:'Balance', v:BB.money(ti.balance), s:ti.limit? 'limit '+BB.money(ti.limit) : 'no limit set', cls:ti.overdue?'bad':(ti.sev==='warn'?'warn':'') },
+      { l:'Credit open', v:ti.limit? BB.money(Math.max(0,ti.available)) : '—', s:ti.limit? Math.min(999,Math.round(Math.max(0,ti.balance)/ti.limit*100))+'% used' : 'no credit terms' },
+      { l:'Hectares', v:f.ha? BB.num(f.ha) : '—', s:nBlocks+' block'+(nBlocks===1?'':'s') },
+      { l:'Open work', v:String(open), s:'of '+items.length+' records', cls:open?'warn':'' }
+    ],
+    html:((ti.sev==='bad'||ti.sev==='warn')? '<div class="bbp-alert'+(ti.sev==='bad'?'':' warn')+'">'+BB.icon('alert')+esc(ti.verdict)+'</div>' : '')+'<div class="bbp-tt">Samples, visits &amp; programmes</div>',
+    table:recTable(null, items, true, true),
+    actions: canGo('farm-detail.html') ? [{ label:'Farm record', href:'farm-detail.html?farmer='+encodeURIComponent(fid), primary:true }] : [] };
 }
+function queuePopup(q){ BB.popup(sampleCard(q.kind==='Soil'?'soil':'leaf', q.r)); }
 
 // coverage — how much of the book has been measured and prescribed (counted, never estimated)
 var scopeFarms = isAdvisor ? d.where('farmers', function(f){ return f.rep===u.rep; }) : d.all('farmers');
@@ -285,12 +339,8 @@ try{
 try{
   if(farmRows.length) BB.chart.hbar('#chFarms', { valueLabel:'Records', openLabel:'Open full record',
     rows: farmRows.map(function(r){ return { id:r.id, label:r.label, sub:r.sub, value:r.value, color:'#68a53e', href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(r.id):null }; }),
-    // that farm's work, open items first
-    detail:function(ctx){
-      var items=farmItems(ctx.row.id), open=items.filter(function(r){ return KIND[r._k].open(r); }).length, f=d.farmer(ctx.row.id);
-      return { sub:f.name+(f.cell?' · '+f.cell:''), stats:[{ l:'Records', v:String(items.length), s:'samples, visits and programmes' }, { l:'Open', v:String(open), s:'to interpret, follow up or sign off', cls:open?'warn':'' }],
-        table:recTable(null, items, true), note: items.length? 'Tap a record to open it.' : null };
-    } });
+    // that farm as a card, its work open items first
+    detail:function(ctx){ return farmCard(ctx.row.id); } });
 }catch(e){ console.warn('chart', e); }
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }

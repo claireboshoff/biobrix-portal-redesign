@@ -36,6 +36,8 @@ function orderRef(delivery){
 var STATUS_COL = { 'In transit':'#0e8aa6', 'Delivered':'#4b5bb0', 'Awaiting stock':'#a3463a' };   // match the status pills
 
 // ---- popups ----
+// A delivery opens as a card (CONVENTIONS.md, "Record popups: the card pattern"); a list of them
+// opens as a table whose rows open those cards.
 function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
 function go(label, href, primary){ return href && can(href) ? { label:label, href:href, primary:!!primary } : null; }
 function farmHref(fid){ return fid && can('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(fid) : null; }
@@ -44,7 +46,8 @@ function delTable(list, withHold){
   return { columns:['Order','Farmer'].concat(scopeDepot?[]:['Depot']).concat(['Transport','ETA','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(x){ var h=withHold&&d.deliveryHold(d.by('orders', x.order));
       return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(orderRef(x))+'</span>' }, d.farmer(x.farmer).name].concat(scopeDepot?[]:[depShort(x.depot)]).concat([x.transport||'—', BB.date(x.eta),
-        { html:BB.statusBadge(x.status)+(h?' <span class="tag tag-hold'+(h.sev==='high'?'':' med')+'" title="'+BB.esc(h.reason)+'">'+BB.icon('alert')+'HOLD</span>':'') }]), href:farmHref(x.farmer) }; }) };
+        { html:BB.statusBadge(x.status)+(h?' <span class="tag tag-hold'+(h.sev==='high'?'':' med')+'" data-tip="'+BB.esc(h.reason)+'">'+BB.icon('alert')+'HOLD</span>':'') }]),
+        onClick:function(){ openDelivery(x.id); } }; }) };
 }
 // The deliveries in one status, with a button that narrows the table below to them.
 function statusDetail(all, st){
@@ -60,14 +63,35 @@ function showStatus(st){
   }catch(e){ console.warn('filter', e); }
   var c=document.getElementById('dlvTable'); if(c) c.scrollIntoView({ behavior:'smooth', block:'start' });
 }
-function deliveryPreview(x){
-  var o=d.by('orders', x.order), f=d.farmer(x.farmer), hold=o&&d.deliveryHold(o);
-  return { eyebrow:'Delivery', title:(o?o.ref+' · ':'')+f.name, sub:'from '+d.depot(x.depot).name+' · '+(x.transport&&x.transport!=='—'?x.transport:'no transport yet'),
-    stats:[{l:'Status', html:BB.statusBadge(x.status)}, {l:'ETA', v:BB.date(x.eta)}, {l:'Order value', v:o?BB.money(d.orderValue(o)):'—'}]
-      .concat(hold?[{l:'Finance hold', v:'HOLD', s:hold.reason, cls:hold.sev==='high'?'bad':'warn'}]:[]),
-    table:o?{ columns:['Product','Quantity','Value'], num:[1,2], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod);
-      return { cells:[p.name, BB.num(l.qty)+' '+(p.unit||''), BB.money((p.price||0)*(l.qty||0))] }; }) }:null,
-    actions:[go('Open the order','orders.html',true), go('Open the farm', farmHref(x.farmer))] };
+function advance(id, status){
+  d.update('deliveries', id, { status:status });
+  BB.toast('Delivery updated · '+status);
+  render();
+}
+// One delivery: where it is going, how and when — the order's lines beside it. Its status moves
+// from the Status figure (the table's Advance list does the same).
+function openDelivery(id){
+  var x=d.by('deliveries', id); if(!x) return;
+  var o=d.by('orders', x.order), f=d.farmer(x.farmer), hold=o&&d.deliveryHold(o), tr=x.transport&&x.transport!=='—'?x.transport:null, fh=farmHref(x.farmer);
+  var lines=o? '<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Value</th></tr></thead><tbody>'+
+    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td class="faint">'+BB.esc(p.pack||'')+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*(l.qty||0))+'</td></tr>'; }).join('')+
+    '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>' : '';
+  BB.popup({ wide:!!o, layout:o?'split':null, eyebrow:'Delivery', title:o?o.ref:f.name,
+    meta:[
+      { icon:'calendar', text:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.date(x.eta), tip:x.status==='Delivered'?'Delivered':'ETA' },
+      { icon:'warehouse', text:d.depot(x.depot).name, tip:'Depot' },
+      { icon:'truck', text:tr||'No transport yet', tip:'Transport', muted:!tr },
+      f.farm && f.farm!==f.name ? { icon:'user', text:f.name, tip:'Farmer' } : null,
+      { icon:'farm', text:f.farm||f.name, tip:'Farm', href:fh }
+    ],
+    stats:[
+      { l:'Status', html:BB.statusBadge(x.status), tip:'Change the status', onClick:function(el){
+        BB.pick(el, { title:'Move to', items:STATUS_OPTIONS.map(function(st){ return { label:st, value:st, html:BB.statusBadge(st), on:st===x.status }; }),
+          onPick:function(st){ if(st===x.status) return; advance(x.id, st); BB.closePopup(); setTimeout(function(){ openDelivery(x.id); }, 170); } }); } },
+      { l:'Order value', v:o?BB.money(d.orderValue(o)):'—', s:o? (o.lines||[]).length+' product'+((o.lines||[]).length===1?'':'s') : null }
+    ],
+    html:(hold?'<div class="bbp-alert'+(hold.sev==='high'?'':' warn')+'">'+BB.icon('alert')+BB.esc(hold.reason)+'</div>':'')+lines,
+    actions:[go('Farm record', fh), o? go('Open order', 'orders.html?open='+encodeURIComponent(o.id), true) : null] });
 }
 
 function render(){
@@ -109,7 +133,7 @@ function render(){
     rows.forEach(function(x){
       var opts = STATUS_OPTIONS.map(function(s){ return '<option value="'+BB.esc(s)+'"'+(s===x.status?' selected':'')+'>'+BB.esc(s)+'</option>'; }).join('');
       var hold = holdOf(x);
-      var holdBadge = hold ? ' <span class="tag tag-hold'+(hold.sev==='high'?'':' med')+'" title="'+BB.esc(hold.reason)+'">'+BB.icon('alert')+'HOLD</span>' : '';
+      var holdBadge = hold ? ' <span class="tag tag-hold'+(hold.sev==='high'?'':' med')+'" data-tip="'+BB.esc(hold.reason)+'">'+BB.icon('alert')+'HOLD</span>' : '';
       tbl += '<tr>'+
         '<td style="white-space:nowrap;"><a href="#" class="dl-open" data-open="'+BB.esc(x.id)+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(orderRef(x))+'</a></td>'+
         '<td style="white-space:nowrap;">'+BB.esc(d.farmer(x.farmer).name)+'</td>'+
@@ -153,21 +177,18 @@ function render(){
         return { label:dep.name, sub:dep.region, depId:dep.id, parts:STATUS_OPTIONS.map(function(s){ return { name:s, value:mine.filter(function(x){ return x.status===s; }).length, color:STATUS_COL[s] }; }) }; }),
       // that depot's deliveries
       detail:function(ctx){ var mine=all.filter(function(x){ return x.depot===ctx.row.depId; });
-        return { table:delTable(mine, false), actions:[go('Open the depot','depots.html',true)] }; } });
+        return { stats:STATUS_OPTIONS.map(function(st){ return { l:st, v:mine.filter(function(x){ return x.status===st; }).length }; }).concat([{ l:'Deliveries', v:mine.length }]),
+          table:delTable(mine, true), actions:[go('Open the depot','depots.html',true)] }; } });
   }catch(e){ console.warn('chart', e); }
 }
 
 function wire(){
   Array.prototype.forEach.call(document.querySelectorAll('a.dl-open[data-open]'), function(a){
-    a.onclick = function(e){ e.preventDefault(); var x=d.by('deliveries', a.getAttribute('data-open')); if(x) BB.popup(deliveryPreview(x)); };
+    a.onclick = function(e){ e.preventDefault(); openDelivery(a.getAttribute('data-open')); };
   });
   Array.prototype.forEach.call(document.querySelectorAll('select[data-del]'), function(sel){
     sel.onchange = function(){
-      var id = sel.getAttribute('data-del');
-      var status = sel.value;
-      d.update('deliveries', id, { status:status });
-      BB.toast('Delivery updated · '+status);
-      render();
+      advance(sel.getAttribute('data-del'), sel.value);
     };
   });
 }

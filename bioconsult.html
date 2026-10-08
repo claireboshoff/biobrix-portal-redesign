@@ -59,8 +59,7 @@ function progDetail(list, opts){
   var tot=list.reduce(function(t,p){ return t+valueOf(p); },0);
   var rows=progRows(list, valueOf);
   if(list.length>1) rows.push([{ html:'<b>'+list.length+' programmes</b>' }, '', '', { html:'<b>'+BB.money(tot)+'</b>' }]);
-  return { table:{ columns:['Farm · block','Crop · season','Status',opts.valueLabel||'Value'], rows:rows, num:[3] },
-    note: list.length? 'Tap a programme to open it.' : null,
+  return { color:null, sub:null, table:{ columns:['Farm · block','Crop · season','Status',opts.valueLabel||'Value'], rows:rows, num:[3] },
     onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=list[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ openProg(p.id); }; }); },
     total:tot, count:list.length };
 }
@@ -69,7 +68,7 @@ function toProgList(){ BB.closePopup(); var el=document.getElementById('progList
   BB.statDetail(k, function(){
     var want=k==='pcActive'?'Active':'Draft', list=d.all('programs').filter(inMyScope).filter(function(p){ return p.status===want; });
     var x=progDetail(list);
-    return Object.assign(x, { sub:k==='pcActive'?'running this season':'awaiting sign-off', stats:[{ l:'Programmes', v:String(x.count) }, { l:'Value', v:BB.money(x.total) }],
+    return Object.assign(x, { stats:[{ l:'Programmes', v:String(x.count) }, { l:'Value', v:BB.money(x.total) }],
       actions:[{ label:'Open the full list', primary:true, onClick:toProgList }] });
   });
 });
@@ -151,12 +150,18 @@ function renderList(){
         var lineOf=function(p){ return (p.lines||[]).filter(function(l){ return l.prod===pid; }); };
         var cost=function(p){ return lineOf(p).reduce(function(t,l){ return t+(l.cost||0); },0); };
         uses.sort(function(a,b){ return cost(b)-cost(a); });
-        return { sub:[pr.code, pr.lever, pr.pack, BB.money(pr.price)+' per '+(pr.unit||'unit')].filter(Boolean).join(' · '),
+        var sup=d.supplier(pr.supplier)||{}, tot=uses.reduce(function(t,p){ return t+cost(p); },0), lib=BB.auth && BB.auth.canPage && BB.auth.canPage('products-library.html');
+        return { wide:true, layout:'split', color:null, sub:null, eyebrow:'Product'+(pr.lever?' · '+pr.lever:''), title:pr.name,
+          meta:[ { icon:'package', text:[pr.code, pr.pack].filter(Boolean).join(' · '), tip:'Code · pack' }, pr.cat && pr.cat!==pr.lever? { icon:'tag', text:pr.cat, tip:'Category' } : null,
+            sup.name? { icon:'link', text:sup.name, tip:'Supplier', html:BB.esc(sup.name)+(sup.lead!=null?'<small>'+sup.lead+' days lead</small>':'') } : null,
+            { icon:'receipt', text:BB.money(pr.price)+' per '+(pr.unit||'unit'), tip:'Price' } ],
+          stats:[{ l:'Programmes', v:String(uses.length), s:uses.filter(function(p){ return p.status==='Active'; }).length+' active' }, { l:'Value', v:BB.money(tot), s:'across them' }],
+          html:'<div class="bbp-tt">Where it is recommended</div>',
           table:{ columns:['Farm · block','Status','Rate','Timing','Cost'], rows:uses.map(function(p){ var f=d.farmer(p.farmer), b=d.by('blocks',p.block)||{name:'—'}, ls=lineOf(p);
             return [{ html:'<b>'+BB.esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.name)+'</div>' }, { html:BB.statusBadge(p.status) }, ls.map(function(l){ return l.rate||'—'; }).join(', '), ls.map(function(l){ return l.timing||'—'; }).join(', '), BB.money(cost(p))]; }), num:[4] },
           note: pr.sheet || null,
           onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var p=uses[i]; if(!p) return; tr.classList.add('click'); tr.onclick=function(){ openProg(p.id); }; }); },
-          actions: BB.auth && BB.auth.canPage && BB.auth.canPage('products-library.html') ? [{ label:'Product library', href:'products-library.html' }] : [] };
+          actions: lib ? [{ label:'Product library', href:'products-library.html?open='+encodeURIComponent(pid), primary:true }] : [] };
       } }); });
   }
   html += '</div>';

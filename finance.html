@@ -106,9 +106,14 @@ function render(){
   var byOpen=function(a,b){ return open_(b)-open_(a); }, byDate=function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); };
   var invTable=function(list, oneCust){
     var ta=0, to=0; list.forEach(function(i){ ta+=(i.amount||0); to+=open_(i); });
+    // one customer's open invoices, inside their card: short and narrow (the status is in the due date)
+    if(oneCust){ var nw=function(t){ return { html:'<span style="white-space:nowrap">'+BB.esc(t)+'</span>' }; };
+      return { columns:['Invoice','Date','Due','Amount','Outstanding'], num:[3,4], foot:list.length>1?['Total · '+list.length,{html:''},{html:''},BB.money(ta),BB.money(to)]:null,
+        rows:list.slice(0,POP_CAP).map(function(i){ var op=open_(i), dd=daysOver(i);
+          return { cells:[i.label||i.ref||'—', nw(BB.shortDate(i.date)), { html:'<span style="white-space:nowrap">'+BB.esc(BB.shortDate(i.dueDate))+'</span>'+(op>0.5&&dd>0?'<div style="font-size:.72rem;color:var(--red);font-weight:600;white-space:nowrap">'+dd+' days over</div>':'') }, BB.money(i.amount), op>0.5?BB.money(op):'—'] }; }) }; }
     var rows=list.slice(0,POP_CAP).map(function(i){ var f=d.farmer(i.farmer), op=open_(i), dd=daysOver(i);
-      return { cells:[i.label||i.ref||'—', f.name, BB.date(i.date), { html:BB.esc(BB.date(i.dueDate))+(op>0.5&&dd>0?' <span class="faint">· '+dd+' d over</span>':'') }, BB.money(i.amount), op>0.5?BB.money(op):'—', { html:BB.statusBadge(i.status) }], href:farmHref(i.farmer) }; });
-    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' invoices'),'','','',bold(BB.money(ta)),bold(BB.money(to)),''] });
+      return { cells:[i.label||i.ref||'—', f.name, BB.date(i.date), { html:BB.esc(BB.date(i.dueDate))+(op>0.5&&dd>0?' <span class="faint">· '+dd+' d over</span>':'') }, BB.money(i.amount), op>0.5?BB.money(op):'—', { html:BB.statusBadge(i.status) }], onClick:oneCust?null:cardRow(i.farmer) }; });
+    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' invoices'),{html:''},{html:''},{html:''},bold(BB.money(ta)),bold(BB.money(to)),{html:''}] });
     var t={ columns:['Invoice','Customer','Date','Due','Amount','Outstanding','Status'], rows:rows, num:[4,5] };
     // one customer's invoices: the name is in the title, not on every line
     if(oneCust){ t.columns.splice(1,1); t.rows.forEach(function(r){ r.cells.splice(1,1); }); t.num=[3,4]; }
@@ -116,29 +121,49 @@ function render(){
   };
   var payTable=function(list){
     var tot=0; list.forEach(function(x){ tot+=(x.amount||0); });
-    var rows=list.slice(0,POP_CAP).map(function(x){ return { cells:[x.ref||'—', d.farmer(x.farmer).name, BB.date(x.date), x.forInv||x.description||'—', BB.money(x.amount||0)], href:farmHref(x.farmer) }; });
-    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' receipts'),'','','',bold(BB.money(tot))] });
+    var rows=list.slice(0,POP_CAP).map(function(x){ return { cells:[x.ref||'—', d.farmer(x.farmer).name, BB.date(x.date), x.forInv||x.description||'—', BB.money(x.amount||0)], onClick:cardRow(x.farmer) }; });
+    if(list.length>1) rows.push({ cells:[bold('Total · '+list.length+' receipts'),{html:''},{html:''},{html:''},bold(BB.money(tot))] });
     return { columns:['Receipt','Customer','Date','For','Amount'], rows:rows, num:[4] };
   };
-  // the same markup BB.popup draws, for a popup that carries two tables
-  var tableHtml=function(title, t){ var nc=t.num||[];
-    return '<div class="eyebrow" style="margin:14px 0 6px;">'+BB.esc(title)+'</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-      (t.rows.length? t.rows.map(function(r){ return '<tr'+(r.href?' class="click" data-href="'+BB.esc(r.href)+'"':'')+'>'+r.cells.map(function(c,i){ return '<td'+(nc.indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c==null?'—':c))+'</td>'; }).join('')+'</tr>'; }).join('')
-        : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing to show.</div></td></tr>')+'</tbody></table></div>'; };
+  // ---- a customer, as its card (CONVENTIONS: the card pattern): who and where · what is open · its open invoices ----
+  var initialsOf=function(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); };
+  var cardRow=function(fid){ return fid && d.by('farmers', fid) ? function(){ BB.popup(custCard(fid)); } : null; };
+  function custCard(fid){
+    var f=d.farmer(fid), list=openInvs.filter(function(i){ return (i.farmer||null)===(fid||null); }).sort(byOpen);
+    var open=0, odv=0, oldest=0; list.forEach(function(i){ var v=open_(i); open+=v; if(i.status==='Overdue'){ odv+=v; oldest=Math.max(oldest, daysOver(i)); } });
+    var bal=d.accountBalance(fid), lim=d.creditLimit(fid), rep=d.rep(f.rep), tel=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27'), rec=farmHref(fid);
+    // the oldest overdue invoice with no reminder waiting yet: the one main thing to do from here
+    var nudge=list.filter(function(i){ return i.status==='Overdue' && !outbox.some(function(x){ return x.invoice===i.id && x.status==='Draft'; }); }).sort(function(a,b){ return daysOver(b)-daysOver(a); })[0];
+    var t=invTable(list, true); t.title='Open invoices';
+    var warn = lim && bal>lim ? 'Over the credit limit by '+BB.money(bal-lim)+' · deliveries on hold' : (odv? BB.money(odv)+' overdue · deliveries on hold' : '');
+    return { eyebrow:'Customer', title:f.name||'—', wide:true, layout:'split',
+      meta:[ f.farm&&f.farm!==f.name?{ icon:'farm', text:f.farm, tip:'Farm', href:rec }:null,
+        (f.town||f.region)?{ icon:'map', text:[f.town,f.region].filter(Boolean).join(', '), tip:'Town' }:null,
+        tel?{ icon:'phone', tip:'Phone', html:'<a href="tel:+'+tel+'">'+BB.esc(f.cell)+'</a>' }:null,
+        rep&&rep.name&&rep.name!=='—'?{ initials:initialsOf(rep.name), color:rep.colour, text:rep.name, tip:'Rep' }:null ],
+      stats:[{ l:'Open', v:BB.money(open), s:list.length+' invoice'+(list.length===1?'':'s') },
+        { l:'Overdue', v:odv?BB.money(odv):'—', s:odv?'oldest '+oldest+' days':'inside terms', cls:odv?'bad':'' },
+        { l:'Balance', v:BB.money(bal), s:BB.auth.live?'in your accounts':'open invoices' },
+        { l:'Credit limit', v:lim?BB.money(lim):'—', s:lim&&bal>lim?'over by '+BB.money(bal-lim):null, cls:lim&&bal>lim?'warn':'' }],
+      html:warn?'<div class="bbp-alert'+(odv?'':' warn')+'">'+BB.icon('alert')+'<span>'+BB.esc(warn)+'</span></div>':'', table:t, note:capNote(list.length),
+      actions:[ rec?{ label:'Farm record', href:rec }:null,
+        nudge? { label:'Draft reminder · '+(nudge.label||nudge.ref), primary:true, onClick:function(){ BB.closePopup(); draftReminder(nudge.id); } }
+             : { label:'Go to the invoices', primary:!rec, onClick:toInvoices } ].filter(Boolean) };
+  }
   var toInvoices=function(){ BB.closePopup(); var el=document.getElementById('invoices'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); };
   // The tiles' list is the invoices table below under its ?show= preset: already there → scroll; otherwise load it.
   var curShow=(new URLSearchParams(location.search).get('show')||'all').toLowerCase();
   var listAction=function(k){ return [{ label:'Open the full list', primary:true, onClick:function(){ if(curShow===k) toInvoices(); else location.href='finance.html?show='+k+'#invoices'; } }]; };
   var openInvs=invs.filter(function(i){ return open_(i)>0.5; });
   var recvList=paySrc.filter(function(x){ return String(x.date||'').slice(0,7)===thisYm; }).sort(byDate);
-  BB.statDetail('f-owed', function(){ return { sub:'open invoices, largest first', wide:true, table:invTable(openInvs.slice().sort(byOpen)), note:capNote(openInvs.length), actions:listAction('open') }; });
-  BB.statDetail('f-overdue', function(){ return { sub:'past their due date, largest first · deliveries on hold', wide:true, table:invTable(overdueInvs.slice().sort(byOpen)), note:capNote(overdueInvs.length), actions:listAction('overdue') }; });
-  BB.statDetail('f-recv', function(){ return { sub:'payments received this month, newest first', wide:true, table:payTable(recvList), note:capNote(recvList.length),
+  BB.statDetail('f-owed', function(){ return { wide:true, table:invTable(openInvs.slice().sort(byOpen)), note:capNote(openInvs.length), actions:listAction('open') }; });
+  BB.statDetail('f-overdue', function(){ return { wide:true, table:invTable(overdueInvs.slice().sort(byOpen)), note:capNote(overdueInvs.length), actions:listAction('overdue') }; });
+  BB.statDetail('f-recv', function(){ return { wide:true, table:payTable(recvList), note:capNote(recvList.length),
     actions:[{ label:'Go to the invoices', primary:true, onClick:toInvoices }] }; });
   BB.statDetail('f-overlimit', function(){
     var rows=overL.map(function(f){ var b=d.accountBalance(f.id), l=d.creditLimit(f.id); return { f:f, b:b, l:l, o:b-l }; }).sort(function(a,b){ return b.o-a.o; });
-    return { sub:'balance above the credit limit', table:{ columns:['Customer','Balance','Limit','Over by'], num:[1,2,3],
-      rows:rows.map(function(r){ return { cells:[r.f.name+(r.f.farm&&r.f.farm!==r.f.name?' · '+r.f.farm:''), BB.money(r.b), BB.money(r.l), BB.money(r.o)], href:farmHref(r.f.id) }; }) } }; });
+    return { table:{ columns:['Customer','Balance','Limit','Over by'], num:[1,2,3],
+      rows:rows.map(function(r){ return { cells:[r.f.name+(r.f.farm&&r.f.farm!==r.f.name?' · '+r.f.farm:''), BB.money(r.b), BB.money(r.l), BB.money(r.o)], onClick:cardRow(r.f.id) }; }) } }; });
 
   var html='';
   html+='<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Finance</div><h1>Finance &amp; reconciliation</h1>'+
@@ -276,8 +301,9 @@ function render(){
         detail:function(ctx){ var m=MONTHS6[ctx.index]; if(!m) return null;
           var iv=invs.filter(function(i){ return String(i.date||'').slice(0,7)===m.ym; }).sort(byDate);
           var py=paySrc.filter(function(x){ return String(x.date||'').slice(0,7)===m.ym; }).sort(byDate);
-          return { sub:iv.length+' invoice'+(iv.length===1?'':'s')+' · '+py.length+' receipt'+(py.length===1?'':'s'), wide:true,
-            html:tableHtml('Invoices', invTable(iv))+tableHtml('Receipts', payTable(py)),
+          var ivT=invTable(iv), pyT=payTable(py); ivT.title='Invoices'; pyT.title='Receipts';
+          return { wide:true, stats:[{ l:'Invoiced', v:BB.money(invByM[ctx.index]||0), s:iv.length+' invoice'+(iv.length===1?'':'s') }, { l:'Received', v:BB.money(payByM[ctx.index]||0), s:py.length+' receipt'+(py.length===1?'':'s') }],
+            tables:[ivT, pyT],
             note:(iv.length>POP_CAP||py.length>POP_CAP)?'Long lists show their first '+POP_CAP+' lines; the totals count them all.':null }; } });
     else document.getElementById('chTrend').innerHTML='<div class="chart-empty">Nothing invoiced or received in the last six months.</div>';
   }catch(e){ console.warn('chart', e); }
@@ -286,7 +312,7 @@ function render(){
       // an age band → the open invoices in it
       detail:function(ctx){ var bi=ageB.indexOf(ctx.row); if(bi<0) return null;
         var list=openInvs.filter(function(i){ var dd=daysOver(i); return (dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4)===bi; }).sort(byOpen);
-        return { sub:list.length+' open invoice'+(list.length===1?'':'s')+' · largest first', wide:true, table:invTable(list), note:capNote(list.length),
+        return { wide:true, stats:[{ l:'Open', v:BB.money(ctx.value), s:list.length+' invoice'+(list.length===1?'':'s') }, { l:'Share', v:(ctx.total?Math.round(ctx.value/ctx.total*100):0)+'%', s:'of '+BB.money(ctx.total)+' owed' }], table:invTable(list), note:capNote(list.length),
           actions:[{ label:'Go to the invoices', primary:true, onClick:toInvoices }] }; } });
     else document.getElementById('chAge').innerHTML='<div class="chart-empty">Nothing open. Every invoice is paid.</div>';
   }catch(e){ console.warn('chart', e); }
@@ -296,17 +322,22 @@ function render(){
         return { label:f.name||'—', sub:(f.farm&&f.farm!==f.name?f.farm:(r.n+' open')), href:(canFarm&&r.id?'farm-detail.html?farmer='+r.id:null),
           parts:[{name:'Overdue',value:r.od,color:'#b8382a'},{name:'Not yet overdue',value:r.nd,color:'#3f6b28'}] }; }),
         legend:[{name:'Overdue',color:'#b8382a'},{name:'Not yet overdue',color:'#3f6b28'}], valueLabel:'Open', openLabel:'Open full record',
-        // a customer → their open invoices
+        // a customer → their card
         detail:function(ctx){ var r=debtors[ctx.index]; if(!r) return null;
-          var list=openInvs.filter(function(i){ return (i.farmer||null)===(r.id||null); }).sort(byOpen);
-          var out={ sub:list.length+' open invoice'+(list.length===1?'':'s')+(r.od?' · '+BB.money(r.od)+' overdue':''), wide:true, table:invTable(list, true), note:capNote(list.length) };
-          if(!farmHref(r.id)) out.actions=[{ label:'Go to the invoices', primary:true, onClick:toInvoices }];
-          return out; } });
+          if(r.id && d.by('farmers', r.id)){ var c=custCard(r.id); c.color=null; return c; }
+          var list=openInvs.filter(function(i){ return !i.farmer; }).sort(byOpen);
+          return { wide:true, table:invTable(list), note:capNote(list.length), actions:[{ label:'Go to the invoices', primary:true, onClick:toInvoices }] }; } });
     else document.getElementById('chDebtors').innerHTML='<div class="chart-empty">Nobody owes anything right now.</div>';
   }catch(e){ console.warn('chart', e); }
   wire();
 }
 function nextMonth25(){ var n=new Date(); var y=n.getFullYear(), m=n.getMonth()+1; if(m>11){m=0;y++;} return y+'-'+String(m+1).padStart(2,'0')+'-25'; }
+// a reminder for one invoice lands in the outbox as a draft (the invoice row's button and the customer card both use it)
+function draftReminder(id){
+  var iv=d.by('invoices', id); if(!iv) return; var f=d.farmer(iv.farmer);
+  d.add('outbox',{ kind:'Reminder', to:iv.farmer, invoice:iv.id, subject:(iv.status==='Overdue'?'Gentle reminder — ':'Heads-up — ')+iv.ref+' ('+BB.money(iv.amount)+') '+(iv.status==='Overdue'?'is overdue':'is due '+BB.date(iv.dueDate)), status:'Draft', created:new Date().toISOString().slice(0,10), channel:'Email + WhatsApp' });
+  BB.toast('Reminder drafted for '+f.name+' — check & send below'); render();
+}
 function wire(){
   var sn=document.getElementById('syncNow'); if(sn) sn.onclick=function(){
     if(BB.auth.live){ sn.disabled=true; sn.innerHTML=BB.icon('refresh')+'Fetching…'; d.refreshSage().then(function(ok){ sn.disabled=false; sn.innerHTML=BB.icon('refresh')+'Sync now'; BB.toast(ok?'Latest Sage figures loaded':'No newer figures yet — Sage is read at 06:00, 12:00 and 17:00'); render(); }); return; }
@@ -317,10 +348,7 @@ function wire(){
       d.add('invoices',{ ref:'INV-'+(1046+Math.floor(Math.random()*900)), farmer:o.farmer, order:o.id, date:new Date().toISOString().slice(0,10), dueDate:nextMonth25(), description:'Order '+o.ref, amount:d.quoteTotal(o), status:'Outstanding', paidDate:null }); n++;
     });
     BB.toast(n+' invoice'+(n===1?'':'s')+' generated — actuals updated'); render(); }; });
-  document.querySelectorAll('button[data-remind]').forEach(function(b){ b.onclick=function(){
-    var iv=d.by('invoices', this.dataset.remind); if(!iv) return; var f=d.farmer(iv.farmer);
-    d.add('outbox',{ kind:'Reminder', to:iv.farmer, invoice:iv.id, subject:(iv.status==='Overdue'?'Gentle reminder — ':'Heads-up — ')+iv.ref+' ('+BB.money(iv.amount)+') '+(iv.status==='Overdue'?'is overdue':'is due '+BB.date(iv.dueDate)), status:'Draft', created:new Date().toISOString().slice(0,10), channel:'Email + WhatsApp' });
-    BB.toast('Reminder drafted for '+f.name+' — check & send below'); render(); }; });
+  document.querySelectorAll('button[data-remind]').forEach(function(b){ b.onclick=function(){ draftReminder(this.dataset.remind); }; });
   document.querySelectorAll('button[data-send]').forEach(function(b){ b.onclick=function(){ d.update('outbox', this.dataset.send, { status:'Sent', sentAt:new Date().toISOString().slice(0,10) }); BB.toast('Sent · logged against the farmer'); render(); }; });
 }
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');

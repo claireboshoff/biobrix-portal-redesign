@@ -85,7 +85,26 @@ function stockTable(list, w){ if(w==null) w=many();
 function jobTable(list, w){ if(w==null) w=many();
   return { columns:['Recipe','Batch'].concat(w?['Depot']:[]).concat(['For','Due','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).map(function(b){
-      return { cells:[b.recipe, b.batch].concat(w?[depShort(b.depot)]:[]).concat([d.farmer(b['for']).name, BB.date(b.due), { html:BB.statusBadge(b.status) }]), href:farmHref(b['for']) }; }) };
+      return { cells:[b.recipe, b.batch].concat(w?[depShort(b.depot)]:[]).concat([d.farmer(b['for']).name, BB.date(b.due), { html:BB.statusBadge(b.status) }]), onClick:function(){ BB.popup(jobCard(b)); } }; }) };
+}
+// A blending job opens as a card (CONVENTIONS.md, "Record popups: the card pattern").
+function jobCard(b){
+  var f=d.farmer(b['for']), fh=farmHref(b['for']);
+  return { eyebrow:'Blending job', title:b.recipe,
+    meta:[{ icon:'calendar', text:'Due '+BB.date(b.due), tip:'Due' }, { icon:'warehouse', text:d.depot(b.depot).name, tip:'Depot' },
+      f.farm && f.farm!==f.name ? { icon:'user', text:f.name, tip:'For' } : null, { icon:'farm', text:f.farm||f.name, tip:'Farm', href:fh }],
+    stats:[{ l:'Status', html:BB.statusBadge(b.status) }, { l:'Batch', v:b.batch }],
+    actions:[go('Farm record', fh), go('Batch labels', 'labels.html?mode=blend', true)] };
+}
+// A depot opens as a card: its stock and its blending floor, with the button that opens it here.
+function depotCard(dep){
+  var s=depotSummary(dep.id), open=s.dels.filter(function(x){ return x.status!=='Delivered'; }).length;
+  var st=stockTable(s.inv, false), jt=jobTable(s.jobs, false); st.title='Stock on hand · lowest first'; jt.title='Mixing & blending';
+  return { wide:true, layout:'split', eyebrow:'Depot', title:dep.name, tags:BB.statusBadge(dep.status), color:null,
+    meta:[{ icon:'map', text:dep.region, tip:'Region' }, dep.address? { icon:'map', text:dep.address, tip:'Address' } : null, dep.manager? { icon:'user', text:dep.manager, tip:'Warehouse manager' } : null],
+    stats:[{ l:'Stock lines', v:s.inv.length }, { l:'Below reorder', v:s.low.length, cls:s.low.length?'bad':'' }, { l:'Blending', v:s.jobs.length, s:'jobs on the floor' }, { l:'Deliveries', v:open, s:'still open' }],
+    tables:[st].concat(s.jobs.length? [jt] : []),
+    actions:[go('Count stock','stock.html'), openDepot(dep.id)] };
 }
 function delTable(list, w){ if(w==null) w=many();
   return { columns:['Order','Farmer'].concat(w?['Depot']:[]).concat(['Transport','ETA','Status']),
@@ -136,7 +155,7 @@ function renderDetail(id){
   } else {
     blendBody = '<div class="scroll"><table class="bb"><thead><tr><th>Recipe</th><th class="num">Batch</th><th>For</th><th>Due</th><th class="num">Status</th></tr></thead><tbody>';
     s.jobs.forEach(function(b){
-      blendBody += '<tr>'+
+      blendBody += '<tr class="click" data-job="'+BB.esc(b.id)+'">'+
         '<td><b style="color:var(--green-dark);">'+BB.esc(b.recipe)+'</b></td>'+
         '<td class="num">'+BB.esc(b.batch)+'</td>'+
         '<td>'+BB.esc(d.farmer(b['for']).name)+'</td>'+
@@ -268,23 +287,14 @@ function render(){
           {name:'Below reorder', values:depots.map(function(x){ return sums[x.id].low.length; }), color:'#b8382a'},
           {name:'Blending jobs', values:depots.map(function(x){ return sums[x.id].jobs.length; }), color:'#c77d17'},
           {name:'Deliveries', values:depots.map(function(x){ return sums[x.id].dels.length; }), color:'#2f6f9e'}],
-        // that depot's stock, blending and deliveries
-        detail:function(ctx){ var dep=depots[ctx.index], s=sums[dep.id];
-          var mini=function(title, t){ if(!t.rows.length) return '<div class="sub" style="margin:12px 0 4px;font-weight:600;">'+title+'</div><div class="faint" style="font-size:.84rem;">None.</div>';
-            return '<div class="sub" style="margin:12px 0 6px;font-weight:600;">'+title+'</div>'+
-            '<div class="scroll"><table class="bb" data-nofilter="1"><thead><tr>'+t.columns.map(function(c,i){ return '<th'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+BB.esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-            (t.rows.length? t.rows.map(function(r){ return '<tr>'+r.cells.map(function(c,i){ return '<td'+((t.num||[]).indexOf(i)>=0?' class="num"':'')+'>'+(c&&c.html!=null?c.html:BB.esc(c))+'</td>'; }).join('')+'</tr>'; }).join('')
-              : '<tr><td colspan="'+t.columns.length+'"><div class="empty">Nothing here.</div></td></tr>')+'</tbody></table></div>'; };
-          // the four counts measure different things, so no shares of a total
-          return { title:dep.name, sub:dep.region+' · '+dep.manager, wide:true,
-            stats:[{l:'Stock lines', v:s.inv.length}, {l:'Below reorder', v:s.low.length, cls:s.low.length?'bad':''}, {l:'Blending jobs', v:s.jobs.length}, {l:'Deliveries', v:s.dels.length, s:s.dels.filter(function(x){ return x.status!=='Delivered'; }).length+' not yet at the farm'}],
-            html:mini('Stock on hand · lowest first', stockTable(s.inv, false))+mini('Mixing &amp; blending', jobTable(s.jobs, false)),
-            actions:[openDepot(dep.id)] }; } });
+        // that depot's card
+        detail:function(ctx){ return depotCard(depots[ctx.index]); } });
     }catch(e){ console.warn('chart', e); }
   }
 }
 
 function wire(){
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-job]'), function(tr){ tr.onclick=function(){ var b=d.by('blending', tr.getAttribute('data-job')); if(b) BB.popup(jobCard(b)); }; });
   var at=document.getElementById('addTask'); if(at) at.onclick=function(){ var txt=document.getElementById('newTask').value.trim(); if(!txt){ BB.toast('Type the task first'); return; } d.add('depotTasks',{ depot:this.dataset.depot, text:txt, by:BB.user.id, due:document.getElementById('newTaskDue').value||null, status:'Open' }); BB.toast('Task added · depot group updated'); render(); };
   Array.prototype.forEach.call(document.querySelectorAll('button[data-taskdone]'), function(b){ b.onclick=function(e){ e.stopPropagation(); d.update('depotTasks', this.dataset.taskdone, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Done'); render(); }; });
   var nt=document.getElementById('newTask'); if(nt) nt.onclick=function(e){ e.stopPropagation(); };

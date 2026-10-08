@@ -56,22 +56,32 @@ var state = { q:'', kind:'All', farmer:'' };
 // ---- popups: the files or farms behind a figure. A farm row opens its folder here. ----
 function pickFarm(id){ BB.closePopup(); state.farmer=id||''; render(); var el=document.getElementById('fileList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 function docHref(f){ return 'document.html?farmer='+encodeURIComponent(f.farmer||'')+'&kind='+encodeURIComponent(f.kind||'Document')+'&name='+encodeURIComponent(f.name||''); }
+function canGo(h){ try{ return BB.auth.canPage(h); }catch(e){ return true; } }
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") ----
+// one file: which farm, what kind, when; open it, or go to that farm's folder
+function fileCard(f){
+  var fm=d.farmer(f.farmer);
+  return { color:null, sub:null, eyebrow:'Farm file · '+(f.kind||'Document'), title:f.name,
+    meta:[ { icon:'farm', text:fm.farm, tip:'Farm', href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(f.farmer):null },
+      fm.name? { icon:'user', text:fm.name, tip:'Farmer' } : null,
+      { icon:KIND_IC[f.kind]||'file', text:(f.kind||'Document')+(f.size&&f.size!=='—'?' · '+f.size:''), tip:'Kind · size' },
+      f.date? { icon:'calendar', text:'Filed '+BB.date(f.date), tip:'Filed' } : null ],
+    actions:[{ label:'Farm folder', onClick:function(){ pickFarm(f.farmer); } }, { label:'Open document', href:docHref(f), primary:true }] };
+}
+// the files behind a figure; a row opens that file's card
 function fileDetail(list){
   list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  return { table:{ columns:['File','Kind','Farm','Date'], rows:list.map(function(f){ var fm=d.farmer(f.farmer);
-      return { cells:[{ html:'<b>'+BB.esc(f.name)+'</b>' }, { html:'<span class="kind k-'+BB.esc(f.kind)+'">'+BB.esc(f.kind)+'</span>' }, fm.farm, BB.shortDate(f.date)], href:docHref(f) }; }) },
-    note: list.length? 'Tap a file to open it.' : null };
+  return { color:null, sub:null, table:{ columns:['File','Kind','Farm','Date'], rows:list.map(function(f){ var fm=d.farmer(f.farmer);
+      return { cells:[{ html:'<b>'+BB.esc(f.name)+'</b>' }, { html:'<span class="kind k-'+BB.esc(f.kind)+'">'+BB.esc(f.kind)+'</span>' }, fm.farm, { html:'<span style="white-space:nowrap;">'+BB.shortDate(f.date)+'</span>' }], onClick:function(){ BB.popup(fileCard(f)); } }; }) } };
 }
 function toFiles(){ BB.closePopup(); var el=document.getElementById('fileList'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }
 var TILE={};
-BB.statDetail('ffMonth', function(){ return Object.assign(fileDetail(TILE.month||[]), { sub:'filed since the 1st of this month', actions:[{ label:'Open the full list', primary:true, onClick:toFiles }] }); });
+BB.statDetail('ffMonth', function(){ return Object.assign(fileDetail(TILE.month||[]), { actions:[{ label:'Open the full list', primary:true, onClick:toFiles }] }); });
 BB.statDetail('ffFarms', function(){
   var all=TILE.all||[], by={};
   all.forEach(function(f){ var k=f.farmer; if(!by[k]) by[k]={ n:0, last:'' }; by[k].n++; if((f.date||'')>by[k].last) by[k].last=f.date||''; });
   var ids=Object.keys(by).sort(function(a,b){ return by[b].n-by[a].n; });
-  return { sub:'farms with at least one document',
-    table:{ columns:['Farm','Files','Last filed'], rows:ids.map(function(id){ var fm=d.farmer(id); return [{ html:'<b>'+BB.esc(fm.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(fm.name)+'</div>' }, String(by[id].n), by[id].last?BB.shortDate(by[id].last):'—']; }), num:[1] },
-    note: ids.length? 'Tap a farm to open its folder.' : null,
+  return { table:{ columns:['Farm','Files','Last filed'], rows:ids.map(function(id){ var fm=d.farmer(id); return [{ html:'<b>'+BB.esc(fm.farm)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(fm.name)+'</div>' }, String(by[id].n), by[id].last?BB.shortDate(by[id].last):'—']; }), num:[1] },
     onOpen:function(body){ body.querySelectorAll('tbody tr').forEach(function(tr,i){ var id=ids[i]; if(!id) return; tr.classList.add('click'); tr.onclick=function(){ pickFarm(id); }; }); },
     actions:[{ label:'Open the full list', primary:true, onClick:toFiles }] };
 });

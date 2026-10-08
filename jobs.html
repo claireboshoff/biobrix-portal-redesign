@@ -97,7 +97,7 @@ function render(){
 }
 function bandPop(b, list){
   var last=function(j){ var m=j.msgs[j.msgs.length-1]; return m? (m.from==='fh'?'FreedomHub':d.person(m.from).name)+': '+m.text : ''; };
-  return { sub:b.hint+' · '+list.length+' job'+(list.length===1?'':'s'), wide:list.length>0, stats:[],
+  return { wide:list.length>0, stats:[],
     html: list.length? '<div class="pop-jobs">'+list.map(function(j){
         return '<div class="job" data-popjob="'+j.id+'" role="button" tabindex="0"><div style="min-width:0;"><div class="t">'+BB.esc(j.title)+'</div>'+
           '<div class="m">'+BB.esc(d.person(j.by).name)+' · '+BB.date(j.created)+' · '+j.msgs.length+' message'+(j.msgs.length===1?'':'s')+'</div>'+

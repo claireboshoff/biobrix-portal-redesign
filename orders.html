@@ -250,7 +250,7 @@ function bind(){
 }
 
 // ---- the actions: status, invoice, quote chain. Each one saves, redraws the list and refreshes the popup.
-function afterAction(id){ render(); if(BB.closePopup) BB.closePopup(); setTimeout(function(){ openOrder(id); }, 170); }
+function afterAction(id){ render(); openOrder(id); }   // the card refreshes in place
 function doAdvance(id, val){ d.update('orders', id, { status:val }); BB.toast('Status updated to '+val); afterAction(id); }
 function doInvoice(id){
   var o=d.by('orders', id);

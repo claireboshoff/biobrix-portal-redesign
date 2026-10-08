@@ -114,7 +114,9 @@ function label(title, rows, bars){
   '</div>';
 }
 
-render('product');
+// ?mode=blend|delivery opens that sheet (a blending job's card links here)
+var startMode = new URLSearchParams(location.search).get('mode');
+render(MODES[startMode] ? startMode : 'product');
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>

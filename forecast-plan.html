@@ -85,10 +85,42 @@ function render(){
     list=list.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
     var tot=0, cols=['Date','Invoice'].concat(showCust?['Customer']:[]).concat(['Amount']);
     var rows=list.slice(0,200).map(function(i){ tot+=(i.amount||0);
-      return { href:custHref(i.customer), cells:[BB.date(i.date), i.label||i.ref||'—'].concat(showCust?[custName[i.customer]||'—']:[]).concat([money(i.amount||0)]) }; });
+      return { onClick:showCust? custRow(i.customer) : null, cells:[BB.date(i.date), i.label||i.ref||'—'].concat(showCust?[custName[i.customer]||'—']:[]).concat([money(i.amount||0)]) }; });
     var all=list.reduce(function(t,i){ return t+(i.amount||0); },0);
-    if(list.length>1) rows.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-1).map(function(){ return ''; })).concat([{ html:'<b>'+money(all)+'</b>' }]) });
-    return { table:{ columns:cols, rows:rows, num:[cols.length-1] }, note: list.length>200? 'Showing the 200 newest of '+list.length+'.' : (showCust && list.length? 'Tap an invoice to open that customer’s farm file.' : null) };
+    if(list.length>1) rows.push({ cells:[{ html:'<b>'+list.length+' invoices</b>' }].concat(cols.slice(1,-1).map(function(){ return {html:''}; })).concat([{ html:'<b>'+money(all)+'</b>' }]) });
+    return { table:{ columns:cols, rows:rows, num:[cols.length-1] }, note: list.length>200? 'Showing the 200 newest of '+list.length+'.' : null };
+  }
+  // ---- record cards (CONVENTIONS: the card pattern): a ledger customer, a product ----
+  var custById = {}; ((sg && sg.customers)||[]).forEach(function(c){ custById[c.id]=c; });
+  var custRow = function(id){ return custById[id]? function(){ BB.popup(custCard(id)); } : null; };
+  var planCell = function(sel){ var el=host.querySelector(sel); if(!el) return null;
+    return function(){ BB.closePopup(); el.scrollIntoView({ behavior:'smooth', block:'center' }); setTimeout(function(){ el.focus(); }, 400); }; };
+  // a customer: account, town, farm file · invoiced, invoices, last invoice, planned · its invoices
+  function custCard(id){
+    var c=custById[id]||{ name:custName[id]||'—' }, list=ledgerInv.filter(function(i){ return i.customer===id; }), x=invoiceTable(list, false);
+    var tot=list.reduce(function(t,i){ return t+(i.amount||0); },0), last=list.reduce(function(m,i){ return (i.date||'')>m? i.date : m; }, '');
+    var plan=0; months.slice(0,6).forEach(function(m){ plan += Number(((fc[d.fKey(m, null, 'sage_'+id)]||{}).value)||0); });
+    var rec=custHref(id), go=canEdit && view==='customer'? planCell('input[data-fv="'+d.fKey(months[0], null, 'sage_'+id)+'"]') : null;
+    x.table.title='Invoices to date';
+    return merge(x, { eyebrow:'Customer', title:c.name||'—', color:null, wide:true, layout:'split',
+      meta:[ c.code?{ icon:'tag', text:c.code, tip:'Account' }:null, c.town?{ icon:'map', text:c.town, tip:'Town' }:null, rec?{ icon:'farm', text:'Farm file', href:rec, tip:'Farm file' }:null ],
+      stats:[{ l:'Invoiced to date', v:money(tot), s:'excl. opening balance' }, { l:'Invoices', v:BB.num(list.length) }, { l:'Last invoice', v:last? BB.shortDate(last) : '—' },
+        { l:'Planned', v:plan? money(plan) : '—', s:'next six months' }],
+      actions:[ rec?{ label:'Farm file', href:rec }:null, go?{ label:'Plan this customer', primary:true, onClick:go }:null ].filter(Boolean) });
+  }
+  // a product: code, pack · planned, last year, sold · month by month
+  function productCard(p){
+    var tp=0, tl=0;
+    var cells=months.map(function(m){
+      var v=Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0), ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4), w=(p.months&&p.months[ly])? Number(p.months[ly].qty)||0 : 0;
+      tp+=v; tl+=w; return { cells:[monthLabel(m), v? BB.num(v) : '—', w? BB.num(w) : '—', { html:(v&&w)? BB.delta(v,w)||'—' : '—' }] }; });
+    var go=canEdit && view==='product'? planCell('input[data-f="'+d.fKey(months[0], p.id, null)+'"]') : null;
+    return { eyebrow:'Product', title:p.name, color:null, wide:true, layout:'split',
+      meta:[ p.code?{ icon:'tag', text:p.code, tip:'Code' }:null, { icon:'package', text:'Counted in '+(p.pack||'L'), tip:'Unit' }, p.real?{ icon:'link', text:'From your accounting system', tip:'Source' }:null ],
+      stats:[{ l:'Planned', v:tp? BB.num(Math.round(tp)) : '—', s:'this season' }, { l:'Last year', v:tl? BB.num(Math.round(tl)) : '—', s:'the same months' }, { l:'Change', html:(tp&&tl)? BB.delta(tp,tl)||'—' : '—' },
+        p.sold? { l:'Sold to date', v:BB.num(p.sold) } : { l:'Months planned', v:BB.num(months.filter(function(m){ return Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0); }).length), s:'of 12' }],
+      table:{ title:'Month by month, units', columns:['Month','Plan','Last year','Change'], rows:cells, num:[1,2,3], foot:['The season', tp? BB.num(Math.round(tp)) : '—', tl? BB.num(Math.round(tl)) : '—', ''] },
+      actions:[ go?{ label:'Edit the plan', primary:true, onClick:go }:null ].filter(Boolean) };
   }
   function prevMonthsAll(){ var out=[], p=startYm.split('-'), y=parseInt(p[0],10), m=parseInt(p[1],10); for(var i=0;i<12;i++){ m--; if(m<1){m=12;y--;} out.unshift(y+'-'+String(m).padStart(2,'0')); } return out; }
   var ledgerInv = (sg && sg.live) ? (sg.invoices||[]).filter(function(i){ return i.kind!=='opening'; }) : [];
@@ -144,12 +176,12 @@ function render(){
           return { p:p, v:v, w:w };
         }).filter(function(x){ return x.v||x.w; }).sort(function(a,b){ return (b.v-a.v)||(b.w-a.w); });
         rows.forEach(function(x){ tp+=x.v; tl+=x.w; });
-        var cells=rows.map(function(x){ return { cells:[{ html:'<b>'+BB.esc(x.p.name)+'</b>' }, x.p.pack||'L', x.v? BB.num(x.v) : '—', x.w? BB.num(x.w) : '—',
+        var cells=rows.map(function(x){ return { onClick:function(){ BB.popup(productCard(x.p)); }, cells:[{ html:'<b>'+BB.esc(x.p.name)+'</b>' }, x.p.pack||'L', x.v? BB.num(x.v) : '—', x.w? BB.num(x.w) : '—',
           { html:(x.v&&x.w)? BB.delta(x.v,x.w)||'—' : '—' }] }; });
-        if(rows.length>1) cells.push({ cells:[{ html:'<b>'+rows.length+' products</b>' }, '', { html:'<b>'+BB.num(Math.round(tp))+'</b>' }, { html:'<b>'+BB.num(Math.round(tl))+'</b>' }, ''] });
-        return { sub:rows.length? rows.length+' product'+(rows.length===1?'':'s')+' planned or sold in '+ctx.label : 'Nothing planned or sold in '+ctx.label,
+        if(rows.length>1) cells.push({ cells:[{ html:'<b>'+rows.length+' products</b>' }, {html:''}, { html:'<b>'+BB.num(Math.round(tp))+'</b>' }, { html:'<b>'+BB.num(Math.round(tl))+'</b>' }, {html:''}] });
+        return { stats:[{ l:'Plan', v:tp? BB.num(Math.round(tp)) : '—', s:'units' }, { l:'Last year', v:tl? BB.num(Math.round(tl)) : '—', s:'units invoiced' }, { l:'Products', v:BB.num(rows.length), s:'planned or sold' }],
           table:{ columns:['Product','Unit','Plan','Last year','Change'], rows:cells, num:[2,3,4] },
-          note:'Units. Type the plan in the table on this page.' };
+          note:rows.length? null : 'Nothing planned or sold in '+ctx.label+'.' };
       } }); });
     else emptyChart('#chPlan','Nothing planned yet. Type a figure in the table below and it shows here.');
     var topP = perProd.map(function(x){ return { label:x.label, sub:x.sub, value:rankByLy? x.ly : x.value }; })
@@ -158,14 +190,7 @@ function render(){
       // one product, month by month: plan beside last year
       detail:function(ctx){
         var p=products.filter(function(x){ return x.name===ctx.row.label; })[0]; if(!p) return null;
-        var tp=0, tl=0;
-        var cells=months.map(function(m){
-          var v=Number(((fc[d.fKey(m, p.id, null)]||{}).qty)||0), ly=(parseInt(m.slice(0,4),10)-1)+m.slice(4), w=(p.months&&p.months[ly])? Number(p.months[ly].qty)||0 : 0;
-          tp+=v; tl+=w; return { cells:[monthLabel(m), v? BB.num(v) : '—', w? BB.num(w) : '—', { html:(v&&w)? BB.delta(v,w)||'—' : '—' }] }; });
-        cells.push({ cells:[{ html:'<b>The season</b>' }, { html:'<b>'+(tp? BB.num(Math.round(tp)) : '—')+'</b>' }, { html:'<b>'+(tl? BB.num(Math.round(tl)) : '—')+'</b>' }, ''] });
-        return { sub:(p.code? p.code+' · ' : '')+(p.pack||'L')+' · units per month',
-          stats:[{ l:'Planned', v:tp? BB.num(Math.round(tp)) : '—', s:'this season' }, { l:'Same months last year', v:tl? BB.num(Math.round(tl)) : '—' }].concat(p.sold? [{ l:'Sold to date', v:BB.num(p.sold) }] : []),
-          table:{ columns:['Month','Plan','Last year','Change'], rows:cells, num:[1,2,3] } };
+        return productCard(p);
       } }); });
     else emptyChart('#chProd','No product has a planned figure yet.');
 
@@ -239,15 +264,12 @@ function render(){
     '</div>';
     if(prevVals.some(function(v){ return v>0; })) chartJobs.push(function(){ BB.chart.bar('#chBack',{ labels:prevMonths.map(monthLabel), money:true, height:290, table:true, series:[{name:'Invoiced',values:prevVals,color:'#3f6b28'}],
       detail:function(ctx){ var m=prevMonths[ctx.index], list=ledgerInv.filter(function(i){ return ym(i.date)===m; });
-        return merge(invoiceTable(list, true), { sub:list.length+' invoice'+(list.length===1?'':'s')+' in '+ctx.label+', opening balances left out', wide:true }); } }); });
+        var nc={}; list.forEach(function(i){ nc[i.customer]=1; });
+        return merge(invoiceTable(list, true), { wide:true, stats:[{ l:'Invoiced', v:money(ctx.total), s:'opening balances left out' }, { l:'Invoices', v:BB.num(list.length) }, { l:'Customers', v:BB.num(Object.keys(nc).length) }] }); } }); });
     else emptyChart('#chBack','This fills in from your accounting system.');
     var topRows = top.filter(function(r){ return r.last12>0; }).slice(0,8).map(function(r){ return { label:r.c.name, sub:r.c.town||'', value:r.last12, cid:r.c.id, href:custHref(r.c.id) }; });
     if(topRows.length) chartJobs.push(function(){ BB.chart.hbar('#chCust',{ money:true, rows:topRows, openLabel:'Open farm file',
-      detail:function(ctx){ var id=ctx.row.cid, list=ledgerInv.filter(function(i){ return i.customer===id; });
-        var x=invoiceTable(list, false);
-        var plan=0; months.slice(0,6).forEach(function(m){ plan += Number(((fc[d.fKey(m, null, 'sage_'+id)]||{}).value)||0); });
-        return merge(x, { sub:(ctx.row.sub? ctx.row.sub+' · ' : '')+list.length+' invoice'+(list.length===1?'':'s')+' to date',
-          stats:[{ l:'Invoiced to date', v:money(ctx.value) }, { l:'Invoices', v:BB.num(list.length) }, { l:'Planned, next six months', v:plan? money(plan) : '—' }] }); } }); });
+      detail:function(ctx){ return custCard(ctx.row.cid); } }); });
     else emptyChart('#chCust','No customer figures yet.');
 
     html += '<div class="card" style="margin-top:16px;"><div class="card-h"><div><h3>By customer</h3><div class="sub">your 40 biggest · last year invoiced shown as the starting point · amounts in rands</div></div>'+BB.liveChip()+'</div>';
@@ -304,7 +326,9 @@ function render(){
         // the month: where its forecast comes from, and the invoices that make up the actual
         detail:function(ctx){ var r=rowsV[ctx.index], list=ledgerInv.filter(function(i){ return ym(i.date)===r.m; });
           var x=invoiceTable(list, true);
-          return merge(x, { wide:true, sub:(r.typed? 'forecast typed for the month' : r.fromCustomers? 'forecast added up from the per-customer figures' : 'no forecast set')+' · '+list.length+' invoice'+(list.length===1?'':'s') }); } }); });
+          var f=Number(r.f)||0;
+          return merge(x, { wide:true, stats:[{ l:'Forecast', v:f? money(f) : '—', s:r.typed? 'typed for the month' : r.fromCustomers? 'added up from customers' : 'not set' },
+            { l:'Invoiced', v:money(r.a), s:BB.num(list.length)+' invoice'+(list.length===1?'':'s') }, { l:'Difference', v:f? (r.a>=f?'+':'−')+money(Math.abs(r.a-f)) : '—', cls:f&&r.a<f*0.8?'warn':'' }] }); } }); });
       var cumPts = cav.filter(function(v){ return v!=null; }).length;
       if(!fTot && cumPts<3) emptyChart('#chCum','Fills in as the year goes: '+money(aTot)+' invoiced so far.');
       else chartJobs.push(function(){ BB.chart.line('#chCum',{ labels:months.map(monthLabel), money:true, height:230, table:true,
@@ -316,7 +340,8 @@ function render(){
                                    : [monthLabel(months[i]), fut? '—' : (av[i]? money(av[i]) : '—'), fut? '—' : money(ra)] }); }
           // a running total's "share of the chart" means nothing: show where the year stands instead
           var st=[{ l:'Invoiced so far', v:money(ra) }].concat(fTot? [{ l:'Forecast so far', v:money(rf) }, { l:ra>=rf?'Ahead by':'Behind by', v:money(Math.abs(ra-rf)), cls:ra>=rf?'':'warn' }] : []);
-          return { stats:st, sub:'the season from '+monthLabel(months[0])+' to '+ctx.label, table:fTot? { columns:['Month','Forecast','Invoiced','Forecast so far','Invoiced so far'], rows:cells, num:[1,2,3,4] } : { columns:['Month','Invoiced','Invoiced so far'], rows:cells, num:[1,2] }, wide:!!fTot };
+          st[0].s='since '+monthLabel(months[0]);
+          return { stats:st, table:fTot? { columns:['Month','Forecast','Invoiced','Forecast so far','Invoiced so far'], rows:cells, num:[1,2,3,4] } : { columns:['Month','Invoiced','Invoiced so far'], rows:cells, num:[1,2] }, wide:!!fTot };
         } }); });
     } else { emptyChart('#chVal','No forecast set and nothing invoiced in these months yet.'); emptyChart('#chCum','Fills in as the year goes.'); }
 
@@ -340,7 +365,7 @@ function render(){
 
   // the invoices behind the two invoiced figures (sales report has them week by week and month by month)
   function invTile(list, sub){ var x=invoiceTable(list, true);
-    return merge(x, { sub:sub, wide:true, stats:[{ l:'Invoiced', v:money(list.reduce(function(t,i){ return t+(i.amount||0); },0)) }, { l:'Invoices', v:BB.num(list.length) }],
+    return merge(x, { wide:true, stats:[{ l:'Invoiced', v:money(list.reduce(function(t,i){ return t+(i.amount||0); },0)) }, { l:'Invoices', v:BB.num(list.length) }],
       actions:[{ label:'Open the full list', href:'sales-report.html?view=monthly', primary:true }] }); }
   BB.statDetail('fpLast12', function(){ var p=prevMonthsAll(); return invTile(ledgerInv.filter(function(i){ return p.indexOf(ym(i.date))>=0; }), 'every customer, '+monthLabel(p[0])+' to '+monthLabel(p[11])); });
   BB.statDetail('fpSoFar', function(){ return invTile(ledgerInv.filter(function(i){ return months.indexOf(ym(i.date))>=0; }), 'this season, '+monthLabel(months[0])+' to '+monthLabel(months[11])); });

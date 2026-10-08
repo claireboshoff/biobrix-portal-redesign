@@ -134,22 +134,62 @@ function progValue(p){
 
 // ---- popups: the farmer's own records behind a figure or a chart part (never anyone else's) ----
 function toSec(sel){ return function(){ BB.closePopup(); var el=document.getElementById(sel); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }; }
+// ---- record cards (CONVENTIONS: "Record popups: the card pattern") — only ever this farmer's own ----
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+function nw(t){ return { html:'<span style="white-space:nowrap;">'+t+'</span>' }; }
+// press a button the page already has (pay, reorder, approve) — the page keeps the one way of doing it
+function pagePress(sel, sec){ return function(){ BB.closePopup(); setTimeout(function(){ var b=document.querySelector(sel);
+  if(b){ b.scrollIntoView({ behavior:'smooth', block:'center' }); b.click(); } else { var el=document.getElementById(sec); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); } }, 170); }; }
+function mine(rec){ return rec && rec.farmer===currentFarmerId(); }
+function invoiceCard(iv){
+  if(!mine(iv)) return null;
+  var open=iv.status!=='Paid', od=iv.status==='Overdue', rp=d.rep(d.farmer(iv.farmer).rep);
+  return { color:null, sub:null, eyebrow:'Invoice', title:iv.ref||iv.label||'Invoice', tags:BB.statusBadge(iv.status||'Outstanding'),
+    meta:[ iv.description? { icon:'file', text:iv.description, tip:'For' } : null,
+      iv.date? { icon:'calendar', text:'Issued '+BB.date(iv.date), tip:'Issued' } : null,
+      rp && rp.name? { initials:initialsOf(rp.name), color:rp.colour, text:rp.name, tip:'Your advisor' } : null ],
+    stats:[{ l:'Amount', v:BB.money(iv.amount||0), s:open?'to pay':'paid — thank you', cls:od?'bad':'' },
+      open? { l:'Due', v:iv.dueDate?BB.shortDate(iv.dueDate):'—', s:od?'overdue':'card or EFT', cls:od?'bad':'' } : { l:'Paid', v:iv.paidDate?BB.shortDate(iv.paidDate):'—', s:iv.method||null }],
+    html: od? '<div class="bbp-alert">'+BB.icon('alert')+'Overdue — please settle to release pending deliveries</div>' : (iv.status==='Proof received'? '<div class="bbp-alert warn">'+BB.icon('check')+'Proof received — marked paid once the funds land</div>' : ''),
+    actions: open && iv.status!=='Proof received' ? [{ label:'Statement', onClick:toSec('account') }, { label:'Pay now', primary:true, onClick:pagePress('button[data-pay="'+iv.id+'"]', 'account') }]
+                  : [{ label:'Statement', primary:true, onClick:toSec('account') }] };
+}
+function openInvoice(iv){ var c=invoiceCard(iv); if(c) BB.popup(c); }
+function orderCard(o){
+  if(!mine(o)) return null;
+  var q=d.quoteStatus(o), del=d.where('deliveries', function(x){ return x.order===o.id; })[0], rp=d.rep(o.rep), pct=q? d.quotePct(o) : 0;
+  var val=q? d.quoteTotal(o) : d.orderValue(o), toApprove=q==='Sent to farmer';
+  var stLabel = toApprove? '<span class="badge b-warn">Quote to approve</span>' : (q==='Awaiting approval'||q==='Approved')? '<span class="badge b-grey">Being quoted</span>' : BB.statusBadge(o.status);
+  var acts=[];
+  if(toApprove) acts.push({ label:'Approve quote', primary:true, onClick:pagePress('button[data-qok="'+o.id+'"]', 'orders') });
+  else if(o.status==='Delivered') acts.push({ label:'Reorder', primary:true, onClick:pagePress('button[data-reorder="'+o.id+'"]', 'orders') });
+  else acts.push({ label:'My orders', onClick:toSec('orders') });
+  return { wide:true, layout:'split', color:null, sub:null, eyebrow:'Order', title:o.ref,
+    meta:[ { icon:'calendar', text:'Ordered '+BB.date(o.date), tip:'Ordered' },
+      { icon:'truck', text:'Delivery '+BB.monthName(o.deliverMonth)+(del? ' · '+String(del.status).toLowerCase()+(del.eta?' '+BB.shortDate(del.eta):'') : ''), tip:'Delivery' },
+      rp && rp.name? { initials:initialsOf(rp.name), color:rp.colour, text:rp.name, tip:'Your advisor' } : null ],
+    stats:[{ l:'Value', v:BB.money(val), s:q? 'quote' : 'list' }, { l:'Status', html:stLabel }],
+    html:(toApprove? '<div class="bbp-alert warn">'+BB.icon('alert')+'This quote waits for your approval — nothing is charged until you approve</div>' : '')+'<div class="bbp-tt">Products</div>',
+    table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod); return [{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack||'')+'</div>' }, nw(BB.num(l.qty)+' '+BB.esc(p.unit||'')), BB.money(Math.round((p.price||0)*l.qty*(1+pct/100)))]; }), num:[1,2], foot:['Total',{ html:'' },BB.money(val)] },
+    actions:acts };
+}
+function openOrderCard(o){ var c=orderCard(o); if(c) BB.popup(c); }
 function invRows(list){
-  return list.map(function(i){ return [{ html:'<b>'+BB.esc(i.label||i.ref||'—')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' },
-    i.date?BB.shortDate(i.date):'—', i.status==='Paid'? (i.paidDate?'paid '+BB.shortDate(i.paidDate):'paid') : (i.dueDate?'due '+BB.shortDate(i.dueDate):'—'), { html:BB.statusBadge(i.status||'Outstanding') }, BB.money(i.amount||0)]; });
+  return list.map(function(i){ return { cells:[{ html:'<b>'+BB.esc(i.label||i.ref||'—')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' },
+    nw(i.date?BB.shortDate(i.date):'—'), nw(i.status==='Paid'? (i.paidDate?'paid '+BB.shortDate(i.paidDate):'paid') : (i.dueDate?'due '+BB.shortDate(i.dueDate):'—')), { html:BB.statusBadge(i.status||'Outstanding') }, BB.money(i.amount||0)],
+    onClick:function(){ openInvoice(i); } }; });
 }
 function invTable(list){ return { columns:['Invoice','Issued','Due / paid','Status','Amount'], rows:invRows(list), num:[4] }; }
 var TILE = {};
 BB.statDetail('cpOwing', function(){
   var open=TILE.open||[];
-  return { sub:open.length? 'invoices still to pay, newest first' : 'nothing to pay — thank you', table:invTable(open),
+  return { table:invTable(open), note: open.length? null : 'Nothing to pay — thank you.',
     actions:[{ label:'Open the full list', primary:true, onClick:toSec('account') }] };
 });
 BB.statDetail('cpBlocks', function(){
   var blocks=TILE.blocks||[], soil=TILE.soil||[], leaf=TILE.leaf||[];
   var last=function(list,bid){ return list.filter(function(x){ return x.block===bid; })[0]; };
-  return { sub:'your blocks and their latest lab reading',
-    table:{ columns:['Block','Ha','Soil','Leaf'], rows:blocks.map(function(b){ var s1=last(soil,b.id), l1=last(leaf,b.id);
+  return { table:{ columns:['Block','Ha','Soil','Leaf'], rows:blocks.map(function(b){ var s1=last(soil,b.id), l1=last(leaf,b.id);
       var cell=function(x){ return x? { html:'<span class="badge '+statusFlagBadge(x.flag)+'" style="white-space:normal;">'+BB.esc(x.flag||x.status)+'</span>' } : '—'; };
       return [{ html:'<b>'+BB.esc(b.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(b.crop||'')+'</div>' }, BB.num(b.ha||0), cell(s1), cell(l1)]; }), num:[1] },
     actions:[{ label:'Open the full list', primary:true, onClick:toSec('reports') }] };
@@ -360,7 +400,7 @@ function render(){
     orders.forEach(function(o){
       var del = d.where('deliveries', function(x){ return x.order===o.id; })[0];
       var etaTxt = del ? (BB.date(del.eta)+' · '+BB.esc(del.status)) : '—';
-      html += '<tr><td style="white-space:nowrap;"><b>'+BB.esc(o.ref)+'</b></td>'+
+      html += '<tr class="click" data-ocard="'+BB.esc(o.id)+'"><td style="white-space:nowrap;"><b>'+BB.esc(o.ref)+'</b></td>'+
         '<td>'+BB.monthName(o.deliverMonth)+'</td>'+
         '<td class="num">'+BB.money(oVal(o))+'</td>'+
         '<td>'+(d.quoteStatus(o)==='Sent to farmer'?'<span class="badge b-warn">Quote — approve above</span>':(d.quoteStatus(o)==='Awaiting approval'||d.quoteStatus(o)==='Approved')?'<span class="badge b-grey">Quote being prepared</span>':BB.statusBadge(o.status))+'</td>'+
@@ -380,7 +420,7 @@ function render(){
         // your orders for delivery that month
         detail:function(ctx){ var m=spanM[ctx.index], list=orders.filter(function(o){ return o.deliverMonth===m; });
           return { table:{ columns:['Ref','Ordered','Status','Delivery ETA','Value'], rows:list.map(function(o){ var del=d.where('deliveries', function(x){ return x.order===o.id; })[0];
-              return [{ html:'<b>'+BB.esc(o.ref)+'</b>' }, BB.shortDate(o.date), { html:BB.statusBadge(o.status) }, del? BB.shortDate(del.eta)+' · '+del.status : '—', BB.money(oVal(o))]; }), num:[4] },
+              return { cells:[{ html:'<b>'+BB.esc(o.ref)+'</b>' }, nw(BB.shortDate(o.date)), { html:BB.statusBadge(o.status) }, del? BB.shortDate(del.eta)+' · '+del.status : '—', BB.money(oVal(o))], onClick:function(){ openOrderCard(o); } }; }), num:[4] },
             actions:[{ label:'Open the full list', primary:true, onClick:toSec('orders') }] }; } }); });
     }
     html += '</div>';
@@ -426,9 +466,9 @@ function render(){
         // that month on your account: the invoices issued and the payments received
         detail:function(ctx){ var m=monthsA[ctx.index];
           var issued=invs.filter(function(i){ return mk(i.date)===m; }), paidIn=invs.filter(function(i){ return i.status==='Paid' && mk(i.paidDate)===m; });
-          var rows=issued.map(function(i){ return [BB.shortDate(i.date), { html:'Invoice <b>'+BB.esc(i.label||i.ref||'')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' }, { html:BB.statusBadge(i.status||'Outstanding') }, '+ '+BB.money(i.amount||0)]; })
-            .concat(paidIn.map(function(i){ return [BB.shortDate(i.paidDate), { html:'Payment received — <b>'+BB.esc(i.label||i.ref||'')+'</b>' }, { html:'<span class="badge b-ok">Paid</span>' }, '− '+BB.money(i.amount||0)]; }));
-          return { sub:m.slice(0,4), table:{ columns:['Date','What','Status','Amount'], rows:rows, num:[3] },
+          var rows=issued.map(function(i){ return { cells:[nw(BB.shortDate(i.date)), { html:'Invoice <b>'+BB.esc(i.label||i.ref||'')+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(i.description||'')+'</div>' }, { html:BB.statusBadge(i.status||'Outstanding') }, '+ '+BB.money(i.amount||0)], onClick:function(){ openInvoice(i); } }; })
+            .concat(paidIn.map(function(i){ return { cells:[nw(BB.shortDate(i.paidDate)), { html:'Payment received — <b>'+BB.esc(i.label||i.ref||'')+'</b>' }, { html:'<span class="badge b-ok">Paid</span>' }, '− '+BB.money(i.amount||0)], onClick:function(){ openInvoice(i); } }; }));
+          return { title:BB.monthName(+m.slice(5,7)-1)+' '+m.slice(0,4), table:{ columns:['Date','What','Status','Amount'], rows:rows, num:[3] },
             actions:[{ label:'Open the full list', primary:true, onClick:toSec('account') }] }; } }); });
     }
     // outstanding / overdue first with Pay
@@ -590,6 +630,10 @@ function bind(){
   var sel = main.querySelector('#whoSel');
   if(sel) sel.onchange = function(){ setFarmerId(this.value); render(); window.scrollTo(0,0); };
 
+  // an order row opens that order's card (its own buttons keep working)
+  Array.prototype.forEach.call(main.querySelectorAll('tr[data-ocard]'), function(tr){
+    tr.onclick=function(e){ if(e.target.closest('a,button,input,label')) return; openOrderCard(d.by('orders', tr.getAttribute('data-ocard'))); };
+  });
   Array.prototype.forEach.call(main.querySelectorAll('button[data-reorder]'), function(btn){
     btn.onclick = function(){
       var oid = this.dataset.reorder;

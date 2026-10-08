@@ -72,57 +72,96 @@ function levelCell(qty, reorder){
 }
 
 // ---- popups: what sits behind a click (BB.popup) ----
+// One record opens as a card (CONVENTIONS.md, "Record popups: the card pattern"); a list opens as
+// a table whose rows open those cards.
 function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
 function go(label, href, primary){ return href && can(href) ? { label:label, href:href, primary:!!primary } : null; }
 function farmHref(fid){ return fid && can('farm-detail.html') ? 'farm-detail.html?farmer='+encodeURIComponent(fid) : null; }
 function depShort(id){ return String(d.depot(id).name||'').replace(/ Depot$/,''); }
 function stockStatus(i){ return i.qty<=0?'Out of stock':(i.qty<i.reorder?'Low stock':'In stock'); }
 function badgeCell(s){ return { html:BB.statusBadge(s) }; }
+function initialsOf(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); }
+// a popup row that opens a record's card
+function opens(fn){ return function(){ BB.popup(fn()); }; }
+// the card's identity lines
+function mFarmer(fid){ var f=d.farmer(fid), h=farmHref(fid);
+  return f.farm && f.farm!==f.name ? [{ icon:'user', text:f.name, tip:'Farmer' }, { icon:'farm', text:f.farm, tip:'Farm', href:h }] : [{ icon:'user', text:f.name, tip:'Farmer', href:h }]; }
+function mDepot(id){ return id ? { icon:'warehouse', text:d.depot(id).name, tip:'Depot' } : null; }
+function mRep(id){ var r=d.rep(id); return r && r.name ? { initials:initialsOf(r.name), color:r.colour, text:r.name, tip:'Rep' } : null; }
+function alertLine(text, warn){ return '<div class="bbp-alert'+(warn?' warn':'')+'">'+BB.icon('alert')+BB.esc(text)+'</div>'; }
+function stockAlert(i){ var u=d.product(i.prod).unit||'';
+  return i.qty<=0 ? alertLine('Out of stock — reorder level is '+BB.num(i.reorder)+' '+u) : i.qty<i.reorder ? alertLine('Below reorder — '+BB.num(i.qty)+' of '+BB.num(i.reorder)+' '+u+' on hand', true) : ''; }
 // long lists: keep the biggest n, and say so
 function cap(rows, n, noun){ return rows.length>n ? { rows:rows.slice(0,n), note:'Showing the '+n+' largest of '+rows.length+' '+noun+'.' } : { rows:rows, note:null }; }
 function orderTable(list){
   return { columns:['Order','Farmer','Status','Value'], num:[3], rows:list.slice().sort(function(a,b){ return d.orderValue(b)-d.orderValue(a); }).map(function(o){
-    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o.ref)+'</span>' }, d.farmer(o.farmer).name, badgeCell(o.status), BB.money(d.orderValue(o))], href:farmHref(o.farmer) }; }) };
+    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o.ref)+'</span>' }, d.farmer(o.farmer).name, badgeCell(o.status), BB.money(d.orderValue(o))], onClick:opens(function(){ return orderPreview(o); }) }; }) };
 }
 function lineTable(list, withDepot){
   return { columns:['Product'].concat(withDepot?['Depot']:[]).concat(['On hand','Reorder at','Status']), num:withDepot?[2,3]:[1,2],
     rows:list.slice().sort(function(a,b){ return (a.qty/(a.reorder||1))-(b.qty/(b.reorder||1)); }).map(function(i){ var p=d.product(i.prod);
-      return { cells:[p.name].concat(withDepot?[depShort(i.depot)]:[]).concat([BB.num(i.qty)+' '+(p.unit||''), BB.num(i.reorder), badgeCell(stockStatus(i))]) }; }) };
+      return { cells:[p.name].concat(withDepot?[depShort(i.depot)]:[]).concat([BB.num(i.qty)+' '+(p.unit||''), BB.num(i.reorder), badgeCell(stockStatus(i))]), onClick:opens(function(){ return stockPreview(i); }) }; }) };
 }
-function orderPreview(o, eyebrow){
-  var f=d.farmer(o.farmer), r=d.rep(o.rep)||{}, dl=deliveries.filter(function(x){ return x.order===o.id; })[0];
-  var stats=[{l:'Value', v:BB.money(d.orderValue(o)), s:(o.lines||[]).length+' line'+((o.lines||[]).length===1?'':'s')},
-    {l:'Status', html:BB.statusBadge(o.status), s:'raised '+BB.date(o.date)}, {l:'Rep', v:r.name||'—'}, {l:'Depot', v:o.depot?depShort(o.depot):'—'}];
-  if(dl) stats.push({l:'Delivery', html:BB.statusBadge(dl.status), s:'ETA '+BB.date(dl.eta)});
-  return { eyebrow:eyebrow||'Order', title:o.ref+' · '+f.name, sub:(f.farm&&f.farm!==f.name?f.farm+' · ':'')+'deliver in '+BB.monthName(o.deliverMonth),
-    stats:stats, table:{ columns:['Product','Quantity','Value'], num:[1,2], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod);
-      return { cells:[p.name, BB.num(l.qty)+' '+(p.unit||''), BB.money((p.price||0)*(l.qty||0))] }; }) },
-    actions:[go('Open full record','orders.html',true), go('Open the farm', farmHref(o.farmer))] };
+function productLines(o){
+  return { title:'Products', columns:['Product','Pack','Qty','Value'], num:[2,3], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod);
+    return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b>' }, p.pack||'', BB.num(l.qty), BB.money((p.price||0)*(l.qty||0))] }; }),
+    foot:['List value',{ html:'' },{ html:'' },BB.money(d.orderValue(o))] };
 }
-function stockPreview(i, eyebrow){
-  var p=d.product(i.prod), sup=d.supplier(p.supplier)||{};
-  return { eyebrow:eyebrow||'Stock line', title:p.name+' · '+depShort(i.depot), sub:[p.code,p.pack].filter(Boolean).join(' · '),
-    stats:[{l:'On hand', v:BB.num(i.qty)+' '+(p.unit||''), cls:i.qty<i.reorder?'bad':''}, {l:'Reorder at', v:BB.num(i.reorder)}, {l:'Status', html:BB.statusBadge(stockStatus(i))},
-      {l:'Supplier', v:sup.name||'—', s:sup.lead?sup.lead+' days lead time':null}],
-    html:'<div class="sub" style="margin:4px 0 6px;">The same product at every depot</div>',
-    table:lineTable(inventory.filter(function(x){ return x.prod===i.prod; }), true),
-    actions:[go('Open full record','stock.html',true), go('Suppliers & POs','suppliers.html')] };
+// An order, briefly — the full order card lives on the orders page (?open=<id>).
+function orderPreview(o){
+  var dl=deliveries.filter(function(x){ return x.order===o.id; })[0], hold=d.deliveryHold(o), inv=d.orderInvoiced(o.id), counted=(o.status==='Delivered'||o.status==='Confirmed');
+  return { wide:true, layout:'split', eyebrow:'Order · '+(o.source||'Portal'), title:o.ref,
+    meta:[{ icon:'calendar', text:'Captured '+BB.date(o.date), tip:'Captured' }, mDepot(o.depot)].concat(mFarmer(o.farmer)).concat([mRep(o.rep)]),
+    stats:[{ l:'Value', v:BB.money(d.orderValue(o)), s:'list' }, { l:'Status', html:BB.statusBadge(o.status) },
+      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.shortDate(dl.eta):dl.status.toLowerCase()+' · '+BB.shortDate(dl.eta)) : (o.status==='Delivered'?'delivered':'not booked') },
+      { l:'Invoice', html: inv? '<span class="tag tag-inv">'+BB.icon('receipt')+'Invoiced</span>' : counted? '<span class="tag tag-uninv">'+BB.icon('receipt')+'Not yet</span>' : '<span class="faint">—</span>' }],
+    html:hold? alertLine(hold.reason, hold.sev!=='high') : '', table:productLines(o),
+    actions:[go('Farm record', farmHref(o.farmer)), go('Open order', 'orders.html?open='+encodeURIComponent(o.id), true)] };
 }
+// the same product at the other depots (the product is the card's title, so no Product column)
+function otherDepots(list){
+  return { title:'At the other depots', columns:['Depot','On hand','Reorder at','Status'], num:[1,2], rows:list.map(function(x){ var u=d.product(x.prod).unit||'';
+    return { cells:[d.depot(x.depot).name, BB.num(x.qty)+' '+u, BB.num(x.reorder), { html:BB.statusBadge(x.qty<=0?'Out of stock':(x.qty<x.reorder?'Low stock':'In stock')) }], onClick:opens(function(){ return stockPreview(x); }) }; }) };
+}
+// A stock line: one product at one depot, and the same product at the others.
+function stockPreview(i){
+  var p=d.product(i.prod), sup=d.supplier(p.supplier)||{}, low=i.qty<i.reorder;
+  var others=inventory.filter(function(x){ return x.prod===i.prod && x.depot!==i.depot; }), net=others.reduce(function(t,x){ return t+(x.qty||0); }, i.qty||0);
+  return { wide:others.length>0, layout:others.length?'split':null, eyebrow:'Stock line', title:p.name,
+    meta:[mDepot(i.depot), { icon:'package', text:[p.code, p.pack].filter(Boolean).join(' · '), tip:'Code · pack' },
+      sup.name? { icon:'link', text:sup.name+(sup.lead?' · '+sup.lead+' days lead':''), tip:'Supplier', href:can('suppliers.html')?'suppliers.html':null } : null],
+    stats:[{ l:'On hand', v:BB.num(i.qty)+' '+(p.unit||''), cls:low?'bad':'' }, { l:'Reorder at', v:BB.num(i.reorder)+' '+(p.unit||'') }, { l:'Value', v:BB.money(Math.round((i.qty||0)*(p.price||0))), s:'at list price' },
+      others.length? { l:'All depots', v:BB.num(net)+' '+(p.unit||''), s:(others.length+1)+' depots' } : { l:'Status', html:BB.statusBadge(stockStatus(i)) }],
+    html:stockAlert(i),
+    table:others.length? otherDepots(others) : null,
+    actions:[go('Open stock','stock.html', !low), low? go('Reorder radar','suppliers.html',true) : null] };
+}
+// A delivery: where it is going, how, and when — the order's lines beside it.
 function deliveryPreview(x){
-  var o=d.by('orders', x.order), hold=o&&d.deliveryHold(o);
-  var p=o? orderPreview(o, 'Delivery') : { eyebrow:'Delivery', title:d.farmer(x.farmer).name, stats:[] };
-  p.title=(o?o.ref+' · ':'')+d.farmer(x.farmer).name;
-  p.sub='from '+d.depot(x.depot).name+' · '+(x.transport||'no transport yet');
-  p.stats=[{l:'Status', html:BB.statusBadge(x.status)}, {l:'ETA', v:BB.date(x.eta)}, {l:'Order value', v:o?BB.money(d.orderValue(o)):'—'}]
-    .concat(hold?[{l:'Finance hold', v:'HOLD', s:hold.reason, cls:hold.sev==='high'?'bad':'warn'}]:[]);
-  p.actions=[go('Open full record','deliveries.html',true), go('Open the farm', farmHref(x.farmer))];
-  return p;
+  var o=d.by('orders', x.order), hold=o&&d.deliveryHold(o), tr=x.transport&&x.transport!=='—'?x.transport:null;
+  return { wide:!!o, layout:o?'split':null, eyebrow:'Delivery', title:o?o.ref:d.farmer(x.farmer).name,
+    meta:[{ icon:'calendar', text:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.date(x.eta), tip:x.status==='Delivered'?'Delivered':'ETA' }, mDepot(x.depot),
+      { icon:'truck', text:tr||'No transport yet', tip:'Transport', muted:!tr }].concat(mFarmer(x.farmer)),
+    stats:[{ l:'Status', html:BB.statusBadge(x.status) }, { l:'Order value', v:o?BB.money(d.orderValue(o)):'—' }],
+    html:hold? alertLine(hold.reason, hold.sev!=='high') : '', table:o?productLines(o):null,
+    actions:[go('Farm record', farmHref(x.farmer)), o? go('Open order', 'orders.html?open='+encodeURIComponent(o.id), true) : go('Open deliveries','deliveries.html',true)] };
 }
+// A depot: its lines, lowest against reorder first.
 function depotStock(dep){
-  var items=inventory.filter(function(i){ return i.depot===dep.id; }), low=items.filter(function(i){ return i.qty<i.reorder; });
-  return { eyebrow:'Stock health by depot', title:dep.name, sub:dep.region+' · '+dep.manager,
-    stats:[{l:'Stock lines', v:items.length}, {l:'Below reorder', v:low.length, cls:low.length?'bad':''}, {l:'Out of stock', v:items.filter(function(i){ return i.qty<=0; }).length}],
-    table:lineTable(items, false), actions:[go('Open stock','stock.html',true), go('Open the depot','depots.html')] };
+  var items=inventory.filter(function(i){ return i.depot===dep.id; }), low=items.filter(function(i){ return i.qty<i.reorder; }), out=items.filter(function(i){ return i.qty<=0; });
+  return { wide:true, layout:'split', eyebrow:'Depot', title:dep.name, color:null, tags:BB.statusBadge(dep.status),
+    meta:[{ icon:'map', text:dep.region, tip:'Region' }, dep.address? { icon:'map', text:dep.address, tip:'Address' } : null, dep.manager? { icon:'user', text:dep.manager, tip:'Warehouse manager' } : null],
+    stats:[{ l:'Stock lines', v:items.length }, { l:'Below reorder', v:low.length, cls:low.length?'bad':'' }, { l:'Out of stock', v:out.length, cls:out.length?'bad':'' },
+      { l:'Blending', v:blending.filter(function(b){ return b.depot===dep.id; }).length, s:'jobs on the floor' }],
+    table:(function(t){ t.title='Stock on hand · lowest first'; return t; })(lineTable(items, false)),
+    actions:[go('Open the depot','depots.html'), go('Open stock','stock.html',true)] };
+}
+// A blending job on a depot floor.
+function blendPreview(b){
+  return { eyebrow:'Blending job', title:b.recipe,
+    meta:[{ icon:'calendar', text:'Due '+BB.date(b.due), tip:'Due' }, mDepot(b.depot)].concat(mFarmer(b['for'])),
+    stats:[{ l:'Status', html:BB.statusBadge(b.status) }, { l:'Batch', v:b.batch }],
+    actions:[go('Farm record', farmHref(b['for'])), go('Open the depot','depots.html',true)] };
 }
 
 var headActions = [
@@ -144,7 +183,7 @@ html += '<section class="page-head row between" style="gap:16px;">'+
 // With the accounting system connected, the top of the board is the real trading picture.
 // Orders, stock and blending do not exist in Sage, so they sit lower down and are marked.
 var sg = BB.data.sage && BB.data.sage();
-var STATS;
+var STATS, invoicePreview, accountPreview;   // the ledger cards, set when the ledger is live
 if(sg && sg.live){
   var si=sg.invoices||[], sp=sg.payments||[], sc=sg.customers||[];
   var op=function(i){ return i.outstanding!=null?i.outstanding:(i.status==='Paid'?0:(i.amount||0)); };
@@ -166,14 +205,43 @@ if(sg && sg.live){
     {l:'90 days and older', v:BB.money(a90.reduce(function(t,i){return t+op(i);},0)), s:a90.length+' invoices', cls:a90.length?'warn':'', key:'ops-90', href:'finance.html?show=overdue'},
     {l:'Over their limit', v:lim.length, s:'accounts to watch', cls:lim.length?'warn':'', key:'ops-limit', href:'farms.html?show=overlimit'}
   ];
-  // the ledger lists behind each figure
+  // the ledger lists behind each figure; a row opens that invoice or account as a card
   var custById={}; sc.forEach(function(c){ custById[c.id]=c; });
   var farmOfCust={}; (d.allUnscoped('farmers')||[]).forEach(function(f){ if(f.sageId) farmOfCust[f.sageId]=f.id; });
   var custName=function(id){ return (custById[id]||{}).name||'—'; };
+  var openOf=function(cid){ return si.filter(function(i){ return i.customer===cid && i.kind!=='opening' && op(i)>0.5; }).sort(function(a,b){ return dov(b)-dov(a); }); };
+  var openTable=function(list, title){ var c=cap(list, 30, 'open invoices');
+    return { table:{ title:title, columns:['Invoice','Due','Days over','Open'], num:[2,3], rows:c.rows.map(function(i){
+      return { cells:[i.label||i.ref||'—', i.dueDate?BB.date(i.dueDate):'—', String(Math.max(0,dov(i))), BB.money(Math.round(op(i)))], onClick:opens(function(){ return invoicePreview(i); }) }; }) }, note:c.note }; };
+  var agentOfCust=function(c){ var r=(sg.reps||[]).filter(function(x){ return x.id===c.sageRep; })[0]; return r&&r.name? { initials:initialsOf(r.name), text:r.name, tip:'Agent' } : null; };
+  invoicePreview=function(i){
+    var cu=custById[i.customer]||{name:'—'}, fh=farmHref(farmOfCust[i.customer]), open=op(i), over=open>0.5? dov(i) : 0;
+    var all=openOf(i.customer), rest=all.filter(function(x){ return x.id!==i.id; }), t=openTable(rest, 'Other open invoices on the account');
+    return { wide:rest.length>0, layout:rest.length?'split':null, eyebrow:'Invoice', title:i.label||i.ref||'Invoice',
+      meta:[{ icon:'user', text:cu.name, tip:'Customer', href:fh }, { icon:'calendar', text:'Invoiced '+BB.date(i.date), tip:'Invoiced' },
+        i.dueDate? { icon:'calendar', text:'Due '+BB.date(i.dueDate), tip:'Due' } : null, i.description? { icon:'file', text:i.description, tip:'Description' } : null],
+      stats:[{ l:'Amount', v:BB.money(Math.round(i.amount||0)) }, { l:'Open', v:BB.money(Math.round(open)), cls:over>0?'bad':'' },
+        { l:'Status', html:BB.statusBadge(i.status||(open>0.5?'Open':'Paid')) }, { l:'Account', v:BB.money(Math.round(cu.balance||0)), s:all.length+' open invoice'+(all.length===1?'':'s') }],
+      html:over>0? alertLine(over+' days past due'+(over>=90?' — 90 days and older':''), over<90) : '',
+      table:rest.length? t.table : null, note:rest.length? t.note : null,
+      actions:[go('Farm record', fh), over>0? go('Open what is overdue','finance.html?show=overdue',true) : go('Open finance','finance.html',true)] };
+  };
+  accountPreview=function(c, kind, listHref){
+    var rest=openOf(c.id), t=openTable(rest, 'Open invoices'), fh=farmHref(farmOfCust[c.id]), over=c.creditLimit>0 && c.balance>c.creditLimit;
+    var warn=[c.onHold?'Account on hold':null, over?'over the credit limit by '+BB.money(Math.round(c.balance-c.creditLimit)):null].filter(Boolean).join(' · ');
+    return { wide:rest.length>0, layout:rest.length?'split':null, eyebrow:'Account'+(kind?' · '+kind:''), title:c.name,
+      meta:[c.code? { icon:'file', text:c.code, tip:'Account code' } : null, c.phone? { icon:'phone', text:c.phone, tip:'Phone', href:'tel:'+String(c.phone).replace(/\s/g,'') } : null, agentOfCust(c)],
+      stats:[{ l:'Balance', v:BB.money(Math.round(c.balance||0)) }, { l:'Credit limit', v:c.creditLimit>0?BB.money(Math.round(c.creditLimit)):'none set' },
+        { l:'Open invoices', v:rest.length, s:BB.money(Math.round(rest.reduce(function(t,i){ return t+op(i); },0)))+' open' },
+        (function(od){ return { l:'Overdue', v:BB.money(Math.round(od.reduce(function(t,i){ return t+op(i); },0))), s:od.length+' invoice'+(od.length===1?'':'s'), cls:od.length?'bad':'' }; })(rest.filter(function(i){ return dov(i)>0; }))],
+      html:warn? alertLine(warn.charAt(0).toUpperCase()+warn.slice(1), !c.onHold) : '',
+      table:rest.length? t.table : null, note:rest.length? t.note : null,
+      actions:[go('Farm record', fh), go('Open the list', listHref, true)] };
+  };
   var invTable=function(list, val, cols){ var c=cap(list.slice().sort(function(a,b){ return val(b)-val(a); }), 40, 'invoices');
     return { table:{ columns:['Customer','Invoice',cols==='due'?'Due':'Date'].concat(cols==='due'?['Days over']:[]).concat(['Amount']), num:cols==='due'?[3,4]:[3],
       rows:c.rows.map(function(i){ return { cells:[custName(i.customer), i.label||i.ref||'—', BB.date(cols==='due'?i.dueDate:i.date)].concat(cols==='due'?[String(Math.max(0,dov(i)))]:[]).concat([BB.money(Math.round(val(i)))]),
-        href:farmHref(farmOfCust[i.customer]) }; }) }, note:c.note }; };
+        onClick:opens(function(){ return invoicePreview(i); }) }; }) }, note:c.note }; };
   var amt=function(i){ return i.amount||0; };
   var withAct=function(o, label, href){ o.actions=[go(label||'Open the full list', href, true)]; return o; };
   BB.statDetail('ops-inv', function(){ return withAct(invTable(invM, amt), null, 'finance.html'); });
@@ -184,7 +252,7 @@ if(sg && sg.live){
   BB.statDetail('ops-90', function(){ return withAct(invTable(a90, op, 'due'), null, 'finance.html?show=overdue'); });
   BB.statDetail('ops-limit', function(){ return withAct({ table:{ columns:['Customer','Balance','Limit','Over by'], num:[1,2,3],
     rows:lim.slice().sort(function(a,b){ return (b.balance-b.creditLimit)-(a.balance-a.creditLimit); }).map(function(c){
-      return { cells:[c.name, BB.money(Math.round(c.balance)), BB.money(Math.round(c.creditLimit)), BB.money(Math.round(c.balance-c.creditLimit))], href:farmHref(farmOfCust[c.id]) }; }) } }, null, 'farms.html?show=overlimit'); });
+      return { cells:[c.name, BB.money(Math.round(c.balance)), BB.money(Math.round(c.creditLimit)), BB.money(Math.round(c.balance-c.creditLimit))], onClick:opens(function(){ return accountPreview(c, 'Over limit', 'farms.html?show=overlimit'); }) }; }) } }, null, 'farms.html?show=overlimit'); });
 } else {
   STATS = [
     {l:'Open pipeline', v:BB.money(pipelineVal), s:openOrders.length+' forecast + pending', cls:'', key:'ops-pipe', href:'orders.html'},
@@ -200,9 +268,9 @@ if(sg && sg.live){
   BB.statDetail('ops-await', function(){ return ordersTile(orders.filter(function(o){ return o.status==='Awaiting stock'; }), 'orders.html'); });
   BB.statDetail('ops-low', function(){ return { table:lineTable(lowItems, true), actions:[go('Open the full list','stock.html',true), go('Reorder radar','suppliers.html')] }; });
   BB.statDetail('ops-transit', function(){ return { table:{ columns:['Order','Farmer','Depot','Transport','ETA'], rows:inTransit.map(function(x){ var o=d.by('orders', x.order);
-    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o?o.ref:'—')+'</span>' }, d.farmer(x.farmer).name, depShort(x.depot), x.transport||'—', BB.date(x.eta)], href:farmHref(x.farmer) }; }) }, actions:[go('Open the full list','deliveries.html',true)] }; });
+    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o?o.ref:'—')+'</span>' }, d.farmer(x.farmer).name, depShort(x.depot), x.transport||'—', BB.date(x.eta)], onClick:opens(function(){ return deliveryPreview(x); }) }; }) }, actions:[go('Open the full list','deliveries.html',true)] }; });
   BB.statDetail('ops-blend', function(){ return { table:{ columns:['Recipe','Batch','Depot','For','Due','Status'], rows:blending.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).map(function(b){
-    return { cells:[b.recipe, b.batch, depShort(b.depot), d.farmer(b['for']).name, BB.date(b.due), badgeCell(b.status)], href:farmHref(b['for']) }; }) }, actions:[go('Open the full list','depots.html',true)] }; });
+    return { cells:[b.recipe, b.batch, depShort(b.depot), d.farmer(b['for']).name, BB.date(b.due), badgeCell(b.status)], onClick:opens(function(){ return blendPreview(b); }) }; }) }, actions:[go('Open the full list','depots.html',true)] }; });
 }
 html += '<div class="grid g6 ops-kpi">';
 STATS.forEach(function(st){
@@ -265,9 +333,8 @@ if(liveBoard && sgB && sgB.live){
       detail:function(ctx){ var k=ctx.row.k;
         var mine=invB.filter(function(i){ return (i.date||'').slice(0,7)===ymB && (agentOf(byIdB[i.customer]||{})||'')===k; }).sort(function(a,b){ return (b.amount||0)-(a.amount||0); });
         var c=cap(mine, 40, 'invoices');
-        return { sub:'invoiced in '+BB.monthName(new Date().getMonth())+' · '+mine.length+' invoice'+(mine.length===1?'':'s'),
-          table:{ columns:['Customer','Invoice','Date','Amount'], num:[3], rows:c.rows.map(function(i){ var cu=byIdB[i.customer]||{};
-            return { cells:[cu.name||'—', i.label||i.ref||'—', BB.date(i.date), BB.money(Math.round(i.amount||0))], href:farmHref(farmOfB[i.customer]) }; }) },
+        return { table:{ columns:['Customer','Invoice','Date','Amount'], num:[3], rows:c.rows.map(function(i){ var cu=byIdB[i.customer]||{};
+            return { cells:[cu.name||'—', i.label||i.ref||'—', BB.date(i.date), BB.money(Math.round(i.amount||0))], onClick:opens(function(){ return invoicePreview(i); }) }; }) },
           note:c.note, actions:[go('Open sales by customer','sales-report.html?view=customer',true)] }; } }); });
   }
 
@@ -303,12 +370,13 @@ if(liveBoard && sgB && sgB.live){
       series:[{name:'Invoiced',values:invBy,color:'#3f6b28'},{name:'Received',values:payBy,color:'#8fbf5a'}],
       // the invoices and receipts in that month, biggest first
       detail:function(ctx){ var ym=M6[ctx.index].ym;
-        var rows=invB.filter(function(i){ return (i.date||'').slice(0,7)===ym; }).map(function(i){ return { t:'Invoice', c:i.customer, r:i.label||i.ref||'—', dt:i.date, v:i.amount||0 }; })
+        var rows=invB.filter(function(i){ return (i.date||'').slice(0,7)===ym; }).map(function(i){ return { t:'Invoice', c:i.customer, r:i.label||i.ref||'—', dt:i.date, v:i.amount||0, inv:i }; })
           .concat((sgB.payments||[]).filter(function(x){ return (x.date||'').slice(0,7)===ym; }).map(function(x){ return { t:'Receipt', c:x.customer, r:x.ref||'—', dt:x.date, v:x.amount||0 }; }))
           .sort(function(a,b){ return b.v-a.v; });
         var c=cap(rows, 40, 'entries');
-        return { wide:true, table:{ columns:['Customer','Type','Reference','Date','Amount'], num:[4], rows:c.rows.map(function(x){
-          return { cells:[custLabel(x.c), x.t, x.r, BB.date(x.dt), BB.money(Math.round(x.v))], href:farmHref(farmOfB[x.c]) }; }) },
+        return { wide:true, stats:[{ l:'Invoiced', v:BB.money(Math.round(ctx.values[0]||0)) }, { l:'Received', v:BB.money(Math.round(ctx.values[1]||0)) }, { l:'Entries', v:rows.length }],
+          table:{ columns:['Customer','Type','Reference','Date','Amount'], num:[4], rows:c.rows.map(function(x){
+          return { cells:[custLabel(x.c), x.t, x.r, BB.date(x.dt), BB.money(Math.round(x.v))], onClick:x.inv? opens(function(){ return invoicePreview(x.inv); }) : null, href:x.inv? null : farmHref(farmOfB[x.c]) }; }) },
           note:c.note, actions:[go('Open finance','finance.html',true)] }; } }); });
     chartJobs.push(function(){ BB.chart.donut('#chAgeOps', { rows:ageG, money:true, valueLabel:'Owed', centreLabel:'owed',
       // the open invoices in that age band
@@ -316,8 +384,8 @@ if(liveBoard && sgB && sgB.live){
         var band=(sgB.invoices||[]).filter(function(i){ if(openG(i)<=0.5) return false; var dd=i.dueDate?Math.round((t0g-new Date(i.dueDate))/86400000):0;
           return (dd<=0?0:dd<=30?1:dd<=60?2:dd<=90?3:4)===b; }).sort(function(a,z){ return openG(z)-openG(a); });
         var c=cap(band, 40, 'invoices');
-        return { sub:band.length+' open invoice'+(band.length===1?'':'s'), table:{ columns:['Customer','Invoice','Due','Open'], num:[3], rows:c.rows.map(function(i){
-          return { cells:[custLabel(i.customer), i.label||i.ref||'—', i.dueDate?BB.date(i.dueDate):'—', BB.money(Math.round(openG(i)))], href:farmHref(farmOfB[i.customer]) }; }) },
+        return { table:{ columns:['Customer','Invoice','Due','Open'], num:[3], rows:c.rows.map(function(i){
+          return { cells:[custLabel(i.customer), i.label||i.ref||'—', i.dueDate?BB.date(i.dueDate):'—', BB.money(Math.round(openG(i)))], onClick:opens(function(){ return invoicePreview(i); }) }; }) },
           note:c.note, actions:[go(b>0?'Open what is overdue':'Open finance', b>0?'finance.html?show=overdue':'finance.html', true)] }; } }); });
   }
 } else {
@@ -406,7 +474,7 @@ chartJobs.push(function(){ BB.chart.bar('#chDepots', { labels:depots.map(functio
   max:Math.max(4, Math.ceil(Math.max.apply(null, depOk.map(function(v,k){ return v+depLow[k]; }).concat([0]))/4)*4),
   series:[{name:'Above reorder',values:depOk,color:'#3f6b28'},{name:'Below reorder',values:depLow,color:'#b8382a'}],
   // that depot's lines, lowest first
-  detail:function(ctx){ var p=depotStock(depots[ctx.index]); delete p.eyebrow; delete p.stats; return p; } }); });
+  detail:function(ctx){ return depotStock(depots[ctx.index]); } }); });
 
 }
 
@@ -423,21 +491,6 @@ if(liveBoard && sgB && sgB.live){
   var t0N = new Date(new Date().toISOString().slice(0,10));
   var overN = function(i){ return i.dueDate ? Math.round((t0N-new Date(i.dueDate))/86400000) : 0; };
   var farmOfN = {}; (d.allUnscoped('farmers')||[]).forEach(function(f){ if(f.sageId) farmOfN[f.sageId]=f.id; });
-  var openOf = function(custId){ return invN.filter(function(i){ return i.customer===custId && openN(i)>0.5; }).sort(function(a,b){ return overN(b)-overN(a); }); };
-  var openTable = function(list){ var c=cap(list, 30, 'open invoices');
-    return { table:{ columns:['Invoice','Due','Days over','Open'], num:[2,3], rows:c.rows.map(function(i){
-      return { cells:[i.label||i.ref||'—', i.dueDate?BB.date(i.dueDate):'—', String(Math.max(0,overN(i))), BB.money(Math.round(openN(i)))] }; }) }, note:c.note }; };
-  var invoicePreview = function(i){ var cu=byIdN[i.customer]||{name:'—'}, rest=openOf(i.customer), t=openTable(rest);
-    return { eyebrow:'90 days and older', title:cu.name+' · '+(i.label||i.ref||''), sub:i.description||null,
-      stats:[{l:'Open', v:BB.money(Math.round(openN(i))), cls:'bad'}, {l:'Due', v:i.dueDate?BB.date(i.dueDate):'—', s:overN(i)+' days over'},
-        {l:'Invoiced', v:BB.money(Math.round(i.amount||0)), s:BB.date(i.date)}, {l:'Account balance', v:BB.money(Math.round(cu.balance||0)), s:rest.length+' open invoice'+(rest.length===1?'':'s')}],
-      table:t.table, note:t.note, actions:[go('Open full record','finance.html?show=overdue',true), go('Open the account', farmHref(farmOfN[i.customer]))] }; };
-  var accountPreview = function(c, eyebrow, listHref){ var rest=openOf(c.id), t=openTable(rest), fh=farmHref(farmOfN[c.id]);
-    return { eyebrow:eyebrow, title:c.name, sub:[c.code, c.phone].filter(Boolean).join(' · ')||null,
-      stats:[{l:'Balance', v:BB.money(Math.round(c.balance||0))}, {l:'Credit limit', v:c.creditLimit>0?BB.money(Math.round(c.creditLimit)):'none set'},
-        {l:'Over by', v:c.creditLimit>0&&c.balance>c.creditLimit?BB.money(Math.round(c.balance-c.creditLimit)):'—', cls:c.creditLimit>0&&c.balance>c.creditLimit?'bad':''},
-        {l:'Open invoices', v:rest.length}],
-      table:t.table, note:t.note, actions:[fh?go('Open full record', fh, true):go('Open full record', listHref, true), fh?go('Open the list', listHref):null] }; };
   invN.filter(function(i){ return openN(i)>0.5 && overN(i)>=90; })
     .sort(function(a,b){ return overN(b)-overN(a); }).slice(0,8).forEach(function(i){
       actions.push({ kind:'90+ days', what:(byIdN[i.customer]||{name:'—'}).name+' · '+(i.label||i.ref||''),
@@ -446,19 +499,21 @@ if(liveBoard && sgB && sgB.live){
   custN.filter(function(c){ return c.creditLimit>0 && c.balance>c.creditLimit; })
     .sort(function(a,b){ return (b.balance-b.creditLimit)-(a.balance-a.creditLimit); }).slice(0,8).forEach(function(c){
       actions.push({ kind:'Over limit', what:c.name, val:BB.money(Math.round(c.balance))+' of '+BB.money(Math.round(c.creditLimit)),
-        badge:'Over limit', href:'farms.html?show=overlimit', pop:function(){ return accountPreview(c, 'Over their limit', 'farms.html?show=overlimit'); } });
+        badge:'Over limit', href:'farms.html?show=overlimit', pop:function(){ return accountPreview(c, 'Over limit', 'farms.html?show=overlimit'); } });
     });
   custN.filter(function(c){ return c.onHold; }).slice(0,8).forEach(function(c){
     actions.push({ kind:'On hold', what:c.name, val:BB.money(Math.round(c.balance||0)), badge:'On hold', href:'farms.html?show=accounts', pop:function(){ return accountPreview(c, 'On hold', 'farms.html?show=accounts'); } });
   });
 }
+// A soil or leaf sample waiting on the lab.
 function samplePreview(s, kind, href){
-  var f=d.farmer(s.farmer), adv=d.rep(s.advisor)||{}, blk=s.block?(d.by('blocks', s.block)||{}):{};
-  var facts=[['Block', blk.name], ['Crop', s.crop||blk.crop], ['Flag', s.flag]].filter(function(x){ return x[1]; });
-  return { eyebrow:'Needs action · '+kind, title:f.name, sub:f.farm&&f.farm!==f.name?f.farm:null,
-    stats:[{l:'Status', html:BB.statusBadge(s.status)}, {l:'Taken', v:s.date?BB.date(s.date):'—'}, {l:'Advisor', v:adv.name||'—'}],
-    table:facts.length?{ columns:['Detail',''], rows:facts.map(function(x){ return { cells:[x[0], x[1]] }; }) }:null,
-    actions:[go('Open full record', href, true), go('Open the farm', farmHref(s.farmer))] };
+  var adv=d.rep(s.advisor), blk=s.block?(d.by('blocks', s.block)||{}):{}, crop=s.crop||blk.crop;
+  return { eyebrow:kind, title:blk.name||d.farmer(s.farmer).farm||d.farmer(s.farmer).name,
+    meta:[s.date? { icon:'calendar', text:'Taken '+BB.date(s.date), tip:'Taken' } : null].concat(mFarmer(s.farmer)).concat([
+      crop? { icon:'sprout', text:crop, tip:'Crop' } : null,
+      adv&&adv.name? { initials:initialsOf(adv.name), color:adv.colour, text:adv.name, tip:'Advisor' } : null]),
+    stats:[{ l:'Status', html:BB.statusBadge(s.status) }].concat(s.flag? [{ l:'Flag', v:s.flag }] : []),
+    actions:[go('Farm record', farmHref(s.farmer)), go('Open '+kind.toLowerCase()+'s', href, true)] };
 }
 if(!liveBoard) orders.filter(function(o){ return o.status==='Pending'||o.status==='Awaiting stock'; }).forEach(function(o){
   actions.push({
@@ -467,7 +522,7 @@ if(!liveBoard) orders.filter(function(o){ return o.status==='Pending'||o.status=
     val: BB.money(d.orderValue(o)),
     badge: o.status,
     href: 'orders.html',
-    pop: function(){ return orderPreview(o, 'Needs action'); }
+    pop: function(){ return orderPreview(o); }
   });
 });
 if(!liveBoard) lowItems.forEach(function(i){
@@ -477,7 +532,7 @@ if(!liveBoard) lowItems.forEach(function(i){
     val: i.qty+' / '+i.reorder+' '+(d.product(i.prod).unit||''),
     badge: i.qty===0?'Out of stock':'Low stock',
     href: 'stock.html',
-    pop: function(){ return stockPreview(i, 'Needs action'); }
+    pop: function(){ return stockPreview(i); }
   });
 });
 if(!liveBoard) soil.filter(function(s){ return s.status==='New'||s.status==='Awaiting lab'; }).forEach(function(s){
@@ -512,7 +567,7 @@ if(!liveBoard){
   else {
     blendBody = '<div class="dep-list" style="border-top:0;">';
     blending.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).forEach(function(b){
-      blendBody += '<div class="dep-row"><div style="min-width:0;"><b>'+BB.esc(b.recipe)+'</b>'+
+      blendBody += '<div class="dep-row" role="button" tabindex="0" data-blend="'+BB.esc(b.id)+'" style="cursor:pointer;"><div style="min-width:0;"><b>'+BB.esc(b.recipe)+'</b>'+
         '<div class="faint" style="font-size:.74rem;">'+BB.esc(b.batch)+' · '+BB.esc(d.depot(b.depot).name.replace(/ Depot$/,''))+' · for '+BB.esc(d.farmer(b['for']).name)+'</div></div>'+
         '<div style="text-align:right;flex:none;">'+BB.statusBadge(b.status)+'<div class="faint" style="font-size:.72rem;margin-top:3px;">due '+BB.shortDate(b.due)+'</div></div></div>';
     });
@@ -568,18 +623,24 @@ chartJobs.forEach(function(f){ try{ f(); }catch(e){ console.warn('chart', e); } 
 // rows open their record over the board; the record page is a button inside
 function onRows(sel, fn){ Array.prototype.forEach.call(document.querySelectorAll(sel), function(tr){ tr.onclick = function(){ var p=fn(tr); if(p) BB.popup(p); }; }); }
 onRows('tr.click[data-act]', function(tr){ var a=actions[+tr.getAttribute('data-act')];
-  return a && (a.pop ? a.pop() : { eyebrow:'Needs action', title:a.kind, sub:a.what, actions:[go('Open full record', a.href, true)] }); });
-onRows('tr.click[data-order]', function(tr){ var o=d.by('orders', tr.getAttribute('data-order')); return o && orderPreview(o, 'Latest orders'); });
+  return a && (a.pop ? a.pop() : { eyebrow:'Needs action', title:a.kind, actions:[go('Open full record', a.href, true)] }); });
+onRows('tr.click[data-order]', function(tr){ var o=d.by('orders', tr.getAttribute('data-order')); return o && orderPreview(o); });
 onRows('tr.click[data-del]', function(tr){ var x=d.by('deliveries', tr.getAttribute('data-del')); return x && deliveryPreview(x); });
-onRows('tr.click[data-stock]', function(tr){ var i=inventory[+tr.getAttribute('data-stock')]; return i && stockPreview(i, 'Stock vs reorder'); });
+onRows('tr.click[data-stock]', function(tr){ var i=inventory[+tr.getAttribute('data-stock')]; return i && stockPreview(i); });
+onRows('[data-blend]', function(el){ var b=d.by('blending', el.getAttribute('data-blend')); return b && blendPreview(b); });
+Array.prototype.forEach.call(document.querySelectorAll('[data-blend]'), function(el){ el.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.onclick(); } }; });
+// a product's movement off the ledger, month by month
 onRows('tr.click[data-mover]', function(tr){ var x=movers[+tr.getAttribute('data-mover')]; if(!x) return null;
-  var ks=Object.keys(x.months).sort().reverse().slice(0,6);
-  return { eyebrow:'Biggest movers this month', title:x.n, sub:[x.c, x.pack].filter(Boolean).join(' · ')||null,
-    stats:[{l:'This month', v:(Math.round(x.q*10)/10).toLocaleString('en-ZA'), s:'quantity invoiced'}, {l:'Invoiced', v:BB.money(Math.round(x.v))}],
-    table:{ columns:['Month','Quantity','Invoiced'], num:[1,2], rows:ks.map(function(k){ var m=x.months[k]||{}, p=k.split('-');
+  var ks=Object.keys(x.months).sort().reverse().slice(0,6), lm=(function(){ var t=new Date(); t.setDate(1); t.setMonth(t.getMonth()-1); return x.months[t.toISOString().slice(0,7)]||{}; })();
+  return { wide:true, layout:'split', eyebrow:'Product movement', title:x.n,
+    meta:[x.c? { icon:'package', text:x.c+(x.pack?' · '+x.pack:''), tip:'Code · pack' } : null],
+    stats:[{ l:'This month', v:(Math.round(x.q*10)/10).toLocaleString('en-ZA'), s:'quantity invoiced' }, { l:'Invoiced', v:BB.money(Math.round(x.v)) },
+      { l:'Last month', v:(Math.round((lm.qty||0)*10)/10).toLocaleString('en-ZA') },
+      { l:'Six months', v:(Math.round(ks.reduce(function(t,k){ return t+((x.months[k]||{}).qty||0); },0)*10)/10).toLocaleString('en-ZA'), s:'quantity invoiced' }],
+    table:{ title:'Last six months', columns:['Month','Quantity','Invoiced'], num:[1,2], rows:ks.map(function(k){ var m=x.months[k]||{}, p=k.split('-');
       return { cells:[BB.monthName(+p[1]-1)+' '+p[0], (Math.round((m.qty||0)*10)/10).toLocaleString('en-ZA'), BB.money(Math.round(m.value||0))] }; }) },
     actions:[go('Every product','dispatch.html',true)] }; });
-// a depot in the health list opens its lines
+// a depot in the health list opens its card
 Array.prototype.forEach.call(document.querySelectorAll('a.dep-row[data-dep]'), function(a){
   a.addEventListener('click', function(e){ if(e.metaKey||e.ctrlKey||e.shiftKey) return; e.preventDefault();
     BB.popup(depotStock(d.depot(a.getAttribute('data-dep')))); });
