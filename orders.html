@@ -39,8 +39,8 @@ var isDirector = u.roleKey==='director';
 function canInvoiceOrder(o){ return canInvoiceRole || (isAdvisor && d.quoteStatus(o)==='Farmer approved'); }
 function quoteChip(o){
   var q=d.quoteStatus(o); if(!q) return '';
-  var cls = q==='Awaiting approval'?'b-warn': q==='Approved'?'b-blue': q==='Sent to farmer'?'b-blue': q==='Farmer approved'?'b-ok':'b-grey';
-  return '<span class="badge '+cls+'" title="Quote">'+BB.esc(q==='Awaiting approval'?'Quote · awaiting '+(isDirector?'you':'Rudie'):'Quote · '+q.toLowerCase())+'</span>';
+  var ic = q==='Farmer approved'?'check': q==='Declined'?'alert':'file';
+  return '<span class="tag tag-quote" title="Quote stage">'+BB.icon(ic)+BB.esc(q==='Awaiting approval'?'Quote · awaiting '+(isDirector?'you':'Rudie'):'Quote · '+q.toLowerCase())+'</span>';
 }
 function farmerWA(o, msg){
   var f=d.farmer(o.farmer); var cell=String(f.cell||'').replace(/\D/g,'').replace(/^0/,'27');
@@ -99,16 +99,15 @@ function nextMonth25(){
 // Invoicing indicator: green once actually invoiced, amber when a
 // delivered/confirmed order is still counted as a sale but NOT yet invoiced.
 function invoiceBadge(o){
-  if(d.orderInvoiced(o.id)) return '<span class="badge b-ok">Invoiced</span>';
-  if(o.status==='Delivered' || o.status==='Confirmed') return '<span class="badge b-warn">Uninvoiced</span>';
+  if(d.orderInvoiced(o.id)) return '<span class="tag tag-inv" title="An invoice exists — counts as actual revenue">'+BB.icon('receipt')+'Invoiced</span>';
+  if(o.status==='Delivered' || o.status==='Confirmed') return '<span class="tag tag-uninv" title="Counted as a sale, not yet invoiced">'+BB.icon('receipt')+'Not invoiced</span>';
   return '';
 }
 
 function holdBadge(o){
   var h = d.deliveryHold(o);
   if(!h) return '';
-  var cls = h.sev==='high' ? 'b-bad' : 'b-warn';
-  return '<span class="badge '+cls+'" title="'+BB.esc(h.reason)+'">HOLD</span>';
+  return '<span class="tag tag-hold'+(h.sev==='high'?'':' med')+'" title="'+BB.esc(h.reason)+'">'+BB.icon('alert')+'HOLD</span>';
 }
 
 function allOrders(){
@@ -178,7 +177,7 @@ function statBar(orders){
   return html;
 }
 
-var STATUS_COL = { 'Forecast':'#68a53e', 'Pending':'#c77d17', 'Confirmed':'#3f6b28', 'Awaiting stock':'#a3533f', 'Delivered':'#2f6f9e' };
+var STATUS_COL = { 'Forecast':'#6b7d8f', 'Pending':'#c77d17', 'Confirmed':'#2b7d39', 'Awaiting stock':'#a3463a', 'Delivered':'#4b5bb0' };   // same hues as the status pills
 
 function render(){
   var orders = allOrders();
@@ -220,13 +219,14 @@ function render(){
       (isAdvisor?'':'<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>')+
       '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'delivered ':BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
       '<td class="num"><b>'+BB.money(val)+'</b>'+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;font-weight:400;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
-      '<td>'+BB.statusBadge(o.status)+'</td>'+
+      '<td><div class="tags">'+BB.statusBadge(o.status)+quoteChip(o)+invoiceBadge(o)+holdBadge(o)+'</div></td>'+
     '</tr>';
   });
 
   html += '</tbody>';
   if(shown.length) html += '<tfoot><tr><td colspan="'+(cols-2)+'">'+shown.length+' order'+(shown.length===1?'':'s')+'</td><td class="num">'+BB.money(shownTot)+'</td><td></td></tr></tfoot>';
-  html += '</table></div></div>';
+  html += '</table></div>'+
+    '<div class="card-f tags" style="gap:6px 10px;"><span>Beside the status:</span><span class="tag tag-quote">'+BB.icon('file')+'Quote stage</span><span class="tag tag-inv">'+BB.icon('receipt')+'Invoiced</span><span class="tag tag-uninv">'+BB.icon('receipt')+'Not invoiced</span><span class="tag tag-hold">'+BB.icon('alert')+'HOLD · overdue</span><span class="tag tag-hold med">'+BB.icon('alert')+'HOLD · over limit</span></div></div>';
 
   document.getElementById('ordMain').innerHTML=html;
   drawCharts(orders);

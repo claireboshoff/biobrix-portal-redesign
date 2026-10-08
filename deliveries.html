@@ -33,7 +33,7 @@ function orderRef(delivery){
   return o ? o.ref : '—';
 }
 
-var STATUS_COL = { 'In transit':'#2f6f9e', 'Delivered':'#3f6b28', 'Awaiting stock':'#c77d17' };
+var STATUS_COL = { 'In transit':'#0e8aa6', 'Delivered':'#4b5bb0', 'Awaiting stock':'#a3463a' };   // match the status pills
 
 // ---- popups ----
 function can(href){ return !(BB.auth && typeof BB.auth.canPage==='function') || BB.auth.canPage(href); }
@@ -44,7 +44,7 @@ function delTable(list, withHold){
   return { columns:['Order','Farmer'].concat(scopeDepot?[]:['Depot']).concat(['Transport','ETA','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(x){ var h=withHold&&d.deliveryHold(d.by('orders', x.order));
       return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(orderRef(x))+'</span>' }, d.farmer(x.farmer).name].concat(scopeDepot?[]:[depShort(x.depot)]).concat([x.transport||'—', BB.date(x.eta),
-        { html:BB.statusBadge(x.status)+(h?' <span class="badge '+(h.sev==='high'?'b-bad':'b-warn')+'" title="'+BB.esc(h.reason)+'">HOLD</span>':'') }]), href:farmHref(x.farmer) }; }) };
+        { html:BB.statusBadge(x.status)+(h?' <span class="tag tag-hold'+(h.sev==='high'?'':' med')+'" title="'+BB.esc(h.reason)+'">'+BB.icon('alert')+'HOLD</span>':'') }]), href:farmHref(x.farmer) }; }) };
 }
 // The deliveries in one status, with a button that narrows the table below to them.
 function statusDetail(all, st){
@@ -109,7 +109,7 @@ function render(){
     rows.forEach(function(x){
       var opts = STATUS_OPTIONS.map(function(s){ return '<option value="'+BB.esc(s)+'"'+(s===x.status?' selected':'')+'>'+BB.esc(s)+'</option>'; }).join('');
       var hold = holdOf(x);
-      var holdBadge = hold ? ' <span class="badge '+(hold.sev==='high'?'b-bad':'b-warn')+'" title="'+BB.esc(hold.reason)+'">HOLD</span>' : '';
+      var holdBadge = hold ? ' <span class="tag tag-hold'+(hold.sev==='high'?'':' med')+'" title="'+BB.esc(hold.reason)+'">'+BB.icon('alert')+'HOLD</span>' : '';
       tbl += '<tr>'+
         '<td style="white-space:nowrap;"><a href="#" class="dl-open" data-open="'+BB.esc(x.id)+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(orderRef(x))+'</a></td>'+
         '<td style="white-space:nowrap;">'+BB.esc(d.farmer(x.farmer).name)+'</td>'+

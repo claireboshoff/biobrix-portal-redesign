@@ -288,6 +288,24 @@
 
 
 
+
+  /* Order pills — each status its own colour (tinted fill); the tags beside them use other styles:
+     quote = purple with an icon · invoice = outlined · HOLD = the only solid pill. */
+  .b-forecast{background:#edf1f5;color:#4a5a6b;}
+  .b-pending{background:#fdf1dc;color:#9a5c0a;}
+  .b-confirmed{background:#e3f2e5;color:#23702f;}
+  .b-await{background:#f8e5e1;color:#9c3f33;}
+  .b-delivered{background:#eaecfa;color:#4352a3;}
+  .b-transit{background:#e0f3f7;color:#0e6e86;}
+  .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.68rem;font-weight:600;white-space:nowrap;line-height:1.5;}
+  .tag .ico{width:11px;height:11px;stroke-width:2.2;}
+  .tag-quote{background:#f3ecf8;color:#6d3f8a;}
+  .tag-inv{background:#fff;color:#16726a;box-shadow:inset 0 0 0 1px #8fcfc6;}
+  .tag-uninv{background:#fff;color:#7a6250;box-shadow:none;border:1px dashed #c4ad97;padding:1px 7px;}
+  .tag-hold{background:#b8382a;color:#fff;letter-spacing:.4px;}
+  .tag-hold.med{background:#a15c08;}
+  .tags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+
   /* ── Themed controls (no OS-drawn widgets) ── */
   .bb-sel{position:relative;display:inline-block;min-width:0;max-width:100%;vertical-align:middle;}
   .bb-sel .bb-native{position:absolute !important;inset:0;width:100% !important;height:100% !important;opacity:0 !important;pointer-events:none !important;margin:0 !important;}
@@ -1037,11 +1055,11 @@
   function monthName(i){ return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i]; }
 
   function statusBadge(s){
-    var m={ 'Confirmed':'b-ok','Delivered':'b-ok','Paid':'b-ok','Active':'b-ok','In stock':'b-ok','Healthy':'b-ok','Approved':'b-ok',
-      'Pending':'b-warn','Forecast':'b-warn','Awaiting stock':'b-warn','Low stock':'b-warn','In progress':'b-warn','Monitoring':'b-warn','Reorder':'b-warn',
+    var m={ 'Confirmed':'b-confirmed','Delivered':'b-delivered','Paid':'b-ok','Active':'b-ok','In stock':'b-ok','Healthy':'b-ok','Approved':'b-ok',
+      'Pending':'b-pending','Forecast':'b-forecast','Awaiting stock':'b-await','Low stock':'b-warn','In progress':'b-warn','Monitoring':'b-warn','Reorder':'b-warn',
       'Draft':'b-grey','Planned':'b-grey','New':'b-grey',
       'Out of stock':'b-bad','Overdue':'b-bad','Urgent':'b-bad','Critical':'b-bad','At risk':'b-bad',
-      'Ordered':'b-blue','In transit':'b-blue','Blending':'b-blue','Quoted':'b-blue','Proof received':'b-blue','Sent':'b-ok','Shipped':'b-ok','In flight':'b-blue','Awaiting you':'b-warn','Open':'b-grey','Done':'b-ok','Design':'b-grey','Live':'b-ok' };
+      'Ordered':'b-blue','In transit':'b-transit','Blending':'b-blue','Quoted':'b-blue','Proof received':'b-blue','Sent':'b-ok','Shipped':'b-ok','In flight':'b-blue','Awaiting you':'b-warn','Open':'b-grey','Done':'b-ok','Design':'b-grey','Live':'b-ok' };
     return '<span class="badge '+(m[s]||'b-grey')+'">'+esc(s)+'</span>';
   }
 
