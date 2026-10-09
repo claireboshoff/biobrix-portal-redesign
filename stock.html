@@ -11,6 +11,8 @@
 <script src="bb-data.js?v=redesign1"></script>
 <script src="bb-shell.js?v=redesign1"></script>
 <style>
+  /* phones: the count comes first; Depot, Reorder at, Level and Status live in the line's card */
+  @media(max-width:700px){ [data-stock-table] .ph-x{display:none;} [data-stock-table] td.num .row{flex-wrap:wrap !important;justify-content:flex-end;} [data-stock-table] .cnt-in{width:92px;} [data-stock-table] .scroll{overflow-x:visible;} }
   .take{border-left:3px solid var(--green-bright);}
   .take-in{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:18px 20px;}
   .take-ic{width:40px;height:40px;border-radius:10px;background:#eef4e4;color:var(--green-dark);display:flex;align-items:center;justify-content:center;flex:none;}
@@ -180,13 +182,18 @@ function render(){
   '</div>';
 
   // ---- the picture: on hand against reorder, beside where the value sits ----
-  html += '<div class="split" style="margin-top:16px;">'+
+  // On a phone the count comes first: stock take and lines, then the charts (see below).
+  var phone = window.matchMedia('(max-width:700px)').matches;
+  var picHtml = '';
+  picHtml += '<div class="split" style="margin-top:16px;">'+
     '<div class="card"><div class="card-h"><div><h3>'+(oneDepot?'On hand against reorder level':'Stock health by depot')+'</h3><div class="sub">'+
       (oneDepot?BB.esc(d.depot(oneDepot).name)+' · every line':'lines in stock, low and out')+'</div></div></div><div class="card-p">'+
       (all.length?'<div id="chStock"></div>':'<div class="empty">No stock lines yet.</div>')+'</div></div>'+
     '<div class="card"><div class="card-h"><div><h3>On-hand value</h3><div class="sub">at list price, '+(oneDepot?'by product':'by depot')+'</div></div></div><div class="card-p">'+
       (totalValue>0?'<div id="chValue"></div>':'<div class="empty">Nothing on hand.</div>')+'</div></div>'+
   '</div>';
+
+  if(!phone) html += picHtml;
 
   // ---- STOCK TAKE — one tap when nothing moved, voice when it did --------
   var lastTake = null; try{ lastTake = JSON.parse(localStorage.getItem('bb_stocktake_'+(scopeDepot||filter))); }catch(e){}
@@ -223,7 +230,7 @@ function render(){
   var lowInView = rows.filter(function(i){ return i.qty<i.reorder; }).length;
   html += '<div class="card" data-stock-table="1" style="margin-top:16px;"><div class="card-h"><div><h3>Stock lines</h3><div class="sub">'+rows.length+' line'+(rows.length===1?'':'s')+(lowInView?' · '+lowInView+' below reorder':'')+' · type a count to save it</div></div>'+chips+'</div>'+
     '<div class="scroll"><table class="bb">'+
-    '<thead><tr><th>Product</th>'+(scopeDepot?'':'<th>Depot</th>')+'<th class="num">On hand</th><th class="num">Reorder at</th><th class="lvl-col" style="min-width:150px;">Level</th><th>Status</th><th class="num">Stock take</th></tr></thead><tbody>';
+    '<thead><tr><th>Product</th>'+(scopeDepot?'':'<th class="ph-x">Depot</th>')+'<th class="num">On hand</th><th class="num ph-x">Reorder at</th><th class="lvl-col ph-x" style="min-width:150px;">Level</th><th class="ph-x">Status</th><th class="num">'+(phone?'Count':'Stock take')+'</th></tr></thead><tbody>';
 
   if(!rows.length){
     html += '<tr><td colspan="'+(scopeDepot?6:7)+'"><div class="empty">No stock lines for this depot.</div></td></tr>';
@@ -235,11 +242,11 @@ function render(){
       var rowCls = st==='Out of stock' ? 'r-out' : (st==='Low stock' ? 'r-low' : '');
       html += '<tr class="'+rowCls+'">'+
         '<td><a href="#" data-line="'+i.depot+'|'+i.prod+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(p.name)+'</a><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
-        (scopeDepot?'':'<td class="muted">'+BB.esc(d.depot(i.depot).name)+'</td>')+
+        (scopeDepot?'':'<td class="muted ph-x">'+BB.esc(d.depot(i.depot).name)+'</td>')+
         '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
-        '<td class="num muted">'+BB.num(i.reorder)+'</td>'+
-        '<td class="lvl-col">'+levelCell(i.qty, i.reorder)+'</td>'+
-        '<td>'+BB.statusBadge(st)+'</td>'+
+        '<td class="num muted ph-x">'+BB.num(i.reorder)+'</td>'+
+        '<td class="lvl-col ph-x">'+levelCell(i.qty, i.reorder)+'</td>'+
+        '<td class="ph-x">'+BB.statusBadge(st)+'</td>'+
         '<td class="num"><div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:nowrap;">'+
           (low ? '<button class="btn ghost sm" data-reorder="'+i.depot+'|'+i.prod+'">Reorder</button>' : '')+
           '<input type="number" min="0" value="'+i.qty+'" data-count="'+i.depot+'|'+i.prod+'" class="cnt-in" aria-label="Count for '+BB.esc(p.name)+'">'+
@@ -249,6 +256,7 @@ function render(){
   }
   html += '</tbody></table></div>'+
     '<div class="card-f">Tap a product for its card. Change an On-hand count and it saves the moment you leave the field. Reorder raises a request with the product\'s supplier. The mark on each level bar is the reorder level.</div></div>';
+  if(phone) html += picHtml;
   html += '<div style="height:24px;"></div>';
 
   var main = document.querySelector('main.wrap');

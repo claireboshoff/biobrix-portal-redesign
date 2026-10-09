@@ -560,6 +560,9 @@
     .askdock.min{left:auto;right:12px;}
     body.has-ask main.wrap{padding-bottom:170px;}
     .ask-ib.minb{display:none;}
+    /* phones: the suggestions show once the bar is in use, not over the page all the time */
+    .askdock:not(:focus-within):not(.open) .ask-sugs{display:none;}
+    body.has-ask main.wrap{padding-bottom:120px;}
     .ask-panel{max-height:62vh;}
     body.has-ask .toast{bottom:150px;}
   }
@@ -606,6 +609,35 @@
     #bbNav,#bbOverlay,.bb-top,.bb-nav,.toast,.bbc-tip{display:none !important;}
     .wrap{max-width:none;padding:0;}
     .card,.stat{box-shadow:none;break-inside:avoid;}
+  }
+
+  /* ── Phones and touch screens (mobile pass, Oct 2026) ── */
+  @media (max-width:900px){
+    /* iOS zooms into any field under 16px: keep every field at 16px on phones */
+    input:not([type=checkbox]):not([type=radio]), select, textarea, .bb-sel-btn, .col-filter-menu input, .bb-sel-menu .sq input{font-size:16px !important;}
+    /* readable minimum for the small uppercase labels */
+    table.bb th, .stat .l, .eyebrow, .tag, .badge, .crop-chip, .bbp-stats .stat .l, .card-h .sub, .sec .cnt, .bbp-h .eb{font-size:11.5px !important;}
+    .mo-kpi .l{font-size:10.5px !important;}
+    .stat .s, .faint, small{font-size:max(12px, .76rem);}
+  }
+  @media (pointer:coarse){
+    /* bigger hit areas without bigger visuals */
+    .th-filter{position:relative;opacity:.8;}
+    .th-filter::after{content:"";position:absolute;inset:-10px -8px;}
+    .btn.sm{min-height:40px;padding:8px 12px;}
+    .chip{min-height:36px;padding:7px 12px;}
+    .seg button,.seg a{min-height:36px;padding:8px 12px;}
+    .tog{min-height:36px;}
+    .bbc-table summary{padding:10px 0;display:inline-block;}
+    .donut-legend .r{padding:8px 4px;}
+    .hbar{padding:8px 6px;}
+    .bb-back{min-height:40px;padding:8px 12px 8px 8px;}
+    .bb-cal .cg button{height:40px;}
+    .bb-sel-menu .op, .bb-pick .op, .cf-opopt, .col-filter-menu .cf-item, .col-filter-menu .cf-sort{padding-top:11px !important;padding-bottom:11px !important;}
+    table.bb td a{display:inline-block;padding:6px 0;}
+    /* phones bring up a number keypad; the tiny up/down arrows are just in the way */
+    .bb-numw .st{display:none;}
+    .bb-numw input{padding-right:12px !important;}
   }
   @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important;} }
   `;
@@ -970,6 +1002,9 @@
     });
 
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeRail(); toggleNav(false); } });
+    // the offline count follows every change saved on the device, not just connection changes
+    try{ if(BB.data && !BB.data._wrapped){ ['add','update','enqueue','save'].forEach(function(k){ var f=BB.data[k]; if(typeof f!=='function') return;
+      BB.data[k]=function(){ var r=f.apply(this, arguments); if(!navigator.onLine) setTimeout(refreshSync,0); return r; }; }); BB.data._wrapped=true; } }catch(e){}
     refreshSync();
     setTimeout(markSamplePage, 0);
     setTimeout(loadAsk, 0);

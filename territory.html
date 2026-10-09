@@ -24,7 +24,7 @@ var css=''+
 '.pbar i{display:block;height:100%;background:var(--green-bright);}'+
 '.readout{background:#f7faf1;border:1px solid var(--line);border-left:3px solid var(--green-bright);border-radius:11px;padding:14px 16px;margin-top:12px;}'+
 '.readout.warn{border-left-color:var(--amber);background:var(--amber-bg);}'+
-'.map-card{position:relative;padding:0;}'+
+'.map-card{position:relative;padding:0;isolation:isolate;}'+   /* the floating panels stay under the sticky top bar */
 '.map-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line-soft);}'+
 '.map-tools .grp{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}'+
 '.map-tools .lbl{font-size:.64rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);margin-right:2px;}'+
@@ -118,7 +118,7 @@ var css=''+
 '.map-card.carding .mo-search{display:none;}'+
 '.map-card.carding .mo-key{display:none;}'+
 '.sel-pin{outline:3px solid var(--lime);outline-offset:2px;}'+
-'@media(max-width:700px){.mo-kpis{grid-template-columns:repeat(2,84px);top:auto;bottom:12px;right:12px;} .mo-key{bottom:auto;top:62px;width:calc(100% - 24px);} .mo-key:not(.open-m) .body{display:none;}}'+
+'@media(max-width:700px){.mo-kpis{position:static;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px;border-top:1px solid var(--line-soft);} .mo-kpis .mo-panel{box-shadow:none;background:var(--panel-2);} .mo-kpi{padding:7px 8px;} .mo-kpi .v{font-size:.92rem;} .mo-key{bottom:auto;top:62px;width:calc(100% - 24px);} .mo-key:not(.open-m) .body{display:none;}}'+
 '.terr-split .t-table .town small{display:block;font-size:.72rem;color:var(--faint);font-weight:400;}'+
 '.terr-split .t-table td,.terr-split .t-table th{padding-left:10px;padding-right:10px;}'+
 '.terr-split .t-table .bar-cell{min-width:64px !important;}'+
