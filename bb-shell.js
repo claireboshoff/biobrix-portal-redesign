@@ -1024,12 +1024,12 @@
     if(sc){
       var band='';
       if(sc.rep){ var rr=BB.data.rep(sc.rep);
-        var rWhat = sageReal() ? 'your accounts, your sales and the plan — nobody else’s'
+        var rWhat = sageLive() ? 'your accounts, your sales and the plan — nobody else’s'
                                : 'your farmers, orders, forecast and farm files only';
         band='<div class="bb-scope"><span class="dot" style="background:'+esc(rr.colour||'#68a53e')+';"></span><b>'+esc((u.name||'').split(' ')[0])+'’s view</b> · '+esc(rr.region||'')+' · '+rWhat+'</div>'; }
       else if(sc.farmer){ var ff=BB.data.farmer(sc.farmer); band='<div class="bb-scope"><span class="dot" style="background:var(--green-bright);"></span><b>'+esc(ff.farm||'My farm')+'</b> · your farm, your orders, your account — nothing else</div>'; }
       else if(sc.depot){ var dd=BB.data.depot(sc.depot);
-        var dWhat = sageReal() ? 'what is going out, and jobs — no customer accounts'
+        var dWhat = sageLive() ? 'what is going out, and jobs — no customer accounts'
                                : 'your stock, deliveries, blending and labels only';
         band='<div class="bb-scope"><span class="dot" style="background:var(--green-bright);"></span><b>'+esc(dd.name||'Depot')+' view</b> · '+dWhat+'</div>'; }
       top = top.replace('<div class="bb-sync" id="bbSync"></div>', band+'<div class="bb-sync" id="bbSync"></div>');
@@ -1106,13 +1106,10 @@
       ' Treat them as at that date, not as today.</div></div>';
   }
   function sageLive(){ try{ var s=BB.data.sage&&BB.data.sage(); return !!(s&&s.live); }catch(e){ return false; } }
-  // A real ledger, not the demo's sample one: only then is anything on the page "partly real",
-  // so only then do sample banners and chips have something to tell apart.
-  function sageReal(){ try{ var s=BB.data.sage&&BB.data.sage(); return !!(s&&s.live&&!s.demo); }catch(e){ return false; } }
   function isSample(rec){ return !(rec && (rec.src==='sage' || rec.sageId)); }
   function sampleNote(what){
     return '<div class="bb-sample"><span class="t">Sample</span><div>The figures in <b>'+esc(what)+'</b> are demonstration data, not BioBrix\'s own. '+
-      (sageReal()? 'Your customers, invoices and payments are live from your accounting system — this section is not connected to it yet.' : 'Nothing here comes from your systems yet.')+'</div></div>';
+      (sageLive()? 'Your customers, invoices and payments are live from your accounting system — this section is not connected to it yet.' : 'Nothing here comes from your systems yet.')+'</div></div>';
   }
   // Pages where the top of the screen is now real (fed by the accounting system) and only the
   // sections below it are demonstration data. The note goes above the first of those sections.
@@ -1121,7 +1118,7 @@
     'index.html':{ after:'#insights', what:'the farm health scores and the stock and sample alerts above' }
   };
   function markSamplePage(){
-    if(!sageReal()) return;                                  // in demo mode (sample ledger or none) the whole thing is a demo
+    if(!sageLive()) return;                                  // in pure demo mode the whole thing is a demo
     // On a live client seat there is no sample data left to mark: the store stops serving seeded
     // records altogether (see bb-data, "the sample-data cut-off"). A banner here would be warning
     // people about figures they can no longer see.
@@ -1703,11 +1700,10 @@
     toggleNav:toggleNav, toggleUser:toggleUser, PAL:PAL, delta:delta, railPages:railPages,
     popup:popup, closePopup:closePopup, pick:pick, confirm:confirmBox, enhance:enhanceAll, statDetail:function(k,fn){ STAT_DETAIL[k]=fn; },
     chart:{ bar:bar, line:line, hbar:hbar, donut:donut, spark:spark, compact:compact, moneyCompact:moneyCompact },
-    sageLive:sageLive, sageReal:sageReal, isSample:isSample, sampleNote:sampleNote, sageAge:sageAge, staleNote:staleNote,
-    sampleChip:function(rec){ return isSample(rec) && sageReal() ? '<span class="chip-sample">Sample</span>' : ''; },
-    // a made-up ledger (demo mode) says so, so sample figures are never read as the real books
-    liveChip:function(){ if(!sageLive()) return ''; var sg=BB.data&&BB.data.sage&&BB.data.sage();
-      return sg&&sg.demo ? '<span class="chip-live" data-tip="Made-up figures in the shape of your accounting system">Sample ledger</span>' : '<span class="chip-live">From your accounts</span>'; },
+    sageLive:sageLive, isSample:isSample, sampleNote:sampleNote, sageAge:sageAge, staleNote:staleNote,
+    sampleChip:function(rec){ return isSample(rec) && sageLive() ? '<span class="chip-sample">Sample</span>' : ''; },
+    // figures from the accounting system carry no badge: real figures are simply the figures
+    liveChip:function(){ return ''; },
     // inject brand CSS immediately
     _cssInjected:false
   });

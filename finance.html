@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Finance · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign6"></script><script src="guard.js?v=redesign6"></script>
-<script src="bb-data.js?v=redesign6"></script>
-<script src="bb-shell.js?v=redesign6"></script>
+<script src="bb-config.js?v=redesign7"></script><script src="guard.js?v=redesign7"></script>
+<script src="bb-data.js?v=redesign7"></script>
+<script src="bb-shell.js?v=redesign7"></script>
 <style>
   .fin-row{margin-top:16px;}
   .fin-rec{display:grid;gap:16px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start;}
@@ -251,7 +251,7 @@ function render(){
   var liveSeat = !!(BB.auth && BB.auth.tenantLive && BB.auth.tenantLive() && !(BB.auth.isFreedomHub && BB.auth.isFreedomHub()));
   var repRowsAny = reps.some(function(r){ return orders.some(function(o){ return o.rep===r.id && (o.status==='Delivered'||o.status==='Confirmed'); }); });
   var showRec = !(liveSeat && !repRowsAny);
-  if(showRec && BB.sageReal() && !liveSeat) html+=BB.sampleNote('what the reps reported');
+  if(showRec && BB.sageLive() && !liveSeat) html+=BB.sampleNote('what the reps reported');
   html+=showRec ? '<div class="fin-rec fin-row">' : '';
   if(showRec){
     var tRep=0, tAct=0;

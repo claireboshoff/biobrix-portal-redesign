@@ -10,10 +10,10 @@
 <meta name="theme-color" content="#22431a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="BioBrix">
-<script src="bb-config.js?v=redesign6"></script><script src="guard.js?v=redesign6"></script>
-<script src="bb-data.js?v=redesign6"></script>
-<script src="bb-shell.js?v=redesign6"></script>
-<script src="bb-intel.js?v=redesign6"></script>
+<script src="bb-config.js?v=redesign7"></script><script src="guard.js?v=redesign7"></script>
+<script src="bb-data.js?v=redesign7"></script>
+<script src="bb-shell.js?v=redesign7"></script>
+<script src="bb-intel.js?v=redesign7"></script>
 <style>
 /* ── Insights (moved from the Intelligence page) ── */
 .alert-list{max-height:440px;overflow:auto;}
@@ -523,7 +523,7 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
 // follow-ups: programme timing turned into dated reminders (advisor sees own; director sees all).
 // These run on the portal's own seeded farms. Once BioBrix is on their own figures their people
 // must never meet our example farmers, so the whole block stands down for a live client seat.
-if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && !sage.demo && BB.auth.can('finance'))){
+if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && BB.auth.can('finance'))){
   var fups = d.all('followups').filter(function(x){ return x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); }).slice(0,5);
   var today0 = new Date(new Date().toISOString().slice(0,10));
   html += '<div class="card" style="margin-top:16px;" id="fuCard"><div class="card-h"><div><h3>Follow-ups due</h3><div class="sub">the farmer gets an email + WhatsApp nudge 3 days before, with the weather window</div></div><span class="badge b-warn">'+fups.length+' open</span></div>';
