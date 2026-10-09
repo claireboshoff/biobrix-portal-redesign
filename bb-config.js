@@ -22,7 +22,7 @@
     // A local copy runs the self-contained demo (no Worker needed); everything else signs in for real.
     AUTH: local ? 'demo' : 'live',
     // Who may sign in to this build at all (lower-case emails). Empty = every BioBrix account.
-    ALLOW: preview ? ['rudie@biobrix.co.za', 'claire@freedomhub.io'] : [],
+    ALLOW: preview ? ['rudie@biobrix.co.za', 'claire.boshoff@gmail.com'] : [],
     API: local ? 'http://localhost:8787' : 'https://fh-biobrix.claire-boshoff.workers.dev',
     // The Ask bar's brain (ask-worker/). Until it is deployed with a key, questions fall back to the built-in rules.
     ASK_API: local ? 'http://localhost:8788' : 'https://fh-biobrix-ask.claire-boshoff.workers.dev'

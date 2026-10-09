@@ -24,7 +24,7 @@
   // If this page came out of a cache and is older than what is published, reload it once, with a
   // cache-busting parameter. Without this a stale copy can sit on a device for as long as the CDN
   // cache lives, and everything we ship looks like it never happened.
-  var BUILD = 'redesign5';
+  var BUILD = 'redesign6';
   try{
     if(typeof fetch==='function' && navigator.onLine){
       fetch('version.txt?_=' + Date.now(), {cache:'no-store'}).then(function(r){ return r.ok? r.json():null; }).then(function(j){
