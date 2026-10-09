@@ -2,9 +2,11 @@
    NETWORK-FIRST for pages (so a refresh always shows the latest when online),
    cache-first for assets. Falls back to cache only when offline (the field).
    Data lives in localStorage (bb-data.js) so the app keeps working with no signal. */
-var CACHE = 'biobrix-os-v43';
+// Its own cache family: the preview shares an address with other BioBrix builds, so it only
+// ever clears its own old caches, never theirs.
+var CACHE = 'biobrix-redesign-v44';
 var SHELL = [
-  'index.html','login.html','welcome.html','bb-config.js?v=redesign1','guard.js?v=redesign1','bb-data.js?v=redesign1','bb-shell.js?v=redesign1','bb-intel.js?v=redesign1','bb-ask.js?v=redesign1','bb-table.js?v=redesign1','manifest.json',
+  'index.html','login.html','welcome.html','bb-config.js?v=redesign2','guard.js?v=redesign2','bb-data.js?v=redesign2','bb-shell.js?v=redesign2','bb-intel.js?v=redesign2','bb-ask.js?v=redesign2','bb-table.js?v=redesign2','manifest.json',
   'voice-order.html','forecast.html','territory.html','orders.html',
   'operations.html','stock.html','depots.html','suppliers.html','deliveries.html',
   'bioservices.html','farms.html','farm-detail.html','bioanalyze-soil.html',
@@ -18,7 +20,7 @@ self.addEventListener('install', function(e){
 });
 self.addEventListener('activate', function(e){
   e.waitUntil(caches.keys().then(function(keys){
-    return Promise.all(keys.map(function(k){ if(k!==CACHE) return caches.delete(k); }));
+    return Promise.all(keys.map(function(k){ if(k!==CACHE && k.indexOf('biobrix-redesign-')===0) return caches.delete(k); }));
   }).then(function(){ return self.clients.claim(); }));
 });
 self.addEventListener('fetch', function(e){
