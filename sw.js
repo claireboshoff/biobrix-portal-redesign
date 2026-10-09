@@ -4,9 +4,9 @@
    Data lives in localStorage (bb-data.js) so the app keeps working with no signal. */
 // Its own cache family: the preview shares an address with other BioBrix builds, so it only
 // ever clears its own old caches, never theirs.
-var CACHE = 'biobrix-redesign-v46';
+var CACHE = 'biobrix-redesign-v47';
 var SHELL = [
-  'index.html','login.html','welcome.html','bb-config.js?v=redesign4','guard.js?v=redesign4','bb-data.js?v=redesign4','bb-shell.js?v=redesign4','bb-intel.js?v=redesign4','bb-ask.js?v=redesign4','bb-table.js?v=redesign4','manifest.json',
+  'index.html','login.html','welcome.html','bb-config.js?v=redesign5','guard.js?v=redesign5','bb-data.js?v=redesign5','bb-shell.js?v=redesign5','bb-intel.js?v=redesign5','bb-ask.js?v=redesign5','bb-table.js?v=redesign5','manifest.json',
   'voice-order.html','forecast.html','territory.html','orders.html',
   'operations.html','stock.html','depots.html','suppliers.html','deliveries.html',
   'bioservices.html','farms.html','farm-detail.html','bioanalyze-soil.html',
