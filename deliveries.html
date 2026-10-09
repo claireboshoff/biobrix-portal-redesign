@@ -87,7 +87,10 @@ function openDelivery(id){
     stats:[
       { l:'Status', html:BB.statusBadge(x.status), tip:'Change the status', onClick:function(el){
         BB.pick(el, { title:'Move to', items:STATUS_OPTIONS.map(function(st){ return { label:st, value:st, html:BB.statusBadge(st), on:st===x.status }; }),
-          onPick:function(st){ if(st===x.status) return; advance(x.id, st); BB.closePopup(); setTimeout(function(){ openDelivery(x.id); }, 170); } }); } },
+          onPick:function(st){ if(st===x.status) return;
+            var o=d.by('orders', x.order), hold=o&&d.deliveryHold(o), go=function(){ advance(x.id, st); openDelivery(x.id); };
+            if(hold && (st==='In transit'||st==='Delivered')) BB.confirm(hold.reason+'. Move this delivery to '+st+' anyway?', { title:'This order is on HOLD', ok:'Move to '+st }).then(function(yes){ if(yes) go(); else openDelivery(x.id); });
+            else go(); } }); } },
       { l:'Order value', v:o?BB.money(d.orderValue(o)):'—', s:o? (o.lines||[]).length+' product'+((o.lines||[]).length===1?'':'s') : null }
     ],
     html:(hold?'<div class="bbp-alert'+(hold.sev==='high'?'':' warn')+'">'+BB.icon('alert')+BB.esc(hold.reason)+'</div>':'')+lines,
@@ -188,7 +191,14 @@ function wire(){
   });
   Array.prototype.forEach.call(document.querySelectorAll('select[data-del]'), function(sel){
     sel.onchange = function(){
-      advance(sel.getAttribute('data-del'), sel.value);
+      var id=sel.getAttribute('data-del'), val=sel.value, x=d.by('deliveries', id), o=x&&d.by('orders', x.order), hold=o&&d.deliveryHold(o);
+      // a held order isn't sent out or marked delivered without a second look
+      if(hold && (val==='In transit'||val==='Delivered')){
+        BB.confirm(hold.reason+'. Move this delivery to '+val+' anyway?', { title:'This order is on HOLD', ok:'Move to '+val })
+          .then(function(yes){ if(yes) advance(id, val); else { sel.value=x.status; } });
+        return;
+      }
+      advance(id, val);
     };
   });
 }

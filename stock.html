@@ -381,6 +381,7 @@ function wire(){
       var parts = inp.getAttribute('data-count').split('|');
       var depotId = parts[0], prodId = parts[1];
       var row = d.store().inventory.find(function(r){ return r.depot===depotId && r.prod===prodId; });
+      if(row && String(inp.value).trim()===''){ inp.value=row.qty; BB.toast('Count left as '+row.qty+' — type 0 if the shelf is empty'); return; }
       if(row){
         var val = Math.max(0, Math.round(Number(inp.value)||0));
         row.qty = val;

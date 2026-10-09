@@ -125,7 +125,7 @@
   .bb-scope{display:flex;align-items:center;gap:8px;font-size:.76rem;padding:7px 28px;background:#eef4e4;color:var(--green-dark);border-top:1px solid var(--line-soft);}
   .bb-scope{flex-wrap:wrap;line-height:1.4;} .bb-scope b{font-weight:700;white-space:nowrap;} .bb-scope .dot{width:8px;height:8px;border-radius:50%;flex:none;}
   /* Offline / sync banner */
-  .bb-sync{display:none;align-items:center;gap:9px;justify-content:center;font-size:.78rem;font-weight:600;padding:7px 14px;color:#fff;}
+  .bb-sync{display:none;align-items:center;gap:9px;justify-content:center;font-size:.78rem;font-weight:600;padding:7px 14px;color:#fff;position:absolute;left:0;right:0;top:100%;z-index:2;box-shadow:0 6px 14px -8px rgba(0,0,0,.3);}   /* overlays: never pushes the page while you tap */
   .bb-sync.off{display:flex;background:#8a6d1f;} .bb-sync.syncing{display:flex;background:var(--blue);}
   .bb-sync .dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:bbpulse 1.1s infinite;}
   @keyframes bbpulse{0%,100%{opacity:.35}50%{opacity:1}}
@@ -584,6 +584,7 @@
     .bb-top-in{padding:0 16px;gap:10px;}
     .bb-user .who{display:none;}
     .bb-net span.t{display:none;}
+    .bb-net.off span.t{display:inline;}   /* offline is said in words, not just a dot */
     .bb-nav{display:flex;}
     .toast{bottom:86px;}
     .wrap{padding:0 16px 32px;}
@@ -609,6 +610,25 @@
     #bbNav,#bbOverlay,.bb-top,.bb-nav,.toast,.bbc-tip{display:none !important;}
     .wrap{max-width:none;padding:0;}
     .card,.stat{box-shadow:none;break-inside:avoid;}
+  }
+
+
+  /* ── Phones, from the usability review ── */
+  html.bbp-lock .askdock{display:none !important;}               /* a popup has the screen; the Ask bar steps aside */
+  @media (max-width:900px){
+    /* the Ask bar slides away while you scroll down and comes back when you scroll up or stop near the end */
+    .askdock{transition:transform .2s ease, opacity .2s ease;}
+    body.scroll-down .askdock:not(.open):not(:focus-within){transform:translateY(calc(100% + 90px));opacity:0;pointer-events:none;}
+    /* the seat banner scrolls away instead of riding in the sticky header */
+    body.scrolled .bb-scope{display:none;}
+    /* a table's action column (a button, a status picker, a field) stays on screen */
+    .scroll table.bb td:last-child:has(button, select, a.btn, input:not([type=checkbox])), .scroll table.bb tr:has(td:last-child :is(button, select, a.btn)) th:last-child{position:sticky;right:0;}
+    .scroll table.bb td:last-child:has(button, select, a.btn, input:not([type=checkbox])){background:#fff;box-shadow:-10px 0 10px -10px rgba(18,33,12,.25);z-index:1;}
+    .scroll table.bb tr:has(td:last-child :is(button, select, a.btn)) th:last-child{z-index:2;background:var(--panel-2);box-shadow:-10px 0 10px -10px rgba(18,33,12,.2);}
+    /* the work before the charts: pages that opt in (body.work-first) put chart-only blocks last */
+    body.work-first main.wrap, body.work-first main.wrap > div:only-child{display:flex;flex-direction:column;}   /* a page may wrap everything in one div */
+    body.work-first main.wrap > *:has(.bbc, .hbars, .donut-wrap):not(:has(table.bb:not([data-nofilter]):not(.bbc table))):not(:has(.alert-list, .alert, .take)),
+    body.work-first main.wrap > div:only-child > *:has(.bbc, .hbars, .donut-wrap):not(:has(table.bb:not([data-nofilter]):not(.bbc table))):not(:has(.alert-list, .alert, .take)){order:5;}
   }
 
   /* ── Phones and touch screens (mobile pass, Oct 2026) ── */
@@ -938,6 +958,14 @@
     opts = opts || {};
     var u = (window.BB && BB.user) || { name:'BioBrix', role:'—' };
     var here = whereAmI();
+    // On phones these pages lead with the work (lists, actions) and put chart-only blocks after it.
+    if(['index.html','orders.html','deliveries.html','farms.html','bioanalyze-soil.html','bioanalyze-leaf.html','biowatch.html'].indexOf(curFile())>=0) document.body.classList.add('work-first');
+    (function(){ var last=window.scrollY, tick=false;
+      window.addEventListener('scroll', function(){ if(tick) return; tick=true; requestAnimationFrame(function(){ var y=window.scrollY, nearEnd=(window.innerHeight+y)>=document.documentElement.scrollHeight-40;
+        document.body.classList.toggle('scrolled', y>60);
+        if(Math.abs(y-last)>6){ document.body.classList.toggle('scroll-down', y>last && y>120 && !nearEnd); last=y; }
+        if(nearEnd) document.body.classList.remove('scroll-down');
+        tick=false; }); }, { passive:true }); })();
     // Breadcrumb: Category › Page. Drill-downs (farm → farm detail) also get a Back button,
     // since the rail can't say which farm you came from.
     var f = curFile();

@@ -251,7 +251,13 @@ function bind(){
 
 // ---- the actions: status, invoice, quote chain. Each one saves, redraws the list and refreshes the popup.
 function afterAction(id){ render(); openOrder(id); }   // the card refreshes in place
-function doAdvance(id, val){ d.update('orders', id, { status:val }); BB.toast('Status updated to '+val); afterAction(id); }
+function doAdvance(id, val){
+  var o=d.by('orders', id), hold=o && d.deliveryHold(o);
+  var go=function(){ d.update('orders', id, { status:val }); BB.toast('Status updated to '+val); afterAction(id); };
+  // a held order isn't released to the farmer without a second look
+  if(hold && val==='Delivered'){ BB.confirm(hold.reason+'. Mark '+o.ref+' as Delivered anyway?', { title:'This order is on HOLD', ok:'Mark delivered' }).then(function(yes){ if(yes) go(); else openOrder(id); }); return; }
+  go();
+}
 function doInvoice(id){
   var o=d.by('orders', id);
   if(!o || d.orderInvoiced(o.id)) return;

@@ -42,6 +42,9 @@ var css = ''+
 '.transcript .interim{color:var(--faint);}'+
 '.line-row{display:grid;grid-template-columns:1fr 110px 44px;gap:8px;align-items:end;margin-bottom:9px;}'+
 '.line-row .fld{margin-bottom:0;}'+
+'.line-row > *{min-width:0;}'+
+'.fld-err .bb-sel-btn,.fld-err input{border-color:var(--red) !important;box-shadow:0 0 0 3px rgba(184,56,42,.12);}'+
+'.fld-msg{font-size:.78rem;color:var(--red);margin-top:4px;font-weight:600;}'+
 '.line-del{height:44px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;}'+
 '.line-del:hover{border-color:var(--red);background:var(--red-bg);}'+
 '.tot-band{display:flex;align-items:center;justify-content:space-between;background:var(--green-darkest);color:#eaf4d8;border-radius:12px;padding:14px 18px;margin-top:6px;}'+
@@ -274,7 +277,7 @@ function renderLines(){
       '<div class="fld"><select data-li="'+i+'" class="lProd"><option value="">Product…</option>'+
         products.map(function(p){ return '<option value="'+p.id+'"'+(l.prod===p.id?' selected':'')+'>'+BB.esc(p.name)+' ('+BB.esc(p.pack)+')</option>'; }).join('')+
       '</select></div>'+
-      '<div class="fld"><input type="number" min="0" data-li="'+i+'" class="lQty" placeholder="Qty" value="'+(l.qty!==''&&l.qty!=null?l.qty:'')+'"></div>'+
+      '<div class="fld"><input type="number" min="0" data-li="'+i+'" class="lQty" placeholder="Packs" aria-label="Quantity in packs" inputmode="numeric" value="'+(l.qty!==''&&l.qty!=null?l.qty:'')+'"></div>'+
       '<button class="line-del" data-li="'+i+'" title="Remove" aria-label="Remove product">'+X_ICON+'</button>'+
     '</div>';
   }).join('');
@@ -370,11 +373,15 @@ function nextRef(){
 }
 
 function confirmOrder(){
-  if(!draft.farmer){ BB.toast('Pick a farmer first'); return; }
+  // point at the missing field rather than a toast about something scrolled out of sight
+  var need=function(id, msg){ var el=document.getElementById(id); var w=el&&(el.closest('.fld')||el); if(w){ w.classList.add('fld-err'); var m=w.querySelector('.fld-msg'); if(!m){ m=document.createElement('div'); m.className='fld-msg'; w.appendChild(m); } m.textContent=msg; w.scrollIntoView({behavior:'smooth',block:'center'}); var b=w.querySelector('.bb-sel-btn,input,select'); if(b) setTimeout(function(){ b.focus({preventScroll:true}); },350); } };
+  document.querySelectorAll('.fld-err').forEach(function(x){ x.classList.remove('fld-err'); var m=x.querySelector('.fld-msg'); if(m) m.remove(); });
+  if(!draft.farmer){ need('fFarmer','Pick the farmer'); return; }
+  if(draft.month===''||draft.month==null){ need('fMonth','When should it be delivered?'); return; }
   var lines=draft.lines.filter(function(l){ return l.prod && Number(l.qty)>0; });
   if(!lines.length){ BB.toast('Add at least one product with a quantity'); return; }
   var f=d.farmer(draft.farmer);
-  var month = (draft.month===''||draft.month==null)? new Date().getMonth() : Number(draft.month);
+  var month = Number(draft.month);
   var depot = depotForFarmer(draft.farmer);
   var rec = d.add('orders', {
     ref: nextRef(),
@@ -392,6 +399,7 @@ function confirmOrder(){
 }
 
 function renderConfirmed(o){
+  window.scrollTo(0,0);
   var f=d.farmer(o.farmer);
   var html='';
   html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Order captured</h1><p>It is on the Operations board now. No week-long wait, no re-typing.</p></div>'+

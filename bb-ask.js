@@ -387,6 +387,7 @@
       for (var n = 0; n < MAX_STEPS; n++) {
         var res = await call(S.messages);
         S.messages.push({ role: 'assistant', content: res.content });   // exactly as received
+        if (assistantDown) { assistantDown = false; try { sessionStorage.removeItem('bb_ask_down'); } catch (x) {} }
         var text = (res.content || []).filter(function (b) { return b.type === 'text' && b.text; }).map(function (b) { return b.text; }).join('\n\n');
         if (text) addView({ who: 'ai', text: text });
         if (res.stop_reason === 'refusal') { addView({ who: 'note', text: 'The assistant declined that one. Try asking another way.' }); break; }
@@ -405,12 +406,19 @@
   // No Worker, no signal, or not switched on yet: answer from the built-in rules and keep the
   // conversation clean (drop the unanswered turn so the history stays valid for later).
   function fallback(e) {
+    assistantDown = true; try { sessionStorage.setItem('bb_ask_down', '1'); } catch (x) {}
+    if (typeof paint === 'function') setTimeout(paint, 0);
     var last = S.messages[S.messages.length - 1];
     if (last && last.role === 'user' && typeof last.content === 'string') {
       S.messages.pop();
       var q = last.content.replace(/^\[[^\]]*\]\s*/, '');
       var a = BB.intel && (BB.intel.answer(q) || BB.intel.answer('at a glance'));
-      if (a) addView({ who: 'ai', text: '# ' + a.title + '\n' + a.lines.join('\n') + '\n\n[Open the detail](' + a.to + ')', offline: true });
+      // the built-in rules fall back to a general summary when they don't recognise a question:
+      // say so plainly instead of presenting that summary as the answer
+      var missed = a && a.title === 'BioBrix at a glance' && !/glance|summar|overview|how are we/i.test(q);
+      if (missed) addView({ who: 'ai', offline: true, text: '# I can\u2019t answer that offline\nThe assistant isn\u2019t reachable, so only built-in questions work right now: ' +
+        (BB.intel.suggest || []).map(function (x) { return '\u201c' + x + '\u201d'; }).join(', ') + '.\n\n**Meanwhile, at a glance:** ' + a.lines.slice(0, 2).join(' · ') + '\n\n[Operations board](operations.html)' });
+      else if (a) addView({ who: 'ai', text: '# ' + a.title + '\n' + a.lines.join('\n') + '\n\n[Open the detail](' + a.to + ')', offline: true });
     } else if (last && last.role === 'user') {
       // a tool round failed to send: drop it and the assistant turn that asked for it
       S.messages.pop(); if (S.messages.length && S.messages[S.messages.length - 1].role === 'assistant') S.messages.pop();
@@ -468,7 +476,10 @@
     'operations.html': ['What needs action today?', 'Where is the gap between reported and invoiced?'],
     'forecast.html': ['Which month is busiest?', 'How much of the pipeline is confirmed?']
   };
-  function suggestions() { return SUGGEST[file()] || ['Summarise this page', 'What needs me today?', 'Which farms need attention?']; }
+  var assistantDown = !API; try { if (sessionStorage.getItem('bb_ask_down') === '1') assistantDown = true; } catch (e) {}
+  function suggestions() {
+    if (assistantDown && BB.intel && BB.intel.suggest) return BB.intel.suggest.slice(0, 3);   // only what the built-in rules can answer
+    return SUGGEST[file()] || ['Summarise this page', 'What needs me today?', 'Which farms need attention?']; }
 
   var dock, panel, log, input;
   function build() {
