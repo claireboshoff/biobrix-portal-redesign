@@ -5,11 +5,11 @@
    API:  the fh-biobrix Worker. Sage figures are only ever served from behind a session. */
 (function(){
   var local = location.hostname==='localhost' || location.hostname==='127.0.0.1';
-  // The redesign preview on GitHub Pages runs the demo, like a local copy: every seat, sample data.
+  // The redesign preview on GitHub Pages: real accounts and BioBrix's own figures, open to Rudie alone.
   var preview = /^\/biobrix-portal-redesign\//.test(location.pathname);
   // The preview shares claireboshoff.github.io with other BioBrix builds, and so shares their
-  // browser storage. Give it its own: its demo seats and sample data must never land in, or be
-  // hidden by, a real sign-in or Sage cache kept by another build on the same address.
+  // browser storage. Give it its own, so a session or cached ledger from another build never
+  // carries over into it — or out of it.
   if(preview && !window.__bbStorageSplit){
     window.__bbStorageSplit = true;
     var P = 'bbprev:', S = Storage.prototype, get = S.getItem, set = S.setItem, del = S.removeItem;
@@ -19,8 +19,10 @@
   }
   window.BB_CONFIG = {
     PREVIEW: preview,
-    // Local and preview copies run the self-contained demo (no Worker needed); production stays on real accounts.
-    AUTH: (local || preview) ? 'demo' : 'live',
+    // A local copy runs the self-contained demo (no Worker needed); everything else signs in for real.
+    AUTH: local ? 'demo' : 'live',
+    // Who may sign in to this build at all (lower-case emails). Empty = every BioBrix account.
+    ALLOW: preview ? ['rudie@biobrix.co.za'] : [],
     API: local ? 'http://localhost:8787' : 'https://fh-biobrix.claire-boshoff.workers.dev',
     // The Ask bar's brain (ask-worker/). Until it is deployed with a key, questions fall back to the built-in rules.
     ASK_API: local ? 'http://localhost:8788' : 'https://fh-biobrix-ask.claire-boshoff.workers.dev'

@@ -24,7 +24,7 @@
   // If this page came out of a cache and is older than what is published, reload it once, with a
   // cache-busting parameter. Without this a stale copy can sit on a device for as long as the CDN
   // cache lives, and everything we ship looks like it never happened.
-  var BUILD = 'redesign3';
+  var BUILD = 'redesign4';
   try{
     if(typeof fetch==='function' && navigator.onLine){
       fetch('version.txt?_=' + Date.now(), {cache:'no-store'}).then(function(r){ return r.ok? r.json():null; }).then(function(j){
@@ -113,6 +113,10 @@
   if(onLogin){ clearSession(); }
   var user = getUser();
   if(LIVE && user && !tokenValid(getToken())){ clearSession(); user=null; }
+  // A build open to named people only: anyone else's session here is dropped on the spot.
+  var ALLOW = ((window.BB_CONFIG||{}).ALLOW||[]).map(function(e){ return String(e).toLowerCase(); });
+  function allowed(email){ return !ALLOW.length || ALLOW.indexOf(String(email||'').trim().toLowerCase())>=0; }
+  if(user && !allowed(user.email)){ clearSession(); user=null; }
 
   // gate
   if(!user && !onLogin){
@@ -150,10 +154,13 @@
   window.BB.users = USERS;
   // Live: POST /login → { token, user }. Returns a Promise. Demo: synchronous, as before.
   function liveLogin(email, password){
+    // not on the list → the password never leaves this page
+    if(!allowed(email)) return Promise.resolve({ ok:false, err:'This site is open to invited people only.' });
     return fetch(API+'/login',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email, password:password}) })
       .then(function(r){ return r.json().then(function(j){ j._status=r.status; return j; }); })
       .then(function(j){
         if(!j.ok){ return { ok:false, err:j.error||'Sign-in failed.' }; }
+        if(!j.user || !allowed(j.user.email)){ return { ok:false, err:'This site is open to invited people only.' }; }
         setToken(j.token); setUser(j.user); window.BB.user=j.user; setTenantLive(j.live); return { ok:true, user:j.user };
       })
       .catch(function(){ return { ok:false, err:'No signal — sign-in needs a connection the first time.' }; });

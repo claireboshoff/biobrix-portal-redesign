@@ -205,6 +205,16 @@
       { id:'inv7', ref:'INV-1018', farmer:'f_zulu',    order:null, date:'2026-06-10', dueDate:'2026-06-25', paidDate:'2026-06-23', description:'Season opener — soil biology', amount:64200, status:'Paid' },
       { id:'inv8', ref:'INV-1045', farmer:'f_smit',    order:'o5', date:'2026-07-27', dueDate:'2026-08-25', paidDate:null,        description:'Carbon Kick — soil carbon & moisture', amount:418000, status:'Outstanding' }
     ];
+    // Sample invoices move with the calendar so the demo's story holds whenever it is opened:
+    // Thabo Zulu's account is the one overdue (the delivery hold); the other open ones are in terms.
+    (function(){ var iso=function(t){ return t.toISOString().slice(0,10); }, day=function(n){ var t=new Date(); t.setUTCDate(t.getUTCDate()+n); return iso(t); };
+      var e25=function(ds){ var t=new Date(ds+'T00:00:00Z'); return iso(new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 25))); };
+      var shift=Math.round((Date.now()-Date.parse('2026-08-10'))/86400000), mv=function(ds,n){ if(!ds) return ds; var t=new Date(ds+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return iso(t); };
+      invoices.forEach(function(i){
+        if(i.status==='Overdue'){ i.date=day(-75); i.dueDate=day(-40); i.status='Outstanding'; }
+        else if(i.status!=='Paid'){ i.date=day(-18); i.dueDate=e25(i.date); }
+        else { i.date=mv(i.date,shift); i.dueDate=mv(i.dueDate,shift); i.paidDate=mv(i.paidDate,shift); }
+      }); })();
     // Depot tasks — the per-warehouse to-do + hand-over list (mirrors the depot's Telegram group)
     var depotTasks = [
       { id:'dt1', depot:'dep_george',  text:'Blend 800 L Pome Cal Foliar for Langkloof — due Thu', by:'u_ops', due:'2026-09-17', status:'Open' },
@@ -550,82 +560,6 @@
       if(ok){ try{ window.dispatchEvent(new CustomEvent('bb:sage',{detail:j.meta})); }catch(e){} }
       return ok;   // pages listen for bb:sage and draw again — see index/operations/farms/finance
     }).catch(function(){ return false; });
-  }
-  // ---- The sample ledger (demo mode only) ---------------------------------------------------
-  // Live seats get BioBrix's Sage snapshot from the Worker. The demo has no Worker, so without this
-  // every page built on the ledger (Forecast & actual, Product movement, Sales report, the
-  // Finance ledger) would sit empty. This is a made-up ledger in exactly the snapshot's shape,
-  // built from the sample farms, products and reps: about 15 months of invoices and payments
-  // running up to this month, plus the sample invoices the order journeys use. It is rebuilt on
-  // every load and never written under the snapshot's own key, so a demo seat is never mistaken
-  // for a business on its own figures. It is laid over the store once per version, so invoices
-  // made during a demo are not wiped by the next page load.
-  var DEMO_LEDGER_V = 1;
-  function demoLedger(){
-    var seedN = 20261009, rnd = function(){ seedN = (seedN*1103515245 + 12345) % 2147483648; return seedN/2147483648; };
-    var iso = function(dt){ return dt.toISOString().slice(0,10); };
-    var addDays = function(ds, n){ var t=new Date(ds+'T00:00:00Z'); t.setUTCDate(t.getUTCDate()+n); return iso(t); };
-    var monthEnd25 = function(ds){ var t=new Date(ds+'T00:00:00Z'); return iso(new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 25))); };
-    var today = iso(new Date()), now = new Date();
-    var farmersS = (store.farmers||[]).filter(function(f){ return f.status!=='Prospect' && !f.src; });
-    var prods = (store.products||[]).filter(function(x){ return x.price; });
-    var custOf = {}, customers = farmersS.map(function(f, k){
-      var id = String(2001+k); custOf[f.id] = id;
-      return { id:id, code:'BB'+String(k+1).padStart(3,'0'), name:f.name, town:f.town||'', phone:f.cell||'', email:f.email||'',
-               creditLimit:f.creditLimit||0, sageRep:f.rep||null, rep:f.rep||null, balance:0, overdue:0 };
-    });
-    // spring is the big season for biologicals; winter is quiet
-    var SEASON = [0.7,0.6,0.8,0.9,0.5,0.4,0.6,1.2,1.5,1.4,1.1,0.8];
-    var invoices = [], payments = [], pm = {}, n = 0;
-    var line = function(p, q){ return { prod:p, qty:q, value:q*(p.price||0) }; };
-    for(var back=15; back>=0; back--){
-      var y = now.getUTCFullYear(), m = now.getUTCMonth()-back; while(m<0){ m+=12; y--; }
-      farmersS.forEach(function(f, fi){
-        if(rnd() > 0.55*SEASON[m]+0.15) return;
-        var day = 1+Math.floor(rnd()*27), date = y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-        if(date > today) return;
-        var size = (f.ha||200)/250, lines = [];
-        var k = 1+Math.floor(rnd()*3);
-        for(var j=0;j<k;j++){ var p = prods[Math.floor(rnd()*prods.length)]; lines.push(line(p, Math.max(5, Math.round((20+rnd()*140)*size*SEASON[m])))); }
-        var amount = Math.round(lines.reduce(function(t,l){ return t+l.value; },0));
-        var due = monthEnd25(date), age = (Date.parse(today)-Date.parse(date))/86400000;
-        // most of the book is paid; the last six weeks or so is still open
-        var paid = age > 45 || (age > 30 && rnd() < 0.5);
-        var id = 'dl'+(++n), ref = 'INV-'+(900+n);
-        invoices.push({ id:id, ref:ref, customer:custOf[f.id], date:date, dueDate:due, paidDate:paid?addDays(date, 14+Math.floor(rnd()*30)):null,
-          amount:amount, outstanding:paid?0:amount, status:paid?'Paid':'Outstanding', description:lines.map(function(l){ return l.prod.name.replace(/^RenewAg\s+/,''); }).join(' + ') });
-        if(paid) payments.push({ id:'dp'+n, customer:custOf[f.id], date:invoices[invoices.length-1].paidDate, ref:'EFT '+ref, amount:amount, description:'Payment — '+ref });
-        var ym = date.slice(0,7);
-        lines.forEach(function(l){ var r = pm[l.prod.id] || (pm[l.prod.id] = { code:l.prod.code, name:l.prod.name, pack:l.prod.pack||'', qty:0, value:0, months:{} });
-          var mm = r.months[ym] || (r.months[ym] = { qty:0, value:0 }); mm.qty += l.qty; mm.value += l.value; r.qty += l.qty; r.value += l.value; });
-      });
-    }
-    // the sample invoices the order journeys rely on (order links, the overdue hold) stay in the book
-    // Their dates move with the calendar so the story holds whenever the demo is opened: Thabo Zulu's
-    // account is the one overdue (the delivery hold), the other open ones are inside their terms.
-    seed().invoices.forEach(function(i){ if(!custOf[i.farmer]) return;
-      i = Object.assign({}, i);
-      if(i.status!=='Paid'){ var od = i.status==='Overdue'; i.date = addDays(today, od? -75 : -18); i.dueDate = od? addDays(today, -40) : monthEnd25(i.date); }
-      else { var shift = Math.round((Date.parse(today)-Date.parse('2026-08-10'))/86400000); i.date=addDays(i.date, shift); i.dueDate=addDays(i.dueDate, shift); i.paidDate=addDays(i.paidDate, shift); }
-      invoices.push({ id:'ds_'+i.id, ref:i.ref, customer:custOf[i.farmer], order:i.order, date:i.date, dueDate:i.dueDate, paidDate:i.paidDate,
-        amount:i.amount, outstanding:i.status==='Paid'?0:i.amount, status:i.status==='Paid'?'Paid':'Outstanding', description:i.description });
-      if(i.status==='Paid') payments.push({ id:'dps_'+i.id, customer:custOf[i.farmer], date:i.paidDate, ref:'EFT '+i.ref, amount:i.amount, description:'Payment — '+i.ref }); });
-    invoices.sort(function(a,b){ return a.date<b.date?1:-1; });
-    customers.forEach(function(c){ invoices.forEach(function(i){ if(i.customer!==c.id || !i.outstanding) return; c.balance += i.outstanding; if(i.dueDate < today) c.overdue += i.outstanding; }); });
-    var stamp = new Date().toLocaleString('en-ZA', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-    return { ok:true, live:true, demo:true, customers:customers, invoices:invoices, payments:payments,
-      reps:(store.reps||[]).map(function(r){ return { id:r.id, name:r.name }; }),
-      products:Object.keys(pm).map(function(k){ return pm[k]; }).sort(function(a,b){ return b.value-a.value; }),
-      stock:(store.products||[]).map(function(x){ var on=(store.inventory||[]).filter(function(i){ return i.prod===x.id; }).reduce(function(t,i){ return t+(i.qty||0); },0);
-        return { id:x.id, code:x.code, description:x.name, onHand:on, unit:x.unit||'', price:x.price||0 }; }),
-      meta:{ status:'Live', last:new Date().toISOString(), lastSast:stamp+' (sample)', next:'—', counts:{ customers:customers.length, invoices:invoices.length, payments:payments.length } } };
-  }
-  if(window.BB_CONFIG && window.BB_CONFIG.AUTH==='demo'){
-    try{
-      var dl = demoLedger();
-      if(store._demoLedger !== DEMO_LEDGER_V){ if(applySage(dl)){ (store.outbox||[]).forEach(function(x){ if(x.invoice && /^inv\d+$/.test(x.invoice)) x.invoice='sinv_ds_'+x.invoice; }); store._demoLedger = DEMO_LEDGER_V; save(); } }
-      else { (dl.invoices||[]).forEach(function(i){ i.kind='invoice'; i.label=i.ref; }); sage = dl; }
-    }catch(e){ console.warn('sample ledger', e); }
   }
   // On load: lay the cached snapshot over the store at once (offline-safe), then look for a newer one.
   if(window.BB_CONFIG && window.BB_CONFIG.AUTH==='live'){ var cached=sageCached(); if(cached) applySage(cached); setTimeout(function(){ refreshSage(); },0); }
