@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>BioAnalyze — Soil · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
 /* BioAnalyze — page-scoped */
 .detail{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin:2px 0 4px;}
@@ -92,7 +92,7 @@ function walkMeta(bid){
   var w=d.where('watch', function(x){ return x.block===bid; }).sort(byDateDesc)[0];
   return { icon:'eye', tip:'BioWatch', text:w? 'Walked '+BB.shortDate(w.date)+' · vigour '+String(w.vigour||'—').toLowerCase() : 'Not walked yet', muted:!w, href:canGo('biowatch.html')?'biowatch.html?block='+encodeURIComponent(bid):null };
 }
-function markInterp(id){ d.update('soil', id, { status:'Interpreted' }); BB.toast('Marked as interpreted'); BB.closePopup(); render(); var s=d.by('soil', id); if(s) setTimeout(function(){ BB.popup(samplePopup(s)); }, 180); }
+function markInterp(id){ var undo=BB.snapshot('soil', id); d.update('soil', id, { status:'Interpreted' }); BB.toast('Marked as interpreted', { undo:function(){ undo(); render(); }, undone:'Back to waiting for interpretation' }); BB.closePopup(); render(); var s=d.by('soil', id); if(s) setTimeout(function(){ BB.popup(samplePopup(s)); }, 180); }
 // one sample as a card: who, where and when on the left with its key readings; the full read on the right
 function samplePopup(s){
   var f=d.farmer(s.farmer), b=d.by('blocks',s.block)||{name:'—'}, isI=s.status==='Interpreted', adv=s.advisor && !(isAdvisor && s.advisor===u.rep) ? d.rep(s.advisor) : null;
@@ -319,8 +319,9 @@ function bind(){
   Array.prototype.forEach.call(main.querySelectorAll('[data-interp]'), function(btn){
     btn.onclick=function(e){
       e.stopPropagation();
-      d.update('soil', this.dataset.interp, { status:'Interpreted' });
-      BB.toast('Marked as interpreted');
+      var sid=this.dataset.interp, undo=BB.snapshot('soil', sid);
+      d.update('soil', sid, { status:'Interpreted' });
+      BB.toast('Marked as interpreted', { undo:function(){ undo(); render(); }, undone:'Back to waiting for interpretation' });
       render();
     };
   });

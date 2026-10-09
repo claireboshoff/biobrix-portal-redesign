@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>My Farm · BioBrix</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 </head>
 <body>
 <script>
@@ -170,7 +170,7 @@ function orderCard(o){
       rp && rp.name? { initials:initialsOf(rp.name), color:rp.colour, text:rp.name, tip:'Your advisor' } : null ],
     stats:[{ l:'Value', v:BB.money(val), s:q? 'quote' : 'list' }, { l:'Status', html:stLabel }],
     html:(toApprove? '<div class="bbp-alert warn">'+BB.icon('alert')+'This quote waits for your approval — nothing is charged until you approve</div>' : '')+'<div class="bbp-tt">Products</div>',
-    table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod); return [{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack||'')+'</div>' }, nw(BB.num(l.qty)+' '+BB.esc(p.unit||'')), BB.money(Math.round((p.price||0)*l.qty*(1+pct/100)))]; }), num:[1,2], foot:['Total',{ html:'' },BB.money(val)] },
+    table:{ columns:['Product','Qty','Value'], rows:(o.lines||[]).map(function(l){ var p=d.product(l.prod); return [{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack||'')+'</div>' }, { html:'<span style="white-space:nowrap;">'+BB.num(l.qty)+' pack'+(l.qty==1?'':'s')+'</span><div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div>' }, BB.money(Math.round((p.price||0)*l.qty*(1+pct/100)))]; }), num:[1,2], foot:['Total',{ html:'' },BB.money(val)] },
     actions:acts };
 }
 function openOrderCard(o){ var c=orderCard(o); if(c) BB.popup(c); }
@@ -379,7 +379,7 @@ function render(){
           '<button class="btn sm" data-qok="'+o.id+'">'+BB.icon('check')+'Approve quote</button></div>'+
       '</div>'+
       '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Value</th></tr></thead><tbody>'+
-      (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack)+'</div></td><td class="num">'+BB.num(l.qty)+' '+BB.esc(p.unit||'')+'</td><td class="num">'+BB.money(Math.round((p.price||0)*l.qty*(1+d.quotePct(o)/100)))+'</td></tr>'; }).join('')+
+      (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack)+'</div></td><td class="num">'+BB.num(l.qty)+' pack'+(l.qty==1?'':'s')+'<div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div></td><td class="num">'+BB.money(Math.round((p.price||0)*l.qty*(1+d.quotePct(o)/100)))+'</td></tr>'; }).join('')+
       '</tbody><tfoot><tr><td colspan="2">Quote total</td><td class="num">'+BB.money(d.quoteTotal(o))+'</td></tr></tfoot></table></div>'+
       '<div class="card-f">Approve here and '+BB.esc(repFirst)+' invoices and books the delivery. Nothing is charged until you approve.</div>'+
     '</div>';
@@ -670,10 +670,15 @@ function bind(){
       var iv = d.by('invoices', this.dataset.pay); if(!iv) return;
       var td=this.closest('td'); if(!td) return;
       td.innerHTML='<div style="display:grid;gap:6px;min-width:220px;text-align:left;">'+
-        '<button class="btn sm" data-paycard="'+iv.id+'">'+BB.icon('wallet')+'Pay by card (Yoco)</button>'+
+        '<button class="btn sm" data-paycard="'+iv.id+'">'+BB.icon('wallet')+'Pay '+BB.money(iv.outstanding!=null&&iv.outstanding>0?iv.outstanding:iv.amount)+' by card</button>'+
         '<button class="btn ghost sm" data-payeft="'+iv.id+'">'+BB.icon('receipt')+'EFT — bank details &amp; proof</button>'+
       '</div>';
-      td.querySelector('button[data-paycard]').onclick=function(){ d.update('invoices', iv.id, { status:'Paid', paidDate:new Date().toISOString().slice(0,10), method:'Card' }); BB.toast('Paid — thank you. Your statement is updated.'); render(); };
+      // the amount, said plainly, before any money moves
+      td.querySelector('button[data-paycard]').onclick=function(){
+        var amt=iv.outstanding!=null&&iv.outstanding>0? iv.outstanding : iv.amount;
+        BB.confirm('Pay '+BB.money(amt)+' by card for '+(iv.label||iv.ref)+'? Your card is charged through Yoco.', { title:'Pay '+BB.money(amt)+'?', ok:'Pay '+BB.money(amt) }).then(function(yes){
+          if(!yes) return;
+          d.update('invoices', iv.id, { status:'Paid', paidDate:new Date().toISOString().slice(0,10), method:'Card' }); BB.toast('Paid '+BB.money(amt)+' — thank you. Your statement is updated.'); render(); }); };
       td.querySelector('button[data-payeft]').onclick=function(){
         td.innerHTML='<div style="text-align:left;font-size:.78rem;line-height:1.5;min-width:240px;"><b>BioBrix (Pty) Ltd</b><br>FNB · Acc 62 000 000 000 · Branch 250655<br>Ref: <b>'+BB.esc(iv.ref)+'</b>'+
           '<div style="margin-top:8px;"><label class="btn ghost sm" style="cursor:pointer;">'+BB.icon('file')+'Upload proof of payment<input type="file" accept="image/*,.pdf" style="display:none;" data-pop="'+iv.id+'"></label></div></div>';

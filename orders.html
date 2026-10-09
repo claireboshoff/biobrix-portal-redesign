@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Orders · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 </head>
 <body>
 <script>
@@ -50,12 +50,13 @@ function quoteBar(o){
     h+='<span class="faint">No quote yet · list '+BB.money(list)+'</span><span class="sp"></span>';
     if(isAdvisor||isDirector) h+='<button class="btn sm" data-q="create" data-oid="'+o.id+'">'+BB.icon('plus')+'Create quote</button>';
   } else if(q==='Awaiting approval'){
-    h+=lead('awaiting '+(isDirector?'you':'Rudie'))+'<span>'+BB.money(tot)+' to '+BB.esc(first)+' <span class="faint">· '+pct+'% margin by '+BB.esc(r.name.split(' ')[0])+'</span></span><span class="sp"></span>';
+    h+=lead('awaiting '+(isDirector?'you':'Rudie'))+'<span>'+BB.money(tot)+' to '+BB.esc(first)+' <span class="faint">· '+pct+'% markup by '+BB.esc(r.name.split(' ')[0])+(o.quote.raisedFrom!=null?', raised from '+o.quote.raisedFrom+'%':'')+'</span></span><span class="sp"></span>';
     if(isDirector) h+='<button class="btn sm" data-q="approve" data-oid="'+o.id+'">'+BB.icon('check')+'Approve</button><button class="btn ghost sm" data-q="decline" data-oid="'+o.id+'">Decline</button>';
   } else if(q==='Approved'){
-    h+=lead('approved')+'<span class="faint">margin</span><input type="number" min="0" max="50" step="0.5" value="'+pct+'" data-pct="'+o.id+'" aria-label="Margin %" style="width:84px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;">'+
+    var cap=(o.quote.approvedPct!=null?o.quote.approvedPct:pct);
+    h+=lead('approved')+'<span class="faint" data-tip="Markup on list price. Up to the approved '+cap+'% it goes straight to the farmer; above that it goes back for approval.">markup</span><input type="number" min="0" max="50" step="0.5" value="'+pct+'" data-pct="'+o.id+'" data-cap="'+cap+'" aria-label="Markup %" style="width:84px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;">'+
       '<span>'+BB.esc(first)+' pays <b data-tot="'+o.id+'">'+BB.money(tot)+'</b> <span class="faint">· yours <b data-margin="'+o.id+'">'+BB.money(margin)+'</b></span></span><span class="sp"></span>'+
-      '<button class="btn sm" data-q="send" data-oid="'+o.id+'">Send to '+BB.esc(first)+BB.icon('chevron')+'</button>';
+      '<button class="btn sm" data-q="send" data-oid="'+o.id+'" data-send="'+BB.esc(first)+'">Send to '+BB.esc(first)+BB.icon('chevron')+'</button>';
   } else if(q==='Sent to farmer'){
     h+=lead('sent to '+first)+'<span>'+BB.money(tot)+' <span class="faint">· waiting in '+BB.esc(first)+'’s portal</span></span><span class="sp"></span>'+
       '<a class="btn ghost sm" target="_blank" rel="noopener" href="'+farmerWA(o,'your BioBrix quote for '+BB.money(tot)+' is ready in your portal — tap Approve and we get it moving.')+'">'+BB.icon('message')+'Nudge</a>'+
@@ -198,8 +199,8 @@ function render(){
       '<td><b style="white-space:nowrap;">'+BB.esc(o.ref)+'</b></td>'+
       '<td>'+BB.esc(f.name)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(f.farm)+'</div></td>'+
       (isAdvisor?'':'<td><span class="rep"><i style="background:'+r.colour+';"></i>'+BB.esc(r.name)+'</span></td>')+
-      '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'delivered ':BB.esc(dl.status)+' · ETA ')+BB.date(dl.eta)+'</div>'; })()+'</td>'+
-      '<td class="num"><b>'+BB.money(val)+'</b>'+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;font-weight:400;">incl. '+d.quotePct(o)+'% margin</div>':'')+'</td>'+
+      '<td>'+BB.monthName(o.deliverMonth)+(function(){ var dl=d.where('deliveries',function(x){return x.order===o.id;})[0]; if(!dl) return o.status==='Delivered'?'<div class="faint" style="font-size:.72rem;">delivered</div>':''; return '<div class="faint" style="font-size:.72rem;">'+(dl.status==='Delivered'?'delivered '+BB.date(dl.eta):BB.esc(dl.status)+' · ETA '+BB.etaHtml(dl))+'</div>'; })()+'</td>'+
+      '<td class="num"><b>'+BB.money(val)+'</b>'+(d.quoteStatus(o)&&d.quotePct(o)?'<div class="faint" style="font-size:.7rem;font-weight:400;">incl. '+d.quotePct(o)+'% markup</div>':'')+'</td>'+
       '<td><div class="tags">'+BB.statusBadge(o.status)+quoteChip(o)+invoiceBadge(o)+holdBadge(o)+'</div></td>'+
     '</tr>';
   });
@@ -253,7 +254,8 @@ function bind(){
 function afterAction(id){ render(); openOrder(id); }   // the card refreshes in place
 function doAdvance(id, val){
   var o=d.by('orders', id), hold=o && d.deliveryHold(o);
-  var go=function(){ d.update('orders', id, { status:val }); BB.toast('Status updated to '+val); afterAction(id); };
+  var was=o&&o.status;
+  var go=function(){ var undo=BB.snapshot('orders', id); d.update('orders', id, { status:val }); BB.toast(o.ref+' moved to '+val, { undo:function(){ undo(); afterAction(id); }, undone:o.ref+' is back to '+was }); afterAction(id); };
   // a held order isn't released to the farmer without a second look
   if(hold && val==='Delivered'){ BB.confirm(hold.reason+'. Mark '+o.ref+' as Delivered anyway?', { title:'This order is on HOLD', ok:'Mark delivered' }).then(function(yes){ if(yes) go(); else openOrder(id); }); return; }
   go();
@@ -261,24 +263,30 @@ function doAdvance(id, val){
 function doInvoice(id){
   var o=d.by('orders', id);
   if(!o || d.orderInvoiced(o.id)) return;
-  d.add('invoices', { ref:'INV-'+(1046+Math.floor(Math.random()*900)), farmer:o.farmer, order:o.id, date:new Date().toISOString().slice(0,10),
+  var iv=d.add('invoices', { ref:'INV-'+(1046+Math.floor(Math.random()*900)), farmer:o.farmer, order:o.id, date:new Date().toISOString().slice(0,10),
     dueDate:nextMonth25(), description:'Order '+o.ref, amount:d.quoteTotal(o), status:'Outstanding', paidDate:null });
-  BB.toast('Invoice generated — now counts as actual');
+  BB.toast('Invoice '+iv.ref+' generated — now counts as actual', { undo:function(){ d.remove('invoices', iv.id); afterAction(id); }, undone:'Invoice '+iv.ref+' withdrawn' });
   afterAction(id);
 }
 function doQuote(id, act, root){
   var o=d.by('orders', id); if(!o) return;
   var f=d.farmer(o.farmer), r=d.rep(o.rep), today=new Date().toISOString().slice(0,10);
-  var q=Object.assign({}, o.quote||{});
-  if(act==='create'){ q={ status:'Awaiting approval', markupPct:(r.markupPct!=null?r.markupPct:0), createdBy:u.rep||u.id, createdAt:today }; BB.toast('Quote created — sent to Rudie for approval'); }
-  if(act==='approve'){ q.status='Approved'; q.approvedBy=u.name; q.approvedAt=today; BB.toast('Quote approved — back to '+String(r.name).split(' ')[0]+' to send'); }
-  if(act==='decline'){ q.status='Declined'; q.declinedBy=u.name; BB.toast('Quote declined'); }
-  if(act==='send'){ var inp=root && root.querySelector('input[data-pct="'+o.id+'"]'); if(inp){ q.markupPct=Math.max(0,Math.min(50,Number(inp.value)||0)); } q.status='Sent to farmer'; q.sentAt=today; BB.toast('Quote sent — '+String(f.name).split(' ')[0]+' sees it in the portal'); }
-  if(act==='farmerok'){ q.status='Farmer approved'; q.farmerApprovedAt=today; BB.toast(String(f.name).split(' ')[0]+' approved — ready to invoice'); }
+  var q=Object.assign({}, o.quote||{}), msg='', undo=BB.snapshot('orders', id), fed=null;
+  if(act==='create'){ q={ status:'Awaiting approval', markupPct:(r.markupPct!=null?r.markupPct:0), createdBy:u.rep||u.id, createdAt:today }; msg='Quote created — sent to Rudie for approval'; }
+  if(act==='approve'){ q.status='Approved'; q.approvedBy=u.name; q.approvedAt=today; q.approvedPct=d.quotePct(o); msg='Quote approved — back to '+String(r.name).split(' ')[0]+' to send'; }
+  if(act==='decline'){ q.status='Declined'; q.declinedBy=u.name; msg='Quote declined'; }
+  // The approved markup is a ceiling: lowering it is the rep's call, raising it goes back to Rudie.
+  // Once sent, the farmer's price is fixed — there is no markup field after this point.
+  if(act==='send'){ var inp=root && root.querySelector('input[data-pct="'+o.id+'"]'); if(inp){ q.markupPct=Math.max(0,Math.min(50,Number(inp.value)||0)); }
+    var cap=(q.approvedPct!=null?q.approvedPct:q.markupPct);
+    if(q.markupPct>cap){ q.status='Awaiting approval'; q.raisedFrom=cap; msg='Markup raised above the approved '+cap+'% — back to Rudie for approval'; }
+    else { q.status='Sent to farmer'; q.sentAt=today; q.lockedTotal=d.quoteTotal(Object.assign({},o,{quote:q})); msg='Quote sent — '+String(f.name).split(' ')[0]+' sees it in the portal'; } }
+  if(act==='farmerok'){ q.status='Farmer approved'; q.farmerApprovedAt=today; msg=String(f.name).split(' ')[0]+' approved — ready to invoice'; }
   var patch={ quote:q };
   if(act==='farmerok' && (o.status==='Forecast'||o.status==='Pending')) patch.status='Confirmed';
   d.update('orders', o.id, patch);
-  if(act==='create') d.add('feed', { from:u.rep||u.id, date:today, kind:'Order', farmer:o.farmer, ref:o.ref, text:'Quote for '+f.farm+' ('+BB.money(d.quoteTotal(Object.assign({},o,{quote:q})))+') needs approval.' });
+  if(act==='create') fed=d.add('feed', { from:u.rep||u.id, date:today, kind:'Order', farmer:o.farmer, ref:o.ref, text:'Quote for '+f.farm+' ('+BB.money(d.quoteTotal(Object.assign({},o,{quote:q})))+') needs approval.' });
+  if(msg) BB.toast(msg, { undo:function(){ undo(); if(fed) d.remove('feed', fed.id); afterAction(id); }, undone:'Quote put back as it was' });
   afterAction(id);
 }
 
@@ -291,8 +299,8 @@ function openOrder(id){
   var dl=d.where('deliveries',function(x){return x.order===o.id;})[0];
   var hold=d.deliveryHold(o), inv=d.orderInvoiced(o.id), counted=(o.status==='Delivered'||o.status==='Confirmed');
   var canInv = canInvoiceRole && !inv && (counted || d.quoteStatus(o)==='Farmer approved');
-  var lines='<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Value</th></tr></thead><tbody>'+
-    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td class="faint">'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
+  var lines='<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Packs</th><th class="num">Value</th></tr></thead><tbody>'+
+    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td class="faint">'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div></td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
     '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>';
   var html=(hold?'<div class="bbp-alert'+(hold.sev==='high'?'':' warn')+'">'+BB.icon('alert')+BB.esc(hold.reason)+'</div>':'')+lines+quoteBar(o);
   var acts=[];
@@ -307,13 +315,13 @@ function openOrder(id){
       isAdvisor? null : { initials:initialsOf(r.name), color:r.colour, text:r.name, tip:'Rep' }
     ],
     stats:[
-      { l:'Value', v:BB.money(val), s:(d.quoteStatus(o)&&d.quotePct(o)? 'incl. '+d.quotePct(o)+'% margin' : 'list') },
+      { l:'Value', v:BB.money(val), s:(d.quoteStatus(o)&&d.quotePct(o)? 'incl. '+d.quotePct(o)+'% markup' : 'list') },
       canAdvance
         ? { l:'Status', html:BB.statusBadge(o.status), tip:'Change the status', onClick:function(el){
             BB.pick(el, { title:'Move to', items:STATUSES.map(function(st){ return { label:st, value:st, html:BB.statusBadge(st), on:st===o.status }; }),
               onPick:function(st){ if(st!==o.status) doAdvance(o.id, st); } }); } }
         : { l:'Status', html:BB.statusBadge(o.status) },
-      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.shortDate(dl.eta):dl.status.toLowerCase()+' · '+BB.shortDate(dl.eta)) : (o.status==='Delivered'?'delivered':'not booked') },
+      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.shortDate(dl.eta):dl.status.toLowerCase()+' · '+BB.shortDate(dl.eta)+(BB.lateDays(dl)?' · late '+BB.lateDays(dl)+'d':'')) : (o.status==='Delivered'?'delivered':'not booked') },
       { l:'Invoice', html: inv? '<span class="tag tag-inv">'+BB.icon('receipt')+'Invoiced</span>' : counted? '<span class="tag tag-uninv">'+BB.icon('receipt')+'Not yet</span>' : '<span class="faint">—</span>' }
     ],
     html:html, actions:acts,
@@ -322,7 +330,9 @@ function openOrder(id){
       body.querySelectorAll('input[data-pct]').forEach(function(inp){ inp.oninput=function(){
         var pct=Math.max(0,Math.min(50,Number(this.value)||0)), list=d.orderValue(o), tot=Math.round(list*(1+pct/100));
         var t=body.querySelector('b[data-tot="'+o.id+'"]'), m=body.querySelector('b[data-margin="'+o.id+'"]');
-        if(t) t.textContent=BB.money(tot); if(m) m.textContent=BB.money(tot-list); }; });
+        if(t) t.textContent=BB.money(tot); if(m) m.textContent=BB.money(tot-list);
+        var b=body.querySelector('button[data-send]'), cap=Number(this.dataset.cap);
+        if(b) b.innerHTML = pct>cap ? 'Send back for approval'+BB.icon('chevron') : 'Send to '+BB.esc(b.dataset.send)+BB.icon('chevron'); }; });
     } });
 }
 

@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Farms &amp; farmers · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
 /* Farms register — page-scoped */
 .wa{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;border-radius:8px;background:#e9f9ef;color:#128C4A;border:1px solid #bfe8cf;white-space:nowrap;}
@@ -123,7 +123,7 @@ function farmPreview(id){
   var place=[f.town, f.region].filter(function(x){ return x && String(x).trim(); }).join(', ');
   var alert=(ti.sev==='bad'||ti.sev==='warn')? '<div class="bbp-alert'+(ti.sev==='bad'?'':' warn')+'">'+BB.icon('alert')+esc(ti.verdict)+'</div>' : '';
   return {
-    wide:true, layout:'split', color:null, sub:null, eyebrow:'Farm', title:f.farm, tags:BB.statusBadge(f.status)+BB.sampleChip(f),
+    wide:true, layout:'split', color:null, sub:null, eyebrow:'Farm', title:f.farm, tags:BB.farmBadge(f)+BB.sampleChip(f),
     meta:[
       f.name && f.name!==f.farm? { icon:'user', text:f.name, tip:'Farmer' } : null,
       phoneMeta(f),
@@ -245,8 +245,9 @@ function render(){
     '</div>';
   }
 
-  // scope — an advisor's own farms or everyone's; region, rep, status… are the funnels on the register
-  if(isAdvisor){
+  // scope — an advisor's own farms or everyone's; region, rep, status… are the funnels on the register.
+  // A seat that can only ever see its own farms gets no toggle: both sides would show the same list.
+  if(isAdvisor && d.all('farmers').some(function(f){ return f.rep!==u.rep; })){
     html += '<div class="toolbar"><div class="filterbar"><div class="seg">'+
       '<button class="'+(scope==='mine'?'on':'')+'" data-scope="mine">My farms</button>'+
       '<button class="'+(scope==='all'?'on':'')+'" data-scope="all">All farms</button>'+
@@ -287,7 +288,7 @@ function render(){
       (hasLedger? '<td class="num">'+(f.sageId!=null ? '<b>'+BB.money(invoiced12(f.id))+'</b><div class="faint" style="font-size:.7rem;">last 12 months</div>' : '<span class="faint">—</span>')+'</td>' : '')+
       '<td class="num">'+(bal||lim ? '<span class="'+(isOver?'over':'')+'">'+BB.money(bal)+'</span>'+(lim?'<div class="faint" style="font-size:.7rem;">limit '+BB.money(lim)+'</div>':'') : '<span class="faint">—</span>')+'</td>'+
       '<td>'+(f.rep? repChip(r) : '<span class="faint">not allocated</span>')+'</td>'+
-      '<td>'+BB.statusBadge(f.status)+'</td>'+
+      '<td>'+BB.farmBadge(f)+'</td>'+
       (function(){ var t=d.tripInsight(f.id); return '<td class="drive"><span class="badge b-'+t.sev+'" title="Balance '+BB.money(t.balance)+' · limit '+BB.money(t.limit)+'">'+esc(t.verdict)+'</span>'+(t.limit?'<div class="faint" style="font-size:.7rem;margin-top:3px;">'+BB.money(Math.max(0,t.available))+' credit open'+(t.openPipeline?' · '+BB.money(t.openPipeline)+' in pipeline':'')+'</div>':'')+'</td>'; })()+
     '</tr>';
   });
@@ -322,7 +323,7 @@ function render(){
         var list=rows.filter(function(f){ return keys.indexOf(f.region||'Region not captured')>=0; });
         var bal=list.reduce(function(t,f){ return t+Math.max(0,d.accountBalance(f.id)||0); },0), ha=list.reduce(function(t,f){ return t+(f.ha||0); },0);
         return Object.assign(farmList(list, ['Farm','Town','Status','Balance'], function(f){
-            return [{ html:'<b>'+esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+esc(f.name)+'</div>' }, f.town||'—', { html:BB.statusBadge(f.status) }, BB.money(d.accountBalance(f.id)||0)];
+            return [{ html:'<b>'+esc(f.farm)+'</b><div class="faint" style="font-size:.72rem;">'+esc(f.name)+'</div>' }, f.town||'—', { html:BB.farmBadge(f) }, BB.money(d.accountBalance(f.id)||0)];
           }, [3]), { sub:keys.length>1? keys.join(' · ') : null, color:null,
           stats:[{ l:'Farms', v:String(list.length), s:Math.round(list.length/(rows.length||1)*100)+'% of '+rows.length+' in view' }, { l:'Hectares', v:ha? BB.num(ha) : '—' }, { l:'Outstanding', v:BB.money(bal) }] });
       } });

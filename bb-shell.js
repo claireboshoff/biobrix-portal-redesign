@@ -90,6 +90,7 @@
   .search-result .sr-label b{color:var(--lime);font-weight:700;}
   .search-result .sr-tag{font-size:.54rem;max-width:72px;overflow:hidden;text-overflow:ellipsis;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:rgba(222,236,203,.38);white-space:nowrap;}
   .nav-noresult{padding:12px 18px;font-size:.78rem;color:rgba(222,236,203,.45);}
+  .sr-head{padding:10px 18px 4px;font-size:.66rem;letter-spacing:.6px;text-transform:uppercase;font-weight:700;color:rgba(222,236,203,.45);}
   .search-preview{opacity:1;visibility:visible;transform:none;pointer-events:auto;transition:none;}
   .search-preview[hidden]{display:none;}
   .nav-footer{margin-top:auto;padding:14px 18px;border-top:1px solid var(--rail-line);font-size:.66rem;color:rgba(222,236,203,.34);line-height:1.6;}
@@ -108,7 +109,7 @@
   .bb-back .ico{width:15px;height:15px;transform:rotate(180deg);}
   .bb-net{display:inline-flex;align-items:center;gap:7px;font-size:.74rem;font-weight:600;color:var(--muted);padding:5px 10px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);white-space:nowrap;}
   .bb-net .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);}
-  .bb-net.off .dot{background:var(--amber);} .bb-net.sync .dot{background:var(--blue);animation:bbpulse 1.1s infinite;}
+  .bb-net.off .dot,.bb-net.stale .dot{background:var(--amber);} .bb-net.stale{color:var(--amber);} .bb-net.sync .dot{background:var(--blue);animation:bbpulse 1.1s infinite;}
   .bb-user{position:relative;display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px 4px 4px 10px;border-radius:999px;border:1px solid transparent;background:none;font:inherit;color:inherit;text-align:right;}
   .bb-user:hover{border-color:var(--line);}
   .bb-user .nm{font-weight:600;font-size:.82rem;line-height:1.15;color:var(--ink);}
@@ -241,6 +242,8 @@
   .empty{text-align:center;padding:36px 20px;color:var(--faint);font-size:.88rem;} .empty .big{font-size:1.6rem;margin-bottom:8px;}
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--green-darkest);color:#fff;padding:12px 20px;border-radius:10px;font-size:.86rem;font-weight:600;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:90vw;text-align:center;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.undo{display:flex;align-items:center;gap:14px;pointer-events:auto;text-align:left;}
+  .toast.undo button{flex:none;background:none;border:0;color:var(--lime,#b5d334);font:inherit;font-weight:700;cursor:pointer;padding:6px 4px;margin:-6px -4px;min-height:32px;}
   .divider{height:1px;background:var(--line);margin:16px 0;}
   .hero-band{background:linear-gradient(112deg,var(--green-darkest),var(--green-dark));color:#eaf4d8;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);}
   .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.76rem;color:var(--muted);}
@@ -584,7 +587,7 @@
     .bb-top-in{padding:0 16px;gap:10px;}
     .bb-user .who{display:none;}
     .bb-net span.t{display:none;}
-    .bb-net.off span.t{display:inline;}   /* offline is said in words, not just a dot */
+    .bb-net.off span.t,.bb-net.stale span.t{display:inline;}   /* offline is said in words, not just a dot */
     .bb-nav{display:flex;}
     .toast{bottom:86px;}
     .wrap{padding:0 16px 32px;}
@@ -733,7 +736,7 @@
       { href:'territory.html', icon:'map', label:'Territory potential', kw:'country region map' } ]},
     { key:'ops', icon:'truck', label:'Operations', items:[
       { href:'operations.html', icon:'board', label:'Operations board', kw:'board overview' },
-      { href:'dispatch.html', icon:'moving', label:'What is moving', kw:'dispatch' },
+      { href:'dispatch.html', icon:'moving', label:'Product movement', kw:'dispatch moving what is moving units out' },
       { href:'deliveries.html', icon:'truck', label:'Logistics & dispatch', kw:'deliveries transport' },
       { href:'stock.html', icon:'package', label:'Stock', kw:'inventory reorder' },
       { href:'depots.html', icon:'warehouse', label:'Depots', kw:'warehouse blending' },
@@ -806,7 +809,7 @@
     }).join('');
     return '<a class="nav-brand" href="index.html"><div class="bb-mark">B</div><div><div class="bb-word">BIOBRIX <span class="os">OS</span></div><div class="bb-sub">The Biological Way</div></div></a>'+
       '<div class="nav-seat"><div class="bb-av">'+initials(u.name)+'</div><div style="min-width:0"><div class="nm">'+esc(u.name)+'</div><div class="rl">'+esc(u.role)+'</div></div></div>'+
-      '<div class="nav-search">'+icon('search')+'<input id="nav-search" type="search" placeholder="Search menu…" autocomplete="off" aria-label="Search the menu" oninput="BB.filterNav(this.value)" onkeydown="BB.navSearchKey(event)"></div>'+
+      '<div class="nav-search">'+icon('search')+'<input id="nav-search" type="search" placeholder="Search pages, farmers, orders…" autocomplete="off" aria-label="Search the menu" oninput="BB.filterNav(this.value)" onkeydown="BB.navSearchKey(event)"></div>'+
       '<div id="nav-results" style="display:none"></div>'+
       '<div id="nav-preview" class="rail-flyout search-preview" hidden></div>'+
       '<div class="nav-label">Workspace</div>'+
@@ -851,12 +854,25 @@
       if(it.label.toLowerCase().indexOf(q)>=0 || b.label.toLowerCase().indexOf(q)>=0 || String(it.kw||'').toLowerCase().split(/[,\s]+/).some(function(k){ return k && k.indexOf(q)===0; }))
         navHits.push({ href:it.href, icon:it.icon, label:it.label, cat:b });
     }); });
+    var pages=navHits.length;
+    // records too: a farmer, a farm, an order or an invoice ref — only what this seat may see
+    if(q.length>=2 && window.BB.data) try{
+      var D=BB.data, has=function(t){ return String(t||'').toLowerCase().indexOf(q)>=0; }, rec=[], cap=8;
+      var farmCat={ label:'Farmer', direct:true, items:[] }, ordCat={ label:'Order', direct:true, items:[] }, invCat={ label:'Invoice', direct:true, items:[] };
+      D.all('farmers').forEach(function(f){ if(rec.length<cap && (has(f.name)||has(f.farm)))
+        rec.push({ href:canGo('farm-detail.html')?'farm-detail.html?farmer='+encodeURIComponent(f.id):canGo('farms.html')?'farms.html':null, icon:'user', label:f.name+(f.farm&&f.farm!==f.name?' · '+f.farm:''), cat:farmCat }); });
+      D.all('orders').forEach(function(o){ if(rec.length<cap && has(o.ref))
+        rec.push({ href:canGo('orders.html')?'orders.html?open='+encodeURIComponent(o.id):null, icon:'receipt', label:o.ref+' · '+D.farmer(o.farmer).name, cat:ordCat }); });
+      D.all('invoices').forEach(function(i){ var r=i.label||i.ref; if(rec.length<cap && has(r))
+        rec.push({ href:canGo('finance.html')?'finance.html?cust='+encodeURIComponent(i.farmer||''):canGo('farm-detail.html')&&i.farmer?'farm-detail.html?farmer='+encodeURIComponent(i.farmer):null, icon:'file', label:r+' · '+D.farmer(i.farmer).name, cat:invCat }); });
+      navHits=navHits.concat(rec.filter(function(h){ return h.href; }));
+    }catch(e){ console.warn('record search', e); }
     items.style.display='none'; results.style.display='';
-    if(!navHits.length){ results.innerHTML='<div class="nav-noresult">No pages match “'+esc(q)+'”.</div>'; return; }
+    if(!navHits.length){ results.innerHTML='<div class="nav-noresult">Nothing matches “'+esc(q)+'”.</div>'; return; }
     results.innerHTML=navHits.map(function(h,i){
       var k=h.label.toLowerCase().indexOf(q);
       var lbl = k<0 ? esc(h.label) : esc(h.label.slice(0,k))+'<b>'+esc(h.label.slice(k,k+q.length))+'</b>'+esc(h.label.slice(k+q.length));
-      return '<a href="'+h.href+'" class="search-result" data-i="'+i+'" onmouseenter="BB.navSearchActive('+i+')">'+icon(h.icon)+'<span class="sr-label">'+lbl+'</span><span class="sr-tag">'+esc(h.cat.label)+'</span></a>';
+      return (i===pages && pages? '<div class="sr-head">Records</div>' : '')+'<a href="'+h.href+'" class="search-result" data-i="'+i+'" onmouseenter="BB.navSearchActive('+i+')">'+icon(h.icon)+'<span class="sr-label">'+lbl+'</span><span class="sr-tag">'+esc(h.cat.label)+'</span></a>';
     }).join('');
   }
   function navSearchActive(i){
@@ -920,7 +936,7 @@
       { id:'account',href:'client-portal.html#account', icon:'receipt', label:'Account' },
       { id:'docs',   href:'client-portal.html#docs',    icon:'folder', label:'Documents' } ],
     warehouse: [ HOME,
-      { id:'dispatch', href:'dispatch.html', icon:'moving', label:'Moving' },
+      { id:'dispatch', href:'dispatch.html', icon:'moving', label:'Movement' },
       { id:'stock', href:'stock.html',       icon:'package', label:'Stock' },
       { id:'depots',href:'depots.html',      icon:'warehouse', label:'Depots' },
       { id:'deliveries', href:'deliveries.html', icon:'truck', label:'Deliveries' } ]
@@ -946,8 +962,14 @@
         if(swapped.length>1) navItems = swapped.slice(0,5);
       }
     }catch(e){}
+    // Light the tab for the page you are on. Only a tab that names a whole area (Sales, Ops,
+    // BioServices) stands in for a page it doesn't link to; a tab named for one page ("Orders")
+    // never lights up on another page that happens to share its area.
+    var here = navItems.filter(function(n){ return isHere(n.href); })[0];
+    var AREA = { Sales:1, Ops:1, BioServices:1 };
+    var lit = here || navItems.filter(function(n){ return active===n.id && AREA[n.label]; })[0] || null;
     return '<nav class="bb-nav" aria-label="Quick links">'+navItems.map(function(n){
-      return '<a href="'+n.href+'" class="'+(active===n.id?'on':'')+'">'+icon(n.icon)+n.label+'</a>';
+      return '<a href="'+n.href+'" class="'+(lit===n?'on':'')+'"'+(lit===n?' aria-current="page"':'')+'>'+icon(n.icon)+n.label+'</a>';
     }).join('')+'</nav>';
   }
 
@@ -956,6 +978,7 @@
   var STAT_DETAIL = {};
   function renderHeader(opts){
     opts = opts || {};
+    pendingUndo();
     var u = (window.BB && BB.user) || { name:'BioBrix', role:'—' };
     var here = whereAmI();
     // On phones these pages lead with the work (lists, actions) and put chart-only blocks after it.
@@ -1001,12 +1024,12 @@
     if(sc){
       var band='';
       if(sc.rep){ var rr=BB.data.rep(sc.rep);
-        var rWhat = sageLive() ? 'your accounts, your sales and the plan — nobody else’s'
+        var rWhat = sageReal() ? 'your accounts, your sales and the plan — nobody else’s'
                                : 'your farmers, orders, forecast and farm files only';
         band='<div class="bb-scope"><span class="dot" style="background:'+esc(rr.colour||'#68a53e')+';"></span><b>'+esc((u.name||'').split(' ')[0])+'’s view</b> · '+esc(rr.region||'')+' · '+rWhat+'</div>'; }
       else if(sc.farmer){ var ff=BB.data.farmer(sc.farmer); band='<div class="bb-scope"><span class="dot" style="background:var(--green-bright);"></span><b>'+esc(ff.farm||'My farm')+'</b> · your farm, your orders, your account — nothing else</div>'; }
       else if(sc.depot){ var dd=BB.data.depot(sc.depot);
-        var dWhat = sageLive() ? 'what is going out, and jobs — no customer accounts'
+        var dWhat = sageReal() ? 'what is going out, and jobs — no customer accounts'
                                : 'your stock, deliveries, blending and labels only';
         band='<div class="bb-scope"><span class="dot" style="background:var(--green-bright);"></span><b>'+esc(dd.name||'Depot')+' view</b> · '+dWhat+'</div>'; }
       top = top.replace('<div class="bb-sync" id="bbSync"></div>', band+'<div class="bb-sync" id="bbSync"></div>');
@@ -1083,10 +1106,13 @@
       ' Treat them as at that date, not as today.</div></div>';
   }
   function sageLive(){ try{ var s=BB.data.sage&&BB.data.sage(); return !!(s&&s.live); }catch(e){ return false; } }
+  // A real ledger, not the demo's sample one: only then is anything on the page "partly real",
+  // so only then do sample banners and chips have something to tell apart.
+  function sageReal(){ try{ var s=BB.data.sage&&BB.data.sage(); return !!(s&&s.live&&!s.demo); }catch(e){ return false; } }
   function isSample(rec){ return !(rec && (rec.src==='sage' || rec.sageId)); }
   function sampleNote(what){
     return '<div class="bb-sample"><span class="t">Sample</span><div>The figures in <b>'+esc(what)+'</b> are demonstration data, not BioBrix\'s own. '+
-      (sageLive()? 'Your customers, invoices and payments are live from your accounting system — this section is not connected to it yet.' : 'Nothing here comes from your systems yet.')+'</div></div>';
+      (sageReal()? 'Your customers, invoices and payments are live from your accounting system — this section is not connected to it yet.' : 'Nothing here comes from your systems yet.')+'</div></div>';
   }
   // Pages where the top of the screen is now real (fed by the accounting system) and only the
   // sections below it are demonstration data. The note goes above the first of those sections.
@@ -1095,7 +1121,7 @@
     'index.html':{ after:'#insights', what:'the farm health scores and the stock and sample alerts above' }
   };
   function markSamplePage(){
-    if(!sageLive()) return;                                  // in pure demo mode the whole thing is a demo
+    if(!sageReal()) return;                                  // in demo mode (sample ledger or none) the whole thing is a demo
     // On a live client seat there is no sample data left to mark: the store stops serving seeded
     // records altogether (see bb-data, "the sample-data cut-off"). A banner here would be warning
     // people about figures they can no longer see.
@@ -1122,7 +1148,13 @@
     var el = document.getElementById('bbSync'); if(!el) return;
     var q = BB.data.queue();
     var net = document.getElementById('bbNet');
-    if(net){ net.className='bb-net'+(!navigator.onLine?' off':q.length?' sync':''); var t=net.querySelector('.t'); if(t) t.textContent=!navigator.onLine?'Offline · '+q.length+' queued':q.length?'Syncing '+q.length+'…':'Up to date'; }
+    // "Up to date" is a claim about the accounts too: if the last read of the accounting system is
+    // more than a day old, say how old instead.
+    var stale=null; try{ var sg=BB.data.sage&&BB.data.sage(), last=sg&&sg.meta&&sg.meta.last&&Date.parse(sg.meta.last);
+      if(last && Date.now()-last > 26*3600000){ var h=Math.round((Date.now()-last)/3600000); stale = h<48? h+' hours ago' : Math.round(h/24)+' days ago'; } }catch(e){}
+    if(net){ net.className='bb-net'+(!navigator.onLine?' off':q.length?' sync':stale?' stale':''); var t=net.querySelector('.t');
+      if(t) t.textContent=!navigator.onLine?'Offline · '+q.length+' queued':q.length?'Syncing '+q.length+'…':stale?'Accounts read '+stale:'Up to date';
+      if(stale && navigator.onLine && !q.length) net.setAttribute('data-tip','The last read of your accounting system was '+stale+'. Figures from it may be behind.'); else net.removeAttribute('data-tip'); }
     if(!navigator.onLine){
       el.className='bb-sync off';
       el.innerHTML='<span class="dot"></span>Offline — '+q.length+' change'+(q.length===1?'':'s')+' saved on this device, will sync when signal returns';
@@ -1135,14 +1167,37 @@
     }
   }
   window.addEventListener('online', refreshSync);
+  window.addEventListener('bb:sage', refreshSync);
   window.addEventListener('offline', refreshSync);
 
   // ---- toast ----------------------------------------------------
-  function toast(msg){
-    var t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t);
+  // toast(msg) · toast(msg, { undo:fn }) — with an undo it stays longer and carries an Undo button.
+  // Only one undo toast is live at a time: a new one replaces it, so Undo always means the last thing.
+  function toast(msg, o){
+    o=o||{};
+    if(o.undo){ var prev=document.querySelector('.toast.undo'); if(prev) prev.remove(); }
+    var t=document.createElement('div'); t.className='toast'+(o.undo?' undo':''); t.setAttribute('role','status');
+    var sp=document.createElement('span'); sp.textContent=msg; t.appendChild(sp);
+    var gone=false, hide=function(){ if(gone) return; gone=true; t.classList.remove('show'); setTimeout(function(){t.remove();},300); };
+    if(o.undo){ var b=document.createElement('button'); b.type='button'; b.textContent='Undo';
+      b.onclick=function(){ hide(); try{ o.undo(); }catch(e){ console.warn('undo', e); } toast(o.undone||'Undone'); }; t.appendChild(b); }
+    document.body.appendChild(t);
     requestAnimationFrame(function(){ t.classList.add('show'); });
-    setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){t.remove();},300); }, 2400);
+    setTimeout(hide, o.undo?7000:2400);
   }
+  // For pages that reload after a change: the toast, and its Undo, survive the one reload.
+  function toastAcrossReload(msg, table, id, undone){
+    var r=BB.data.by(table, id); if(!r) return;
+    try{ sessionStorage.setItem('bb_undo_next', JSON.stringify({ at:Date.now(), msg:msg, table:table, snap:JSON.parse(JSON.stringify(r)), undone:undone||'Undone' })); }catch(e){}
+  }
+  function pendingUndo(){
+    var x=null; try{ x=JSON.parse(sessionStorage.getItem('bb_undo_next')); sessionStorage.removeItem('bb_undo_next'); }catch(e){}
+    if(!x || Date.now()-x.at > 15000) return;
+    setTimeout(function(){ toast(x.msg, { undo:function(){ BB.data.restore(x.table, x.snap); setTimeout(function(){ location.reload(); }, 600); }, undone:x.undone }); }, 300);
+  }
+  // Snapshot a record before changing it; the returned function puts it back.
+  function snapshot(table, id){ var r=BB.data.by(table, id); if(!r) return function(){}; var s=JSON.parse(JSON.stringify(r));
+    return function(){ BB.data.restore(table, s); }; }
 
   // ---- formatting ----------------------------------------------
   function money(v){ if(v==null||v==='')return 'R0'; return 'R'+Number(v).toLocaleString('en-ZA',{maximumFractionDigits:0}); }
@@ -1152,12 +1207,21 @@
   function shortDate(d){ if(!d)return '—'; try{return new Date(d).toLocaleDateString('en-ZA',{day:'numeric',month:'short'});}catch(e){return d;} }
   function monthName(i){ return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i]; }
 
+  // A date that should have happened and hasn't: an ETA in the past on something not yet there.
+  function lateDays(x){ if(!x || !x.eta || /^(Delivered|Received|Cancelled)$/.test(x.status||'')) return 0;
+    var g=Math.round((Date.parse(new Date().toISOString().slice(0,10))-Date.parse(x.eta))/86400000); return g>0? g : 0; }
+  function etaHtml(x, short){ if(!x || !x.eta) return '—'; var n=lateDays(x);
+    return '<span style="white-space:nowrap;">'+esc(short? shortDate(x.eta) : date(x.eta))+'</span>'+(n? ' <span class="badge b-bad" data-tip="ETA was '+esc(date(x.eta))+' and it has not arrived">late '+n+'d</span>' : ''); }
+  // A farm's badge: "Active" never sits beside an overdue account — that account is on hold.
+  function farmBadge(f){ if(!f) return ''; var st=f.status||'';
+    if(st==='Active' && f.id && BB.data.isOverdue && BB.data.isOverdue(f.id)) return '<span class="badge b-bad" data-tip="Account overdue — deliveries are held until it is paid">On hold</span>';
+    return statusBadge(st||'—'); }
   function statusBadge(s){
     var m={ 'Confirmed':'b-confirmed','Delivered':'b-delivered','Paid':'b-ok','Active':'b-ok','In stock':'b-ok','Healthy':'b-ok','Approved':'b-ok',
       'Pending':'b-pending','Forecast':'b-forecast','Awaiting stock':'b-await','Low stock':'b-warn','In progress':'b-warn','Monitoring':'b-warn','Reorder':'b-warn',
       'Draft':'b-grey','Planned':'b-grey','New':'b-grey',
       'Out of stock':'b-bad','Overdue':'b-bad','Urgent':'b-bad','Critical':'b-bad','At risk':'b-bad',
-      'Ordered':'b-blue','In transit':'b-transit','Blending':'b-blue','Quoted':'b-blue','Proof received':'b-blue','Sent':'b-ok','Shipped':'b-ok','In flight':'b-blue','Awaiting you':'b-warn','Open':'b-grey','Done':'b-ok','Design':'b-grey','Live':'b-ok' };
+      'Ordered':'b-blue','Requested':'b-warn','In transit':'b-transit','Blending':'b-blue','Quoted':'b-blue','Proof received':'b-blue','Sent':'b-ok','Shipped':'b-ok','In flight':'b-blue','Awaiting you':'b-warn','Open':'b-grey','Done':'b-ok','Design':'b-grey','Live':'b-ok' };
     return '<span class="badge '+(m[s]||'b-grey')+'">'+esc(s)+'</span>';
   }
 
@@ -1632,16 +1696,18 @@
   // ---- expose ---------------------------------------------------
   window.BB = window.BB || {};
   Object.assign(window.BB, {
-    esc:esc, toast:toast, money:money, money2:money2, num:num, date:date, shortDate:shortDate,
+    esc:esc, toast:toast, snapshot:snapshot, toastAcrossReload:toastAcrossReload, pendingUndo:pendingUndo, lateDays:lateDays, etaHtml:etaHtml, farmBadge:farmBadge, money:money, money2:money2, num:num, date:date, shortDate:shortDate,
     monthName:monthName, statusBadge:statusBadge, initials:initials,
     renderHeader:renderHeader, refreshSync:refreshSync, icon:icon,
     toggleRail:toggleRail, closeRail:closeRail, filterNav:filterNav, navSearchActive:navSearchActive, navSearchKey:navSearchKey,
     toggleNav:toggleNav, toggleUser:toggleUser, PAL:PAL, delta:delta, railPages:railPages,
     popup:popup, closePopup:closePopup, pick:pick, confirm:confirmBox, enhance:enhanceAll, statDetail:function(k,fn){ STAT_DETAIL[k]=fn; },
     chart:{ bar:bar, line:line, hbar:hbar, donut:donut, spark:spark, compact:compact, moneyCompact:moneyCompact },
-    sageLive:sageLive, isSample:isSample, sampleNote:sampleNote, sageAge:sageAge, staleNote:staleNote,
-    sampleChip:function(rec){ return isSample(rec) && sageLive() ? '<span class="chip-sample">Sample</span>' : ''; },
-    liveChip:function(){ return sageLive() ? '<span class="chip-live">From your accounts</span>' : ''; },
+    sageLive:sageLive, sageReal:sageReal, isSample:isSample, sampleNote:sampleNote, sageAge:sageAge, staleNote:staleNote,
+    sampleChip:function(rec){ return isSample(rec) && sageReal() ? '<span class="chip-sample">Sample</span>' : ''; },
+    // a made-up ledger (demo mode) says so, so sample figures are never read as the real books
+    liveChip:function(){ if(!sageLive()) return ''; var sg=BB.data&&BB.data.sage&&BB.data.sage();
+      return sg&&sg.demo ? '<span class="chip-live" data-tip="Made-up figures in the shape of your accounting system">Sample ledger</span>' : '<span class="chip-live">From your accounts</span>'; },
     // inject brand CSS immediately
     _cssInjected:false
   });

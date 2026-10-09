@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Suppliers · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .cc{display:inline-flex;align-items:center;justify-content:center;min-width:28px;padding:1px 6px;border-radius:5px;font-size:.66rem;font-weight:700;letter-spacing:.5px;}
   .cc.loc{background:#eef6dc;color:var(--green-mid);} .cc.imp{background:var(--blue-bg);color:var(--blue);}
@@ -54,7 +54,7 @@ function poTable(list, withSup){
   return { columns:(withSup?['Supplier']:[]).concat(['Items','To','Raised','ETA','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(po){
       var items=(po.lines||[]).map(function(l){ return d.product(l.prod).code+' ×'+BB.num(l.qty); }).join(', ');
-      return { cells:(withSup?[d.supplier(po.supplier).name]:[]).concat([items||'—', String(d.depot(po.depot).name).replace(/ Depot$/,''), BB.date(po.date), BB.date(po.eta), { html:BB.statusBadge(po.status) }]),
+      return { cells:(withSup?[d.supplier(po.supplier).name]:[]).concat([items||'—', String(d.depot(po.depot).name).replace(/ Depot$/,''), BB.date(po.date), { html:BB.etaHtml(po) }, { html:BB.statusBadge(po.status) }]),
         onClick:function(){ BB.popup(poCard(po)); } }; }) };
 }
 function prodTable(list, withSup){
@@ -146,7 +146,9 @@ function render(){
   var radar = low.map(function(i){
     var p = d.product(i.prod);
     var sup = d.supplier(p.supplier);
-    return { i:i, p:p, sup:sup };
+    // a depot's reorder request waits here until it becomes the order
+    var req = d.all('purchaseOrders').filter(function(po){ return po.status==='Requested' && po.depot===i.depot && (po.lines||[]).some(function(l){ return l.prod===i.prod; }); })[0]||null;
+    return { i:i, p:p, sup:sup, req:req };
   }).sort(function(a,b){ return b.sup.lead-a.sup.lead; });
 
   var radarBody;
@@ -161,7 +163,8 @@ function render(){
         '<td class="num">'+BB.num(r.i.qty)+' <span class="faint">/ '+BB.num(r.i.reorder)+'</span></td>'+
         '<td><span class="row" style="gap:6px;flex-wrap:nowrap;">'+flag(r.sup.country)+'<span>'+BB.esc(r.sup.name)+'</span></span></td>'+
         '<td class="num muted">'+r.sup.lead+' days</td>'+
-        '<td class="num"><button class="btn ghost sm" data-order="'+r.p.id+'" data-depot="'+r.i.depot+'" data-qty="'+Math.max(r.i.reorder, r.i.reorder*2-r.i.qty)+'">'+BB.icon('plus')+'Raise PO</button></td>'+
+        '<td class="num"><span class="row" style="gap:8px;justify-content:flex-end;flex-wrap:nowrap;">'+(r.req? '<span class="faint" style="font-size:.76rem;white-space:nowrap;">requested '+BB.esc(BB.shortDate(r.req.date))+'</span>' : '')+
+          '<button class="btn '+(r.req?'':'ghost ')+'sm" data-order="'+r.p.id+'" data-depot="'+r.i.depot+'" data-qty="'+(r.req? (r.req.lines[0].qty||0) : Math.max(r.i.reorder, r.i.reorder*2-r.i.qty))+'">'+BB.icon('plus')+'Raise PO</button></span></td>'+
       '</tr>';
     });
     radarBody += '</tbody></table></div>';
@@ -179,7 +182,7 @@ function render(){
         '<div style="min-width:0;"><div class="row" style="gap:6px;flex-wrap:nowrap;">'+flag(sup.country)+'<b>'+BB.esc(sup.name)+'</b></div>'+
           '<div style="font-size:.84rem;margin-top:2px;">'+BB.esc(items)+' <span class="faint">→ '+BB.esc(d.depot(po.depot).name)+'</span></div>'+
           '<div class="faint" style="font-size:.72rem;margin-top:1px;">Raised '+BB.date(po.date)+'</div></div>'+
-        '<div style="text-align:right;flex:none;">'+BB.statusBadge(po.status)+'<div class="faint" style="font-size:.72rem;margin-top:4px;">ETA '+BB.shortDate(po.eta)+'</div></div>'+
+        '<div style="text-align:right;flex:none;">'+BB.statusBadge(po.status)+'<div class="faint" style="font-size:.72rem;margin-top:4px;">'+(po.eta?'ETA '+BB.etaHtml(po, true):'not ordered yet')+'</div></div>'+
       '</div>');
     });
     poBody += '</div>';
@@ -254,7 +257,11 @@ function wire(){
     btn.onclick = function(e){
       e.stopPropagation();
       var p = d.product(btn.getAttribute('data-order'));
-      var sup = d.supplier(p.supplier);
+      var sup = d.supplier(p.supplier), dep = btn.getAttribute('data-depot');
+      // the depot already asked: that request becomes the order, rather than a second one beside it
+      var req = d.all('purchaseOrders').filter(function(po){ return po.status==='Requested' && po.depot===dep && (po.lines||[]).some(function(l){ return l.prod===p.id; }); })[0];
+      if(req){ d.update('purchaseOrders', req.id, { status:'Ordered', date:new Date().toISOString().slice(0,10), eta:new Date(Date.now()+(sup.lead||10)*86400000).toISOString().slice(0,10), orderedBy:(BB.user.rep||BB.user.id) });
+        BB.toast('PO raised with '+sup.name+' from the depot\'s request — ETA '+(sup.lead||10)+' days'); render(); return; }
       d.add('purchaseOrders', {
         supplier: p.supplier, depot: btn.getAttribute('data-depot'),
         date: new Date().toISOString().slice(0,10),

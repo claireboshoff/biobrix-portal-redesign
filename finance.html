@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Finance · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .fin-row{margin-top:16px;}
   .fin-rec{display:grid;gap:16px;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start;}
@@ -128,6 +128,7 @@ function render(){
   // ---- a customer, as its card (CONVENTIONS: the card pattern): who and where · what is open · its open invoices ----
   var initialsOf=function(n){ return String(n||'').split(/\s+/).map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase(); };
   var cardRow=function(fid){ return fid && d.by('farmers', fid) ? function(){ BB.popup(custCard(fid)); } : null; };
+  window.__finCustCard = function(fid){ return custCard(fid); };   // ?cust= (menu search) opens it
   function custCard(fid){
     var f=d.farmer(fid), list=openInvs.filter(function(i){ return (i.farmer||null)===(fid||null); }).sort(byOpen);
     var open=0, odv=0, oldest=0; list.forEach(function(i){ var v=open_(i); open+=v; if(i.status==='Overdue'){ odv+=v; oldest=Math.max(oldest, daysOver(i)); } });
@@ -250,7 +251,7 @@ function render(){
   var liveSeat = !!(BB.auth && BB.auth.tenantLive && BB.auth.tenantLive() && !(BB.auth.isFreedomHub && BB.auth.isFreedomHub()));
   var repRowsAny = reps.some(function(r){ return orders.some(function(o){ return o.rep===r.id && (o.status==='Delivered'||o.status==='Confirmed'); }); });
   var showRec = !(liveSeat && !repRowsAny);
-  if(showRec && BB.sageLive() && !liveSeat) html+=BB.sampleNote('what the reps reported');
+  if(showRec && BB.sageReal() && !liveSeat) html+=BB.sampleNote('what the reps reported');
   html+=showRec ? '<div class="fin-rec fin-row">' : '';
   if(showRec){
     var tRep=0, tAct=0;
@@ -354,6 +355,9 @@ function wire(){
 document.body.insertAdjacentHTML('beforeend','<main class="wrap"></main>');
 render();
 window.addEventListener('bb:sage', function(){ render(); });
+// ?cust=<farmer>: the menu search found one of their invoices — open their card
+var openCust=new URLSearchParams(location.search).get('cust');
+if(openCust && window.__finCustCard && d.by('farmers', openCust)) setTimeout(function(){ BB.popup(window.__finCustCard(openCust)); }, 200);
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>

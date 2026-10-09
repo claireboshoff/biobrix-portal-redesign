@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>What is moving · BioBrix OS</title>
+<title>Product movement · BioBrix OS</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .mini{font-size:.72rem;color:var(--faint);}
   td.up b{color:var(--ok);} td.down b{color:var(--red);}
@@ -38,7 +38,7 @@ function render(){
   var host = document.getElementById('main');
   showValue = BB.auth.can('finance') || u.roleKey==='director' || u.roleKey==='operations';
 
-  var html = '<div class="page-head"><div class="eyebrow">Operations · Dispatch</div><h1>What is moving</h1>'+
+  var html = '<div class="page-head"><div class="eyebrow">Operations · Stock out of the door</div><h1>Product movement</h1>'+
     '<p>Every product you have invoiced, in the quantity that left the shelf — this month against last month, and against the same month a year ago. Straight off your own invoices, so what you see here is what actually went out.</p></div>';
 
   if(!sg || !sg.live || !(sg.products||[]).length){
@@ -117,7 +117,7 @@ function monthDetail(ym){
   var list=prods.map(function(x){ var m=x.months[ym]||{}, a=x.months[ago]||{}; return { p:x, q:m.qty||0, v:m.value||0, a:a.qty||0 }; })
     .filter(function(x){ return x.q>0; }).sort(function(a,b){ return b.q-a.q; });
   var tq=list.reduce(function(t,x){ return t+x.q; },0), tv=list.reduce(function(t,x){ return t+x.v; },0);
-  return { eyebrow:'What is moving', title:monthName(ym), wide:true,
+  return { eyebrow:'Product movement', title:monthName(ym), wide:true,
     stats:[{l:'Units out', v:qty(tq), s:ym===THIS?'so far':null}, {l:'Products', v:list.length}].concat(showValue?[{l:'Invoiced', v:BB.money(Math.round(tv)), s:'excluding VAT'}]:[]),
     table:{ columns:['Product','Code',monthName(ym),monthName(ago)].concat(showValue?['Invoiced']:[]), num:showValue?[2,3,4]:[2,3],
       rows:list.map(function(x){ return { cells:[x.p.name, x.p.code||'', qty(x.q), agoKnown?qty(x.a):'—'].concat(showValue?[BB.money(Math.round(x.v))]:[]), onClick:function(){ BB.popup(productDetail(x.p)); } }; }) },

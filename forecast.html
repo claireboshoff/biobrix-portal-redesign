@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Sales forecast · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 </head>
 <body>
 <script>
@@ -25,6 +25,9 @@ var css=''+
 '.rep{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;} .rep i{width:8px;height:8px;border-radius:50%;flex:none;}'+
 '#pivotBody table.bb td:first-child,#pivotBody table.bb th:first-child{position:sticky;left:0;background:#fff;z-index:2;min-width:160px;}'+
 '#pivotBody table.bb th:first-child{background:var(--panel-2);z-index:3;} #pivotBody table.bb tfoot td:first-child{background:var(--panel-2);}';
+css+='.fc-sum{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 8px;margin-top:12px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:#fbfcf8;font-size:.86rem;color:var(--muted);}'+
+  '.fc-sum b{color:var(--ink);font-weight:700;}.fc-sum i{font-style:normal;color:var(--faint);font-weight:700;padding:0 2px;}'+
+  '.term{border-bottom:1px dotted var(--faint);cursor:help;}';
 document.head.insertAdjacentHTML('beforeend','<style>'+css+'</style>');
 
 // scope orders to role
@@ -33,6 +36,11 @@ if(isAdvisor){ orders = orders.filter(function(o){ return o.rep===u.rep; }); }
 
 function isPipeline(o){ return o.status==='Forecast'||o.status==='Pending'; }
 function isConfirmed(o){ return o.status==='Confirmed'||o.status==='Delivered'; }
+function isAwaiting(o){ return !isPipeline(o) && !isConfirmed(o); }   // farmer said yes, waiting on stock
+// One set of words on this page, and they add up: Confirmed + Awaiting stock + Pipeline = Booked.
+var TERMS = { Confirmed:'The farmer said yes: confirmed or already delivered.', 'Awaiting stock':'The farmer said yes, but it can only go once the stock is in.',
+  Pipeline:'Not yet confirmed by the farmer: forecast and pending orders.', Booked:'Every order this season, whatever its status.' };
+function term(t){ return '<span class="term" data-tip="'+BB.esc(TERMS[t])+'">'+t+'</span>'; }
 
 // ---- popups: the orders (or order lines) behind a chart part or a figure ----
 // Each row opens that order in Orders (expanded), the page that holds its products, quote and invoice.
@@ -71,8 +79,8 @@ function repCard(x){
     meta:[ { initials:initialsOf(r.name), color:r.colour||'#3f6b28', text:r.role||r.name, tip:'Role' },
       r.region?{ icon:'map', text:r.region+(r.base&&r.base!==r.region?' · based '+r.base:''), tip:'Covers' }:null,
       tel?{ icon:'phone', tip:'Phone', html:'<a href="tel:+'+tel+'">'+BB.esc(r.cell)+'</a>' }:null ],
-    stats:[{ l:'Season', v:BB.money(x.total), s:x.count+' order'+(x.count===1?'':'s') }, { l:'Confirmed', v:BB.money(x.confirmed), s:done.length+' confirmed' },
-      { l:'Pipeline', v:BB.money(x.total-x.confirmed), s:pipe.length+' still open' }, { l:'Share', v:totalVal? Math.round(x.total/totalVal*100)+'%' : '—', s:'of the book' }] });
+    stats:[{ l:'Booked', v:BB.money(x.total), s:x.count+' order'+(x.count===1?'':'s') }, { l:'Confirmed', v:BB.money(x.confirmed), s:done.length+' confirmed' },
+      { l:'Awaiting stock', v:BB.money(x.total-x.confirmed-x.pipeline) }, { l:'Pipeline', v:BB.money(x.pipeline), s:'not yet confirmed' }] });
 }
 function productCard(name){
   var p=d.all('products').filter(function(x){ return x.name===name; })[0]||{ name:name }, qty=0, val=0, n=0, nOrd={};
@@ -87,19 +95,20 @@ function productCard(name){
 
 var pipelineVal = orders.filter(isPipeline).reduce(function(s,o){ return s+d.orderValue(o); },0);
 var confirmedVal = orders.filter(isConfirmed).reduce(function(s,o){ return s+d.orderValue(o); },0);
+var awaitVal = orders.filter(isAwaiting).reduce(function(s,o){ return s+d.orderValue(o); },0);
 var totalVal = orders.reduce(function(s,o){ return s+d.orderValue(o); },0);
 
 // group by deliverMonth
 var byMonth=[];
-for(var i=0;i<12;i++) byMonth.push({ i:i, orders:0, forecast:0, confirmed:0 });
+for(var i=0;i<12;i++) byMonth.push({ i:i, orders:0, forecast:0, confirmed:0, awaiting:0 });
 orders.forEach(function(o){
   var m=byMonth[o.deliverMonth]; if(!m) return;
   m.orders++;
   var v=d.orderValue(o);
-  if(isConfirmed(o)) m.confirmed+=v; else m.forecast+=v;
+  if(isConfirmed(o)) m.confirmed+=v; else if(isAwaiting(o)) m.awaiting+=v; else m.forecast+=v;
 });
 var activeMonths = byMonth.filter(function(m){ return m.orders>0; });
-var maxMonth = Math.max.apply(null, byMonth.map(function(m){ return m.forecast+m.confirmed; }).concat([1]));
+var maxMonth = Math.max.apply(null, byMonth.map(function(m){ return m.forecast+m.confirmed+m.awaiting; }).concat([1]));
 
 var html='';
 html += '<div class="page-head row between" style="gap:16px;"><div><div class="eyebrow">Sales</div><h1>Sales forecast</h1><p>'+
@@ -108,7 +117,7 @@ html += '<div class="page-head row between" style="gap:16px;"><div><div class="e
   '<div class="row" style="gap:8px;"><a class="btn" href="voice-order.html">'+BB.icon('mic')+'Capture an order</a><a class="btn ghost" href="orders.html">'+BB.icon('receipt')+'Full pipeline</a></div></div>';
 
 // stat tiles
-var busiest = activeMonths.slice().sort(function(a,b){ return (b.forecast+b.confirmed)-(a.forecast+a.confirmed); })[0];
+var busiest = activeMonths.slice().sort(function(a,b){ return (b.forecast+b.confirmed+b.awaiting)-(a.forecast+a.confirmed+a.awaiting); })[0];
 var convPct = totalVal ? Math.round(confirmedVal/totalVal*100) : 0;
 html += '<div class="grid g4" style="margin-top:16px;">';
 // every figure here is a list of orders: tap one and the list opens over the page
@@ -116,19 +125,22 @@ function tile(key, l, v, s){ return '<a class="stat tap" href="orders.html" data
 function tileDetail(list, sub){ var x=orderTable(list); var tot=list.reduce(function(t,o){ return t+d.orderValue(o); },0);
   return merge(x, { stats:[{ l:'Orders', v:BB.num(list.length) }, { l:'Value', v:BB.money(tot) }], actions:[{ label:'Open the full list', href:'orders.html', primary:true }] }); }
 BB.statDetail('fcPipe', function(){ return tileDetail(orders.filter(isPipeline), 'forecast and pending, by delivery month'); });
+BB.statDetail('fcAwait', function(){ return tileDetail(orders.filter(isAwaiting), 'waiting on stock, by delivery month'); });
 BB.statDetail('fcConf', function(){ return tileDetail(orders.filter(isConfirmed), 'confirmed and delivered, by delivery month'); });
 BB.statDetail('fcAll', function(){ return tileDetail(orders, 'every order this season, by delivery month'); });
 BB.statDetail('fcBusy', function(){ return busiest? tileDetail(orders.filter(function(o){ return o.deliverMonth===busiest.i; }), 'due for delivery in '+BB.monthName(busiest.i)) : null; });
-html += tile('fcPipe', 'Pipeline value', BB.money(pipelineVal), 'forecast + pending');
-html += tile('fcConf', 'Confirmed value', BB.money(confirmedVal), 'confirmed + delivered · '+convPct+'% of the book');
-html += tile('fcAll', 'Total booked', BB.money(totalVal), orders.length+' orders this season');
-html += tile('fcBusy', 'Busiest month', (busiest?BB.monthName(busiest.i):'—'), (busiest?BB.money(busiest.forecast+busiest.confirmed)+' due for delivery':'no orders yet'));
+html += tile('fcConf', 'Confirmed', BB.money(confirmedVal), 'confirmed + delivered · '+convPct+'% of booked');
+html += tile('fcAwait', 'Awaiting stock', BB.money(awaitVal), orders.filter(isAwaiting).length+' order'+(orders.filter(isAwaiting).length===1?'':'s')+' waiting on stock');
+html += tile('fcPipe', 'Pipeline', BB.money(pipelineVal), 'forecast + pending · not yet confirmed');
+html += tile('fcAll', 'Booked', BB.money(totalVal), orders.length+' orders'+(busiest?' · busiest '+BB.monthName(busiest.i):''));
 html += '</div>';
+// the sum, in words, so the four figures above visibly agree (hover a word for what it means)
+html += '<div class="fc-sum">'+term('Confirmed')+' <b>'+BB.money(confirmedVal)+'</b> <i>+</i> '+term('Awaiting stock')+' <b>'+BB.money(awaitVal)+'</b> <i>+</i> '+term('Pipeline')+' <b>'+BB.money(pipelineVal)+'</b> <i>=</i> '+term('Booked')+' <b>'+BB.money(totalVal)+'</b></div>';
 
 // the picture: month by month beside the split by rep (or, for an advisor, confirmed vs pipeline)
 html += '<div class="split" style="margin-top:16px;">'+
-  '<div class="card"><div class="card-h"><div><h3>Month by month</h3><div class="sub">order value by delivery month · confirmed and not yet confirmed</div></div></div><div class="card-p"><div id="chMonth"></div></div></div>'+
-  '<div class="card"><div class="card-h"><div><h3>'+(isAdvisor?'Confirmed vs pipeline':'By rep')+'</h3><div class="sub">'+(isAdvisor?'your book this season':'confirmed and pipeline, this season')+'</div></div></div><div class="card-p"><div id="chSide"></div></div></div>'+
+  '<div class="card"><div class="card-h"><div><h3>Month by month</h3><div class="sub">order value by delivery month · confirmed, awaiting stock and pipeline</div></div></div><div class="card-p"><div id="chMonth"></div></div></div>'+
+  '<div class="card"><div class="card-h"><div><h3>'+(isAdvisor?'Confirmed vs pipeline':'By rep')+'</h3><div class="sub">'+(isAdvisor?'your book this season':'confirmed, awaiting stock and pipeline')+'</div></div></div><div class="card-p"><div id="chSide"></div></div></div>'+
 '</div>';
 
 // ---- the pivot Rudie asked for: per product · per rep · per area · per month ----
@@ -143,17 +155,17 @@ html += '<div class="card" id="pivot" style="margin-top:16px;"><div class="card-
 
 // month detail table beside the rep table (director) or the products (advisor)
 var monthTbl = '<div class="card"><div class="card-h"><div><h3>Detail by month</h3><div class="sub">'+activeMonths.length+' months with deliveries</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
-  '<th>Month</th><th class="num">Orders</th><th class="num">Forecast value</th><th class="num">Confirmed value</th><th class="num">Total</th></tr></thead><tbody>';
+  '<th>Month</th><th class="num">Orders</th><th class="num">Confirmed</th><th class="num">Awaiting stock</th><th class="num">Pipeline</th><th class="num">Booked</th></tr></thead><tbody>';
 if(!activeMonths.length){
-  monthTbl += '<tr><td colspan="5" class="center faint">No orders yet.</td></tr></tbody>';
+  monthTbl += '<tr><td colspan="6" class="center faint">No orders yet.</td></tr></tbody>';
 } else {
-  var tO=0,tF=0,tC=0;
+  var tO=0,tF=0,tC=0,tA=0;
   activeMonths.forEach(function(m){
-    tO+=m.orders; tF+=m.forecast; tC+=m.confirmed;
+    tO+=m.orders; tF+=m.forecast; tC+=m.confirmed; tA+=m.awaiting;
     monthTbl += '<tr><td><b>'+BB.monthName(m.i)+'</b></td><td class="num">'+m.orders+'</td>'+
-      '<td class="num">'+BB.money(m.forecast)+'</td><td class="num">'+BB.money(m.confirmed)+'</td><td class="num"><b>'+BB.money(m.forecast+m.confirmed)+'</b></td></tr>';
+      '<td class="num">'+BB.money(m.confirmed)+'</td><td class="num">'+BB.money(m.awaiting)+'</td><td class="num">'+BB.money(m.forecast)+'</td><td class="num"><b>'+BB.money(m.forecast+m.confirmed+m.awaiting)+'</b></td></tr>';
   });
-  monthTbl += '</tbody><tfoot><tr><td>Season</td><td class="num">'+tO+'</td><td class="num">'+BB.money(tF)+'</td><td class="num">'+BB.money(tC)+'</td><td class="num">'+BB.money(tF+tC)+'</td></tr></tfoot>';
+  monthTbl += '</tbody><tfoot><tr><td>Season</td><td class="num">'+tO+'</td><td class="num">'+BB.money(tC)+'</td><td class="num">'+BB.money(tA)+'</td><td class="num">'+BB.money(tF)+'</td><td class="num">'+BB.money(tF+tC+tA)+'</td></tr></tfoot>';
 }
 monthTbl += '</table></div></div>';
 
@@ -173,15 +185,16 @@ if(!isAdvisor){
   }).filter(function(x){ return x.count>0; }).sort(function(a,b){ return b.total-a.total; });
   var maxRep = Math.max.apply(null, repRows.map(function(x){ return x.total; }).concat([1]));
   sideTbl = '<div class="card"><div class="card-h"><div><h3>By rep</h3><div class="sub">'+repRows.length+' active</div></div></div><div class="scroll"><table class="bb"><thead><tr>'+
-    '<th>Rep</th><th class="num">Orders</th><th class="num">Pipeline</th><th class="num">Confirmed</th><th class="num">Total</th></tr></thead><tbody>';
+    '<th>Rep</th><th class="num">Orders</th><th class="num">Confirmed</th><th class="num">Awaiting stock</th><th class="num">Pipeline</th><th class="num">Booked</th></tr></thead><tbody>';
   repRows.forEach(function(x){
     sideTbl += '<tr><td><span class="rep"><i style="background:'+x.rep.colour+';"></i><b>'+BB.esc(x.rep.name)+'</b></span></td>'+
       '<td class="num">'+x.count+'</td>'+
-      '<td class="num">'+BB.money(x.pipeline)+'</td>'+
       '<td class="num">'+BB.money(x.confirmed)+'</td>'+
+      '<td class="num">'+BB.money(x.total-x.confirmed-x.pipeline)+'</td>'+
+      '<td class="num">'+BB.money(x.pipeline)+'</td>'+
       '<td class="num"><b>'+BB.money(x.total)+'</b></td></tr>';
   });
-  sideTbl += '</tbody><tfoot><tr><td>All reps</td><td class="num">'+repRows.reduce(function(t,x){return t+x.count;},0)+'</td><td class="num">'+BB.money(pipelineVal)+'</td><td class="num">'+BB.money(confirmedVal)+'</td><td class="num">'+BB.money(totalVal)+'</td></tr></tfoot></table></div></div>';
+  sideTbl += '</tbody><tfoot><tr><td>All reps</td><td class="num">'+repRows.reduce(function(t,x){return t+x.count;},0)+'</td><td class="num">'+BB.money(confirmedVal)+'</td><td class="num">'+BB.money(awaitVal)+'</td><td class="num">'+BB.money(pipelineVal)+'</td><td class="num">'+BB.money(totalVal)+'</td></tr></tfoot></table></div></div>';
 } else {
   sideTbl = '<div class="card"><div class="card-h"><div><h3>Your products</h3><div class="sub">order value per product, this season</div></div></div><div class="card-p"><div id="chProd"></div></div></div>';
 }
@@ -197,13 +210,13 @@ try{
   if(hi-lo<5) lo=Math.max(0, hi-5);
   var span=[]; for(var mi=lo; mi<=hi; mi++) span.push(byMonth[mi]);
   BB.chart.bar('#chMonth',{ labels:span.map(function(m){ return BB.monthName(m.i); }), money:true, stacked:true, height:240, table:true,
-    series:[{name:'Confirmed',values:span.map(function(m){return m.confirmed;}),color:'#22431a'},{name:'Not yet confirmed',values:span.map(function(m){return m.forecast;}),color:'#68a53e'}],
+    series:[{name:'Confirmed',values:span.map(function(m){return m.confirmed;}),color:'#22431a'},{name:'Awaiting stock',values:span.map(function(m){return m.awaiting;}),color:'#c77d17'},{name:'Pipeline',values:span.map(function(m){return m.forecast;}),color:'#68a53e'}],
     detail:function(ctx){ var mi=span[ctx.index].i, list=orders.filter(function(o){ return o.deliverMonth===mi; });
       var cv=list.filter(isConfirmed).reduce(function(t,o){ return t+d.orderValue(o); },0);
-      return merge(orderTable(list), { stats:[{ l:'Booked', v:BB.money(ctx.total), s:list.length+' order'+(list.length===1?'':'s') }, { l:'Confirmed', v:BB.money(cv) }, { l:'Not yet confirmed', v:BB.money(ctx.total-cv) }] }); } });
+      return merge(orderTable(list), { stats:[{ l:'Booked', v:BB.money(ctx.total), s:list.length+' order'+(list.length===1?'':'s') }, { l:'Confirmed', v:BB.money(cv) }, { l:'Awaiting stock', v:BB.money(list.filter(isAwaiting).reduce(function(t,o){ return t+d.orderValue(o); },0)) }, { l:'Pipeline', v:BB.money(list.filter(isPipeline).reduce(function(t,o){ return t+d.orderValue(o); },0)) }] }); } });
   if(isAdvisor){
-    if(totalVal) BB.chart.donut('#chSide',{ money:true, centreLabel:'your book', rows:[{label:'Confirmed',value:confirmedVal,color:'#22431a'},{label:'Not yet confirmed',value:totalVal-confirmedVal,color:'#68a53e'}],
-      detail:function(ctx){ var list=orders.filter(function(o){ return ctx.row.label==='Confirmed'? isConfirmed(o) : !isConfirmed(o); });
+    if(totalVal) BB.chart.donut('#chSide',{ money:true, centreLabel:'your book', rows:[{label:'Confirmed',value:confirmedVal,color:'#22431a'},{label:'Awaiting stock',value:awaitVal,color:'#c77d17'},{label:'Pipeline',value:pipelineVal,color:'#68a53e'}],
+      detail:function(ctx){ var list=orders.filter(ctx.row.label==='Confirmed'? isConfirmed : ctx.row.label==='Awaiting stock'? isAwaiting : isPipeline);
         return merge(orderTable(list), { stats:[{ l:'Value', v:BB.money(ctx.value), s:list.length+' order'+(list.length===1?'':'s') }, { l:'Share', v:(ctx.total?Math.round(ctx.value/ctx.total*100):0)+'%', s:'of your book' }] }); } });
     else document.getElementById('chSide').innerHTML='<div class="empty">No orders yet.</div>';
     var pr={};

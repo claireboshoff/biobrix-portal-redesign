@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Depots · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .dep-ic{width:44px;height:44px;border-radius:11px;background:#eef4e4;color:var(--green-dark);display:flex;align-items:center;justify-content:center;flex:none;}
   .dep-ic.sm{width:36px;height:36px;border-radius:9px;}
@@ -296,7 +296,7 @@ function render(){
 function wire(){
   Array.prototype.forEach.call(document.querySelectorAll('tr[data-job]'), function(tr){ tr.onclick=function(){ var b=d.by('blending', tr.getAttribute('data-job')); if(b) BB.popup(jobCard(b)); }; });
   var at=document.getElementById('addTask'); if(at) at.onclick=function(){ var txt=document.getElementById('newTask').value.trim(); if(!txt){ BB.toast('Type the task first'); return; } d.add('depotTasks',{ depot:this.dataset.depot, text:txt, by:BB.user.id, due:document.getElementById('newTaskDue').value||null, status:'Open' }); BB.toast('Task added · depot group updated'); render(); };
-  Array.prototype.forEach.call(document.querySelectorAll('button[data-taskdone]'), function(b){ b.onclick=function(e){ e.stopPropagation(); d.update('depotTasks', this.dataset.taskdone, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Done'); render(); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('button[data-taskdone]'), function(b){ b.onclick=function(e){ e.stopPropagation(); var tid=this.dataset.taskdone, undo=BB.snapshot('depotTasks', tid); d.update('depotTasks', tid, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Task done', { undo:function(){ undo(); render(); }, undone:'Task is open again' }); render(); }; });
   var nt=document.getElementById('newTask'); if(nt) nt.onclick=function(e){ e.stopPropagation(); };
   Array.prototype.forEach.call(document.querySelectorAll('.depot-card[data-depot]'), function(card){
     card.onclick = function(){

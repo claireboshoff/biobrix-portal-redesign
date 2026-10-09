@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Team feed · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .feed-grid{display:grid;gap:16px;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start;margin-top:14px;}
   .feed-side{position:sticky;top:76px;display:flex;flex-direction:column;gap:16px;}
@@ -125,7 +125,7 @@ function farmPop(id){
     meta:[ f.name&&f.name!==f.farm?{ icon:'user', text:f.name, tip:'Farmer' }:null, place?{ icon:'map', text:place, tip:'Town' }:null,
       (f.crops||[]).length?{ icon:'sprout', text:f.crops.join(', ')+(f.ha?' · '+BB.num(f.ha)+' ha':''), tip:'Crops' }:null,
       repMeta(d.rep(f.rep), 'Advisor'), tel?{ icon:'phone', tip:'Phone', html:'<a href="tel:+'+tel+'">'+BB.esc(f.cell)+'</a>' }:null ],
-    stats:[{ l:'Status', html:BB.statusBadge(f.status||'—') }, { l:'Balance', v:BB.money(bal), s:lim?'limit '+BB.money(lim):null, cls:lim&&bal>lim?'warn':'' },
+    stats:[{ l:'Status', html:BB.farmBadge(f) }, { l:'Balance', v:BB.money(bal), s:lim?'limit '+BB.money(lim):null, cls:lim&&bal>lim?'warn':'' },
       { l:'Orders', v:BB.num(os.length), s:os.length?BB.money(os.reduce(function(t,o){ return t+d.orderValue(o); },0)):'none yet' }, { l:'In the feed', v:posts, s:'update'+(posts===1?'':'s') }],
     table:os.length?orderRows(os):null,
     actions:[ rec?{ label:'Farm record', href:rec, primary:true }:null ].filter(Boolean) });

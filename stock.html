@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Stock · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   /* phones: the count comes first; Depot, Reorder at, Level and Status live in the line's card */
   @media(max-width:700px){ [data-stock-table] .ph-x{display:none;} [data-stock-table] td.num .row{flex-wrap:wrap !important;justify-content:flex-end;} [data-stock-table] .cnt-in{width:92px;} [data-stock-table] .scroll{overflow-x:visible;} }
@@ -17,7 +17,12 @@
   .take-in{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:18px 20px;}
   .take-ic{width:40px;height:40px;border-radius:10px;background:#eef4e4;color:var(--green-dark);display:flex;align-items:center;justify-content:center;flex:none;}
   .take h3{font-family:var(--display);font-size:1.04rem;font-weight:600;color:var(--green-darkest);}
-  .take-act{display:flex;gap:8px;flex-wrap:wrap;align-self:center;}
+  .take-act{display:flex;gap:8px;flex-wrap:wrap;align-self:center;align-items:center;}
+  .take.on{border-left-color:var(--amber);}
+  .take-trk{height:6px;border-radius:4px;background:#eef1e8;margin-top:8px;max-width:420px;overflow:hidden;}
+  .take-trk i{display:block;height:100%;background:var(--green-bright);border-radius:4px;transition:width .2s;}
+  tr.r-counted td:first-child{box-shadow:inset 3px 0 0 var(--green-bright);}
+  .cnt-blind{color:var(--faint);font-size:.78rem;}
   .lvl .trk{position:relative;overflow:visible;height:7px;}
   .lvl .trk i{border-radius:4px;}
   .lvl .trk b{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--green-darkest);opacity:.45;}
@@ -25,7 +30,9 @@
   table.bb tr.r-low td:first-child{box-shadow:inset 3px 0 0 var(--amber);} table.bb tr.r-out td:first-child{box-shadow:inset 3px 0 0 var(--red);}
   .cnt-in{width:88px;padding:7px 9px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:8px;text-align:right;background:#fff;}
   .cnt-in:focus{outline:none;border-color:var(--green-bright);box-shadow:0 0 0 3px rgba(104,165,62,.15);}
-  @media(max-width:560px){ .lvl-col{display:none;} .take-act{width:100%;} .take-act .btn{flex:1 1 auto;} }
+  @media(max-width:560px){ .lvl-col{display:none;} .take-act{width:100%;} .take-act .btn{flex:1 1 auto;}
+    td.num > .row{flex-wrap:wrap !important;gap:6px !important;}
+    [data-stock-table] th:last-child{min-width:120px !important;} }
 </style>
 </head>
 <body>
@@ -89,13 +96,82 @@ function lineTable(list, opts){ opts=opts||{}; var withDep=!scopeDepot && opts.d
       onClick:function(){ openLine(i.depot, i.prod); } }; }) };
 }
 // the same as the table's Reorder button: a request to the product's supplier
-function reorder(prodId){ var sup=d.supplier(d.product(prodId).supplier)||{}; BB.toast('Reorder raised with '+(sup.name||'the supplier')); }
+// A reorder is a purchase request on record (Suppliers & POs turns it into the order), so a
+// second tap finds the first instead of raising a duplicate.
+function openRequest(depotId, prodId){ return d.all('purchaseOrders').filter(function(po){ return po.depot===depotId && po.status!=='Delivered' && po.status!=='Received' && (po.lines||[]).some(function(l){ return l.prod===prodId; }); })[0]||null; }
+function reorder(depotId, prodId){
+  var have=openRequest(depotId, prodId), p=d.product(prodId), sup=d.supplier(p.supplier)||{};
+  if(have){ BB.toast(p.name+' is already '+have.status.toLowerCase()+' · '+BB.shortDate(have.date)); return; }
+  var row=findLine(depotId, prodId), qty=row? Math.max(row.reorder, row.reorder*2-row.qty) : 0;
+  var po=d.add('purchaseOrders', { supplier:p.supplier, depot:depotId, date:new Date().toISOString().slice(0,10), status:'Requested', eta:null,
+    by:(BB.user.rep||BB.user.id), lines:[{ prod:prodId, qty:qty }] });
+  BB.toast('Reorder requested · '+BB.num(qty)+' '+(p.unit||'')+' '+p.name+' from '+(sup.name||'the supplier'), { undo:function(){ d.remove('purchaseOrders', po.id); render(); }, undone:'Reorder request withdrawn' });
+  render();
+}
+function requestedTag(po){ return '<span class="tag" data-tip="'+BB.esc(po.status+' on '+BB.date(po.date))+'" style="white-space:nowrap;">'+BB.icon('check')+BB.esc(po.status)+' · '+BB.esc(BB.shortDate(po.date))+'</span>'; }
 // the same as typing a count in the table: save it, and queue it for the office
-function saveCount(depotId, prodId, value){
+// A big change gets a second look: a line counted as empty, or off by more than half.
+function bigChange(was, now){ return was!==now && ((now===0 && was>0) || (was>0 && Math.abs(now-was)/was>0.5)); }
+function saveCount(depotId, prodId, value, after){
   var row=findLine(depotId, prodId); if(!row) return;
-  row.qty=Math.max(0, Math.round(Number(value)||0)); d.save();
-  d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:row.qty });
-  BB.toast('Count saved · '+d.product(prodId).name);
+  var was=row.qty, now=Math.max(0, Math.round(Number(value)||0)), p=d.product(prodId), u=p.unit||'';
+  if(now===was){ if(after) after(); return; }
+  var go=function(){
+    row.qty=now; d.save();
+    d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:now });
+    BB.toast(p.name+' · '+BB.num(was)+' → '+BB.num(now)+' '+u, { undo:function(){ row.qty=was; d.save(); d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:was }); render(); }, undone:p.name+' is back to '+BB.num(was)+' '+u });
+    render(); if(after) after();
+  };
+  if(!bigChange(was, now)){ go(); return; }
+  BB.confirm(now===0? 'Count '+p.name+' as empty? The system has '+BB.num(was)+' '+u+'.' : p.name+' goes from '+BB.num(was)+' to '+BB.num(now)+' '+u+'. Is that what is on the shelf?',
+    { title: now===0? 'Nothing on the shelf?' : 'That is a big change', ok:'Yes, save it' }).then(function(yes){ if(yes) go(); else render(); });
+}
+
+// ---- the stock take: counted blind, line by line, and reviewed before it is saved ----
+// Counts start empty and the system figure stays hidden, so people count the shelf instead of
+// agreeing with the screen. Progress is kept on the device, so a take survives a dropped signal.
+function takeDepot(){ return scopeDepot || (filter!=='all'? filter : null); }
+function getTake(dep){ try{ return dep? JSON.parse(localStorage.getItem('bb_take_'+dep)) : null; }catch(e){ return null; } }
+function putTake(dep, t){ try{ if(t) localStorage.setItem('bb_take_'+dep, JSON.stringify(t)); else localStorage.removeItem('bb_take_'+dep); }catch(e){} }
+function takeLines(dep){ return d.store().inventory.filter(function(i){ return i.depot===dep; }); }
+function takeProgress(dep){ var t=getTake(dep), ls=takeLines(dep); return { n:ls.length, c:t? ls.filter(function(i){ return t.counts[i.prod]!=null; }).length : 0 }; }
+function recordTakeCount(dep, prodId, value){
+  var t=getTake(dep); if(!t) return;
+  if(value===''||value==null) delete t.counts[prodId]; else t.counts[prodId]=Math.max(0, Math.round(Number(value)||0));
+  putTake(dep, t);
+  var pr=takeProgress(dep), el=document.getElementById('takeProg'), bar=document.getElementById('takeBar');
+  if(el) el.textContent=pr.c+' of '+pr.n+' counted'; if(bar) bar.style.width=(pr.n? pr.c/pr.n*100 : 0)+'%';
+  var inp=document.querySelector('input[data-count="'+dep+'|'+prodId+'"]'); if(inp){ var tr=inp.closest('tr'); if(tr) tr.classList.toggle('r-counted', t.counts[prodId]!=null); }
+}
+function finishTake(dep){
+  var t=getTake(dep); if(!t) return;
+  var ls=takeLines(dep), changes=[], missed=[], same=0;
+  ls.forEach(function(i){ var c=t.counts[i.prod]; if(c==null){ missed.push(i); return; } if(c===i.qty) same++; else changes.push({ i:i, was:i.qty, now:c, big:bigChange(i.qty, c) }); });
+  changes.sort(function(a,b){ return (b.big?1:0)-(a.big?1:0) || Math.abs(b.now-b.was)-Math.abs(a.now-a.was); });
+  var nBig=changes.filter(function(c){ return c.big; }).length, dn=d.depot(dep).name;
+  BB.popup({ wide:true, eyebrow:'Stock take · '+dn, title:'Check before saving',
+    stats:[{ l:'Counted', v:(ls.length-missed.length)+' of '+ls.length }, { l:'Match', v:BB.num(same) }, { l:'Changed', v:BB.num(changes.length) }, { l:'Check these', v:BB.num(nBig), cls:nBig?'warn':'' }],
+    html:(missed.length? '<div class="bbp-alert warn">'+BB.icon('alert')+'<span>'+missed.length+' line'+(missed.length===1?' is':'s are')+' not counted and keep'+(missed.length===1?'s its':' their')+' current figure'+(missed.length===1?'':'s')+': '+BB.esc(missed.map(function(i){ return shortName(d.product(i.prod).name); }).join(', '))+'</span></div>' : '')+
+      (changes.length? '' : '<div class="faint" style="padding:6px 2px;">Every line you counted matches the system.</div>'),
+    table: changes.length? { title:'What changes', columns:['Product','System','Counted','Change'], num:[1,2,3],
+      rows:changes.map(function(c){ var p=d.product(c.i.prod), df=c.now-c.was;
+        return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b>'+(c.big?' <span class="badge b-warn">'+(c.now===0?'empty':'check')+'</span>':'') }, BB.num(c.was), { html:'<b>'+BB.num(c.now)+'</b>' }, (df>0?'+':'−')+BB.num(Math.abs(df))+' '+(p.unit||'')] }; }) } : null,
+    actions:[ { label:'Keep counting', close:true }, { label:'Save the take', primary:true, onClick:function(){ BB.closePopup(); saveTake(dep, t, changes); } } ] });
+}
+function saveTake(dep, t, changes){
+  var before=changes.map(function(c){ return { i:c.i, was:c.was }; }), n=Object.keys(t.counts).length;
+  takeLines(dep).forEach(function(i){ var c=t.counts[i.prod]; if(c==null) return; var moved=c!==i.qty; i.qty=c;
+    d.enqueue({ op:'stocktake', table:'inventory', depot:dep, prod:i.prod, qty:c, confirmed:!moved }); });
+  d.save();
+  var when=new Date(), stamp=when.toLocaleDateString('en-ZA',{day:'numeric',month:'short'})+' '+when.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+  var note=n+' line'+(n===1?'':'s')+' counted, '+(changes.length? changes.length+' changed' : 'nothing changed');
+  var prevLast=null; try{ prevLast=localStorage.getItem('bb_stocktake_'+dep); localStorage.setItem('bb_stocktake_'+dep, JSON.stringify({ when:stamp, by:BB.user.name, note:note })); }catch(e){}
+  var fed=d.add('feed', { from:BB.user.id, date:when.toISOString().slice(0,10), kind:'Stock', farmer:null, ref:null, text:'Stock take done at '+d.depot(dep).name+' — '+note+'.' });
+  putTake(dep, null);
+  BB.toast('Stock take saved · '+note, { undo:function(){
+    before.forEach(function(b){ b.i.qty=b.was; d.enqueue({ op:'stocktake', table:'inventory', depot:dep, prod:b.i.prod, qty:b.was }); }); d.save();
+    d.remove('feed', fed.id); try{ if(prevLast) localStorage.setItem('bb_stocktake_'+dep, prevLast); else localStorage.removeItem('bb_stocktake_'+dep); }catch(e){}
+    putTake(dep, t); render(); }, undone:'Take reopened — the counts are back as they were' });
   render();
 }
 // the same product at the other depots (the product is the card's title, so no Product column)
@@ -109,6 +185,17 @@ function openLine(depotId, prodId){
   var p=d.product(i.prod), sup=d.supplier(p.supplier)||{}, u=p.unit||'', low=i.qty<i.reorder;
   var others=scopeDepot? [] : d.store().inventory.filter(function(x){ return x.prod===i.prod && x.depot!==i.depot; });
   var net=others.reduce(function(t,x){ return t+(x.qty||0); }, i.qty||0);
+  // during a take this depot's figures stay hidden: the card shows the count, not the system
+  var tk=getTake(i.depot);
+  if(tk){ var tc=tk.counts[i.prod];
+    BB.popup({ eyebrow:'Stock take · counting blind', title:p.name,
+      meta:[{ icon:'warehouse', text:d.depot(i.depot).name, tip:'Depot' }, { icon:'package', text:[p.code, p.pack].filter(Boolean).join(' · '), tip:'Code · pack' }],
+      html:'<div class="bbp-tt">Counted on the floor</div><div class="bbp-bar"><input type="number" min="0" inputmode="numeric" placeholder="Count" value="'+(tc!=null?tc:'')+'" class="cnt-in" style="width:110px;flex:none;" data-linecount="1" aria-label="Count for '+BB.esc(p.name)+'"><span class="faint">'+BB.esc(u)+'</span><span class="sp"></span>'+
+        '<button class="btn sm" data-linesave="1">'+BB.icon('check')+'Save count</button></div><div class="faint" style="font-size:.8rem;margin-top:8px;">The system figure shows again when the take is saved.</div>',
+      onOpen:function(body){ var inp=body.querySelector('input[data-linecount]'), btn=body.querySelector('button[data-linesave]');
+        var sv=function(){ if(String(inp.value).trim()===''){ BB.toast('Type the count — 0 if the shelf is empty'); return; } recordTakeCount(i.depot, i.prod, inp.value); BB.closePopup(); BB.toast('Counted · '+p.name); };
+        btn.onclick=sv; inp.onkeydown=function(e){ if(e.key==='Enter') sv(); }; setTimeout(function(){ inp.focus(); }, 60); } });
+    return; }
   var alert=i.qty<=0 ? '<div class="bbp-alert">'+BB.icon('alert')+'Out of stock — reorder level is '+BB.num(i.reorder)+' '+BB.esc(u)+'</div>'
     : low ? '<div class="bbp-alert warn">'+BB.icon('alert')+'Below reorder — '+BB.num(i.qty)+' of '+BB.num(i.reorder)+' '+BB.esc(u)+' on hand</div>' : '';
   var count='<div class="bbp-tt">Stock take</div><div class="bbp-bar"><span class="faint">Counted on the floor</span><span class="sp"></span>'+
@@ -121,15 +208,18 @@ function openLine(depotId, prodId){
     meta:[{ icon:'warehouse', text:d.depot(i.depot).name, tip:'Depot' }, { icon:'package', text:[p.code, p.pack].filter(Boolean).join(' · '), tip:'Code · pack' },
       sup.name? { icon:'link', text:sup.name+(sup.lead?' · '+sup.lead+' days lead':''), tip:'Supplier', href:can('suppliers.html')?'suppliers.html':null } : null],
     stats:stats,
-    html:alert+(others.length? '' : count),
+    html:alert+(others.length? '' : count)+(low && openRequest(i.depot, i.prod)? '<div class="faint" style="margin-top:10px;">Reorder '+requestedTag(openRequest(i.depot, i.prod))+'</div>' : ''),
     table:others.length? otherDepots(others) : null,
     note:null,
-    actions:[go('Suppliers & POs','suppliers.html'), low? { label:'Reorder', primary:true, onClick:function(){ reorder(i.prod); } } : null],
+    actions:[go('Suppliers & POs','suppliers.html'), low && !openRequest(i.depot, i.prod)? { label:'Reorder', primary:true, onClick:function(){ BB.closePopup(); reorder(i.depot, i.prod); } } : null],
     onOpen:function(body){
       // with other depots listed, the count sits under them
       if(others.length){ var m=body.querySelector('.bbp-split .main'); if(m) m.insertAdjacentHTML('beforeend', count); }
       var inp=body.querySelector('input[data-linecount]'), btn=body.querySelector('button[data-linesave]');
-      var save=function(){ var dep=i.depot, pr=i.prod; saveCount(dep, pr, inp.value); BB.closePopup(); setTimeout(function(){ openLine(dep, pr); }, 170); };
+      var save=function(){ var dep=i.depot, pr=i.prod;
+        if(String(inp.value).trim()===''){ inp.value=i.qty; BB.toast('Count left as '+i.qty+' — type 0 if the shelf is empty'); return; }
+        if(getTake(dep)){ recordTakeCount(dep, pr, inp.value); BB.closePopup(); render(); BB.toast('Counted · '+d.product(pr).name); return; }
+        saveCount(dep, pr, inp.value, function(){ BB.closePopup(); setTimeout(function(){ openLine(dep, pr); }, 170); }); };
       if(btn) btn.onclick=save;
       if(inp) inp.onkeydown=function(e){ if(e.key==='Enter') save(); };
     } });
@@ -195,24 +285,33 @@ function render(){
 
   if(!phone) html += picHtml;
 
-  // ---- STOCK TAKE — one tap when nothing moved, voice when it did --------
+  // ---- STOCK TAKE — counted blind, reviewed, then saved ----------------------
+  var tDep = takeDepot(), take = getTake(tDep), prog = take? takeProgress(tDep) : null;
   var lastTake = null; try{ lastTake = JSON.parse(localStorage.getItem('bb_stocktake_'+(scopeDepot||filter))); }catch(e){}
   var rmode=''; try{ rmode=localStorage.getItem('bb_reorder_mode')||'notify'; }catch(e){}
-  html += '<div class="card take" id="takeCard" style="margin-top:16px;">'+
+  // the standing order behind low stock is ops' and the director's call, not a depot's
+  var canAuto = BB.user && (BB.user.roleKey==='director' || BB.user.roleKey==='operations');
+  html += '<div class="card take'+(take?' on':'')+'" id="takeCard" style="margin-top:16px;">'+
     '<div class="take-in">'+
       '<div class="take-ic">'+BB.icon('clipboard')+'</div>'+
-      '<div style="min-width:0;flex:1 1 320px;"><div class="eyebrow" style="margin-bottom:2px;">Stock take</div>'+
-        '<h3>'+(scopeDepot?BB.esc(d.depot(scopeDepot).name):(filter==='all'?'Choose a depot below':BB.esc(d.depot(filter).name)))+' · '+all.length+' lines</h3>'+
-        '<p class="muted" style="font-size:.84rem;margin-top:3px;max-width:560px;">Walk the shelves. If every count matches what is on the screen, one tap closes the take. If something moved, say it or type it in the table below.</p>'+
-        (lastTake?'<div class="faint" style="font-size:.76rem;margin-top:6px;">Last take: '+BB.esc(lastTake.when)+' by '+BB.esc(lastTake.by)+' · '+BB.esc(lastTake.note)+'</div>':'')+
+      '<div style="min-width:0;flex:1 1 320px;"><div class="eyebrow" style="margin-bottom:2px;">'+(take?'Stock take in progress':'Stock take')+'</div>'+
+        '<h3>'+(tDep?BB.esc(d.depot(tDep).name):'Choose a depot below')+' · '+(take? '<span id="takeProg">'+prog.c+' of '+prog.n+' counted</span>' : all.length+' lines')+'</h3>'+
+        (take? '<div class="take-trk"><i id="takeBar" style="width:'+(prog.n?prog.c/prog.n*100:0)+'%"></i></div>'+
+               '<p class="muted" style="font-size:.84rem;margin-top:6px;max-width:560px;">Count each shelf and type or say what is there. The system figures stay hidden until you finish, so the count is what is really on the floor.</p>'
+             : '<p class="muted" style="font-size:.84rem;margin-top:3px;max-width:560px;">Start a take to count every line blind, then check what changed before it is saved. To correct one line, type its count in the table.</p>')+
+        (lastTake&&!take?'<div class="faint" style="font-size:.76rem;margin-top:6px;">Last take: '+BB.esc(lastTake.when)+' by '+BB.esc(lastTake.by)+' · '+BB.esc(lastTake.note)+'</div>':'')+
       '</div>'+
       '<div class="take-act">'+
-        '<button class="btn lime" id="takeVoice" title="Say the product and the count">'+BB.icon('mic')+'Say a count</button>'+
-        '<button class="btn" id="takeSame">'+BB.icon('check')+'Nothing has changed</button>'+
+        (take? '<button class="btn lime" id="takeVoice" title="Say the product and the count">'+BB.icon('mic')+'Say a count</button>'+
+               '<button class="btn" id="takeFinish">'+BB.icon('check')+'Finish and check</button>'+
+               '<button class="btn ghost sm" id="takeCancel">Cancel take</button>'
+             : '<button class="btn" id="takeStart">'+BB.icon('clipboard')+'Start stock take</button>'+
+               '<button class="btn ghost sm" id="takeSame" data-tip="Only after walking every shelf">Nothing has changed</button>')+
       '</div>'+
     '</div>'+
     '<div class="card-f row" style="gap:8px;"><span class="faint" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Below reorder</span>'+
-      '<span class="seg"><button class="tog'+(rmode==='notify'?' on':'')+'" data-rmode="notify">Notify Renzie</button><button class="tog'+(rmode==='auto'?' on':'')+'" data-rmode="auto">Auto-raise PO</button></span></div>'+
+      (canAuto? '<span class="seg"><button class="tog'+(rmode==='notify'?' on':'')+'" data-rmode="notify">Notify Renzie</button><button class="tog'+(rmode==='auto'?' on':'')+'" data-rmode="auto">Auto-raise PO</button></span>'
+              : '<span class="faint" style="font-size:.8rem;">'+(rmode==='auto'?'a purchase order is raised automatically':'Renzie is notified to reorder')+' · set by Operations</span>')+'</div>'+
     '<div id="takeVoiceOut" style="display:none;margin:0 20px 16px;padding:12px 14px;border-radius:10px;background:#f7faf1;border:1px solid var(--line);font-size:.86rem;"></div>'+
   '</div>';
 
@@ -239,17 +338,19 @@ function render(){
       var p = d.product(i.prod);
       var st = statusOf(i);
       var low = st!=='In stock';
-      var rowCls = st==='Out of stock' ? 'r-out' : (st==='Low stock' ? 'r-low' : '');
+      var blind = !!(take && i.depot===tDep), tc = blind? take.counts[i.prod] : null;
+      var rowCls = blind? (tc!=null?'r-counted':'') : st==='Out of stock' ? 'r-out' : (st==='Low stock' ? 'r-low' : '');
+      var req = low && !blind ? openRequest(i.depot, i.prod) : null;
       html += '<tr class="'+rowCls+'">'+
         '<td><a href="#" data-line="'+i.depot+'|'+i.prod+'" style="color:var(--green-dark);font-weight:700;">'+BB.esc(p.name)+'</a><div class="faint" style="font-size:.72rem;">'+BB.esc(p.code)+' · '+BB.esc(p.pack)+'</div></td>'+
         (scopeDepot?'':'<td class="muted ph-x">'+BB.esc(d.depot(i.depot).name)+'</td>')+
-        '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>'+
+        (blind? '<td class="num"><span class="cnt-blind">hidden</span></td>' : '<td class="num"><b>'+BB.num(i.qty)+'</b> <span class="faint" style="font-size:.72rem;">'+BB.esc(p.unit||'')+'</span></td>')+
         '<td class="num muted ph-x">'+BB.num(i.reorder)+'</td>'+
-        '<td class="lvl-col ph-x">'+levelCell(i.qty, i.reorder)+'</td>'+
-        '<td class="ph-x">'+BB.statusBadge(st)+'</td>'+
+        '<td class="lvl-col ph-x">'+(blind? '<span class="cnt-blind">after the take</span>' : levelCell(i.qty, i.reorder))+'</td>'+
+        '<td class="ph-x">'+(blind? (tc!=null? '<span class="badge b-ok">Counted</span>' : '<span class="badge b-grey">To count</span>') : BB.statusBadge(st))+'</td>'+
         '<td class="num"><div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:nowrap;">'+
-          (low ? '<button class="btn ghost sm" data-reorder="'+i.depot+'|'+i.prod+'">Reorder</button>' : '')+
-          '<input type="number" min="0" value="'+i.qty+'" data-count="'+i.depot+'|'+i.prod+'" class="cnt-in" aria-label="Count for '+BB.esc(p.name)+'">'+
+          (req ? requestedTag(req) : (low && !blind) ? '<button class="btn ghost sm" data-reorder="'+i.depot+'|'+i.prod+'">Reorder</button>' : '')+
+          '<input type="number" min="0" inputmode="numeric" '+(blind? 'placeholder="Count" value="'+(tc!=null?tc:'')+'"' : 'value="'+i.qty+'"')+' data-count="'+i.depot+'|'+i.prod+'" class="cnt-in" aria-label="Count for '+BB.esc(p.name)+'">'+
         '</div></td>'+
       '</tr>';
     });
@@ -305,18 +406,32 @@ function drawCharts(all, oneDepot){
 
 function wire(){
   Array.prototype.forEach.call(document.querySelectorAll('.tog[data-rmode]'), function(c){ c.onclick=function(){ try{ localStorage.setItem('bb_reorder_mode', this.dataset.rmode); }catch(e){} BB.toast(this.dataset.rmode==='auto'?'Below reorder → purchase order raised automatically with the supplier':'Below reorder → Renzie is notified to reorder'); render(); }; });
-  // one-tap stock take — everything matches
+  var tStart=document.getElementById('takeStart'), tFin=document.getElementById('takeFinish'), tCan=document.getElementById('takeCancel');
+  if(tStart) tStart.onclick=function(){
+    var dep=takeDepot(); if(!dep){ BB.toast('Pick a depot first'); return; }
+    putTake(dep, { started:new Date().toISOString(), by:BB.user.name, counts:{} }); render();
+    var t=document.querySelector('[data-stock-table]'); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
+  };
+  if(tFin) tFin.onclick=function(){ var dep=takeDepot(); var pr=takeProgress(dep); if(!pr.c){ BB.toast('Nothing counted yet — type a count in the table'); return; } finishTake(dep); };
+  if(tCan) tCan.onclick=function(){ var dep=takeDepot(), pr=takeProgress(dep);
+    var stop=function(){ putTake(dep, null); render(); BB.toast('Stock take cancelled — nothing was changed'); };
+    if(!pr.c){ stop(); return; }
+    BB.confirm('Throw away the '+pr.c+' count'+(pr.c===1?'':'s')+' so far? Nothing has been saved to stock yet.', { title:'Cancel the take', ok:'Throw them away', cancel:'Keep counting' }).then(function(y){ if(y) stop(); }); };
+  // everything matches — a deliberate second step, not one tap
   var same=document.getElementById('takeSame');
   if(same) same.onclick=function(){
-    var dep = scopeDepot || (filter!=='all'?filter:null);
+    var dep = takeDepot();
     if(!dep){ BB.toast('Pick a depot first'); return; }
-    var rows = d.store().inventory.filter(function(i){ return i.depot===dep; });
-    var when = new Date(); var stamp = when.toLocaleDateString('en-ZA',{day:'numeric',month:'short'})+' '+when.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
-    rows.forEach(function(i){ d.enqueue({ op:'stocktake', table:'inventory', depot:dep, prod:i.prod, qty:i.qty, confirmed:true }); });
-    try{ localStorage.setItem('bb_stocktake_'+dep, JSON.stringify({ when:stamp, by:BB.user.name, note:rows.length+' lines confirmed, no changes' })); }catch(e){}
-    d.add('feed', { from:BB.user.id, date:when.toISOString().slice(0,10), kind:'Stock', farmer:null, ref:null, text:'Stock take done at '+d.depot(dep).name+' — '+rows.length+' lines counted, nothing changed.' });
-    BB.toast('Stock take closed · '+rows.length+' lines confirmed');
-    render();
+    var rows = takeLines(dep);
+    BB.confirm('Confirm all '+rows.length+' lines at '+d.depot(dep).name+' as they stand, without counting? Only do this after walking every shelf.', { title:'Nothing has changed?', ok:'Confirm all '+rows.length }).then(function(yes){
+      if(!yes) return;
+      var when = new Date(); var stamp = when.toLocaleDateString('en-ZA',{day:'numeric',month:'short'})+' '+when.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+      rows.forEach(function(i){ d.enqueue({ op:'stocktake', table:'inventory', depot:dep, prod:i.prod, qty:i.qty, confirmed:true }); });
+      try{ localStorage.setItem('bb_stocktake_'+dep, JSON.stringify({ when:stamp, by:BB.user.name, note:rows.length+' lines confirmed, no changes' })); }catch(e){}
+      d.add('feed', { from:BB.user.id, date:when.toISOString().slice(0,10), kind:'Stock', farmer:null, ref:null, text:'Stock take done at '+d.depot(dep).name+' — '+rows.length+' lines confirmed, nothing changed.' });
+      BB.toast('Stock take closed · '+rows.length+' lines confirmed');
+      render();
+    });
   };
   // voice count — "SoilPrime six hundred and forty" / "HumiMax 220"
   var vb=document.getElementById('takeVoice'), vo=document.getElementById('takeVoiceOut');
@@ -361,12 +476,12 @@ function wire(){
     });
     var qty=wordsToNumber(low);
     if(!best || qty==null){ vo.innerHTML='<b>Heard</b> “'+BB.esc(t)+'” — <span class="muted">couldn’t match a product and a number. Try “SoilPrime 640”.</span>'; return; }
-    var p=d.product(best.prod); var was=best.qty;
-    best.qty=Math.max(0,Math.round(qty)); d.save();
-    d.enqueue({ op:'stocktake', table:'inventory', depot:best.depot, prod:best.prod, qty:best.qty, via:'voice' });
-    BB.toast('Counted · '+p.name+' '+BB.num(best.qty));
-    render();
-    var vo2=document.getElementById('takeVoiceOut'); if(vo2){ vo2.style.display='block'; vo2.innerHTML='<b>'+BB.esc(p.name)+'</b> updated: '+BB.num(was)+' → <b>'+BB.num(best.qty)+'</b>. Say the next one, or tap <b>Nothing has changed</b> to close the take.'; }
+    var p=d.product(best.prod), n=Math.max(0,Math.round(qty));
+    if(getTake(best.depot)){
+      recordTakeCount(best.depot, best.prod, n); BB.toast('Counted · '+p.name+' '+BB.num(n));
+      var pr=takeProgress(best.depot); vo.innerHTML='<b>'+BB.esc(p.name)+'</b> counted: <b>'+BB.num(n)+'</b>. '+pr.c+' of '+pr.n+' done — say the next one, or tap <b>Finish and check</b>.';
+      return; }
+    saveCount(best.depot, best.prod, n);
   }
   // a product opens its line's card
   Array.prototype.forEach.call(document.querySelectorAll('a[data-line]'), function(a){
@@ -381,25 +496,17 @@ function wire(){
       var parts = inp.getAttribute('data-count').split('|');
       var depotId = parts[0], prodId = parts[1];
       var row = d.store().inventory.find(function(r){ return r.depot===depotId && r.prod===prodId; });
-      if(row && String(inp.value).trim()===''){ inp.value=row.qty; BB.toast('Count left as '+row.qty+' — type 0 if the shelf is empty'); return; }
-      if(row){
-        var val = Math.max(0, Math.round(Number(inp.value)||0));
-        row.qty = val;
-        d.save();
-        d.enqueue({ op:'stocktake', table:'inventory', depot:depotId, prod:prodId, qty:val });
-        BB.toast('Count saved · '+d.product(prodId).name);
-        render();
-      }
+      if(!row) return;
+      if(getTake(depotId)){ recordTakeCount(depotId, prodId, String(inp.value).trim()); return; }
+      if(String(inp.value).trim()===''){ inp.value=row.qty; BB.toast('Count left as '+row.qty+' — type 0 if the shelf is empty'); return; }
+      saveCount(depotId, prodId, inp.value);
     };
   });
   // reorder — raise request with the supplier
   Array.prototype.forEach.call(document.querySelectorAll('button[data-reorder]'), function(btn){
     btn.onclick = function(){
       var parts = btn.getAttribute('data-reorder').split('|');
-      var prodId = parts[1];
-      var p = d.product(prodId);
-      var sup = d.supplier(p.supplier);
-      BB.toast('Reorder raised with '+sup.name);
+      reorder(parts[0], parts[1]);
     };
   });
 }

@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Deliveries · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .side{display:grid;gap:16px;align-content:start;min-width:0;}
   select.adv{padding:6px 8px;font:inherit;font-size:.8rem;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;}
@@ -45,7 +45,7 @@ function depShort(id){ return String(d.depot(id).name||'').replace(/ Depot$/,'')
 function delTable(list, withHold){
   return { columns:['Order','Farmer'].concat(scopeDepot?[]:['Depot']).concat(['Transport','ETA','Status']),
     rows:list.slice().sort(function(a,b){ return String(a.eta).localeCompare(String(b.eta)); }).map(function(x){ var h=withHold&&d.deliveryHold(d.by('orders', x.order));
-      return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(orderRef(x))+'</span>' }, d.farmer(x.farmer).name].concat(scopeDepot?[]:[depShort(x.depot)]).concat([x.transport||'—', BB.date(x.eta),
+      return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(orderRef(x))+'</span>' }, d.farmer(x.farmer).name].concat(scopeDepot?[]:[depShort(x.depot)]).concat([x.transport||'—', { html:BB.etaHtml(x) },
         { html:BB.statusBadge(x.status)+(h?' <span class="tag tag-hold'+(h.sev==='high'?'':' med')+'" data-tip="'+BB.esc(h.reason)+'">'+BB.icon('alert')+'HOLD</span>':'') }]),
         onClick:function(){ openDelivery(x.id); } }; }) };
 }
@@ -64,8 +64,9 @@ function showStatus(st){
   var c=document.getElementById('dlvTable'); if(c) c.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 function advance(id, status){
+  var undo=BB.snapshot('deliveries', id), was=(d.by('deliveries', id)||{}).status;
   d.update('deliveries', id, { status:status });
-  BB.toast('Delivery updated · '+status);
+  BB.toast('Delivery updated · '+status, { undo:function(){ undo(); render(); }, undone:'Delivery is back to '+was });
   render();
 }
 // One delivery: where it is going, how and when — the order's lines beside it. Its status moves
@@ -73,12 +74,12 @@ function advance(id, status){
 function openDelivery(id){
   var x=d.by('deliveries', id); if(!x) return;
   var o=d.by('orders', x.order), f=d.farmer(x.farmer), hold=o&&d.deliveryHold(o), tr=x.transport&&x.transport!=='—'?x.transport:null, fh=farmHref(x.farmer);
-  var lines=o? '<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Value</th></tr></thead><tbody>'+
-    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td class="faint">'+BB.esc(p.pack||'')+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*(l.qty||0))+'</td></tr>'; }).join('')+
+  var lines=o? '<div class="bbp-tt">Products</div><div class="scroll"><table class="bb" data-nofilter="1"><thead><tr><th>Product</th><th>Pack</th><th class="num">Packs</th><th class="num">Value</th></tr></thead><tbody>'+
+    (o.lines||[]).map(function(l){ var p=d.product(l.prod); return '<tr><td><b>'+BB.esc(p.name)+'</b></td><td class="faint">'+BB.esc(p.pack||'')+'</td><td class="num">'+BB.num(l.qty)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div></td><td class="num">'+BB.money((p.price||0)*(l.qty||0))+'</td></tr>'; }).join('')+
     '</tbody><tfoot><tr><td colspan="3">List value</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div>' : '';
   BB.popup({ wide:!!o, layout:o?'split':null, eyebrow:'Delivery', title:o?o.ref:f.name,
     meta:[
-      { icon:'calendar', text:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.date(x.eta), tip:x.status==='Delivered'?'Delivered':'ETA' },
+      { icon:'calendar', html:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.etaHtml(x), tip:x.status==='Delivered'?'Delivered':'ETA' },
       { icon:'warehouse', text:d.depot(x.depot).name, tip:'Depot' },
       { icon:'truck', text:tr||'No transport yet', tip:'Transport', muted:!tr },
       f.farm && f.farm!==f.name ? { icon:'user', text:f.name, tip:'Farmer' } : null,
@@ -142,7 +143,7 @@ function render(){
         '<td style="white-space:nowrap;">'+BB.esc(d.farmer(x.farmer).name)+'</td>'+
         (scopeDepot?'':'<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>')+
         '<td class="muted">'+BB.esc(x.transport)+'</td>'+
-        '<td class="muted" style="white-space:nowrap;">'+BB.date(x.eta)+'</td>'+
+        '<td class="muted" style="white-space:nowrap;">'+BB.etaHtml(x)+'</td>'+
         '<td style="white-space:nowrap;">'+BB.statusBadge(x.status)+holdBadge+'</td>'+
         '<td class="num"><select class="adv" data-del="'+BB.esc(x.id)+'" aria-label="Advance delivery">'+opts+'</select></td>'+
       '</tr>';

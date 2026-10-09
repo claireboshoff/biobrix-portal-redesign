@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Capture an order · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 </head>
 <body>
 <script>
@@ -42,6 +42,7 @@ var css = ''+
 '.transcript .interim{color:var(--faint);}'+
 '.line-row{display:grid;grid-template-columns:1fr 110px 44px;gap:8px;align-items:end;margin-bottom:9px;}'+
 '.line-row .fld{margin-bottom:0;}'+
+'.line-vol{font-size:.76rem;color:var(--muted);margin:-4px 0 10px 2px;min-height:0;}.line-vol:empty{display:none;}'+
 '.line-row > *{min-width:0;}'+
 '.fld-err .bb-sel-btn,.fld-err input{border-color:var(--red) !important;box-shadow:0 0 0 3px rgba(184,56,42,.12);}'+
 '.fld-msg{font-size:.78rem;color:var(--red);margin-top:4px;font-weight:600;}'+
@@ -153,8 +154,14 @@ function parseTranscript(text){
   var m = extractMonth(text); if(m!=null) draft.month = m;
   var qty = extractQty(text);
   var prods = fuzzyProducts(text);
+  // Spoken volumes ("one thousand litres") become packs, rounded up to whole packs.
+  var vol = /\d\s*(l|litres?|liters?|kg|kilos?|kilograms?)\b|\b(litres?|liters?|kilos?|kilograms?)\b/i.test(text);
   if(prods.length){
-    prods.forEach(function(p,idx){ draft.lines.push({ prod:p.id, qty:(idx===0 && qty)?qty:'' }); });
+    prods.forEach(function(p,idx){
+      var q=(idx===0 && qty)?qty:'', z=d.packSize(p.id), note='';
+      if(q && vol && z){ var packs=Math.ceil(q/z.n); note=BB.num(q)+' '+z.u+' heard → '+packs+' pack'+(packs===1?'':'s')+' of '+p.pack; q=packs; }
+      draft.lines.push({ prod:p.id, qty:q, note:note });
+    });
   }
   return draft;
 }
@@ -218,7 +225,7 @@ function renderCapture(){
   html += '<div class="mic-wrap">'+
     '<button class="mic-btn'+(speechOK?'':' off')+'" id="mic" aria-label="Push to talk">'+micFace()+'</button>'+
     '<div class="mic-hint" id="micHint">'+(speechOK?'Tap to speak the order':'Voice needs signal. You can type it in the form and it still saves offline.')+'</div>'+
-    (speechOK?'<div class="mic-eg">e.g. "One thousand litres of SoilPrime for Gideon Joubert, deliver in October"</div>':'')+
+    (speechOK?'<div class="mic-eg">e.g. "Fifty packs of SoilPrime for Gideon Joubert, deliver in October"</div>':'')+
     '<div class="transcript" id="tr" style="display:none;"></div>'+
     '</div>';
   html += '<div class="how">'+
@@ -279,18 +286,26 @@ function renderLines(){
       '</select></div>'+
       '<div class="fld"><input type="number" min="0" data-li="'+i+'" class="lQty" placeholder="Packs" aria-label="Quantity in packs" inputmode="numeric" value="'+(l.qty!==''&&l.qty!=null?l.qty:'')+'"></div>'+
       '<button class="line-del" data-li="'+i+'" title="Remove" aria-label="Remove product">'+X_ICON+'</button>'+
-    '</div>';
+    '</div><div class="line-vol" data-vl="'+i+'">'+volHint(l)+'</div>';
   }).join('');
   Array.prototype.forEach.call(wrap.querySelectorAll('.lProd'), function(sel){
-    sel.onchange=function(){ draft.lines[+this.dataset.li].prod=this.value; refreshTotal(); };
+    sel.onchange=function(){ var l=draft.lines[+this.dataset.li]; l.prod=this.value; l.note=''; showVol(+this.dataset.li); refreshTotal(); };
   });
   Array.prototype.forEach.call(wrap.querySelectorAll('.lQty'), function(inp){
-    inp.oninput=function(){ draft.lines[+this.dataset.li].qty=this.value===''?'':Number(this.value); refreshTotal(); };
+    inp.oninput=function(){ var l=draft.lines[+this.dataset.li]; l.qty=this.value===''?'':Number(this.value); l.note=''; showVol(+this.dataset.li); refreshTotal(); };
   });
   Array.prototype.forEach.call(wrap.querySelectorAll('.line-del'), function(b){
     b.onclick=function(){ draft.lines.splice(+this.dataset.li,1); if(!draft.lines.length) draft.lines=[{prod:'',qty:''}]; renderLines(); refreshTotal(); };
   });
 }
+
+// The pack count with its volume beside it, so 50 packs of 20 L reads as 1 000 L.
+function volHint(l){
+  if(l.note) return BB.esc(l.note);
+  var v=(l.prod && l.qty)? d.volumeLabel(l.prod, l.qty) : '';
+  return v? '= '+BB.esc(v)+' in total' : '';
+}
+function showVol(i){ var el=document.querySelector('.line-vol[data-vl="'+i+'"]'); if(el) el.innerHTML=volHint(draft.lines[i]); }
 
 function refreshTotal(){ var el=document.getElementById('totVal'); if(el) el.textContent=BB.money(draftTotal()); refreshAccountStrip(); }
 
@@ -313,7 +328,7 @@ function applyParsed(text){
   var p = parseTranscript(text);
   if(p.farmer) draft.farmer = p.farmer;
   if(p.month!=='' && p.month!=null) draft.month = p.month;
-  if(p.lines.length) draft.lines = p.lines.map(function(l){ return {prod:l.prod, qty:l.qty}; });
+  if(p.lines.length) draft.lines = p.lines.map(function(l){ return {prod:l.prod, qty:l.qty, note:l.note||''}; });
   if(!draft.lines.length) draft.lines=[{prod:'',qty:''}];
   renderCapture();
   var bits=[];
@@ -380,9 +395,25 @@ function confirmOrder(){
   if(draft.month===''||draft.month==null){ need('fMonth','When should it be delivered?'); return; }
   var lines=draft.lines.filter(function(l){ return l.prod && Number(l.qty)>0; });
   if(!lines.length){ BB.toast('Add at least one product with a quantity'); return; }
+  reviewOrder(lines);
+}
+
+// One look before it goes to Operations: who, when, what (packs and volume) and the total.
+function reviewOrder(lines){
+  var f=d.farmer(draft.farmer), tot=lines.reduce(function(t,l){ return t+(d.product(l.prod).price||0)*Number(l.qty); },0);
+  BB.popup({ eyebrow:'Check before sending', title:'Order for '+f.name,
+    meta:[ { icon:'farm', text:f.farm, tip:'Farm' }, { icon:'calendar', text:BB.monthName(Number(draft.month))+' delivery', tip:'Delivery' }, { icon:'warehouse', text:d.depot(depotForFarmer(draft.farmer)).name, tip:'Depot' } ],
+    table:{ columns:['Product','Packs','Value'], num:[1,2],
+      rows:lines.map(function(l){ var p=d.product(l.prod); return { cells:[{ html:'<b>'+BB.esc(p.name)+'</b><div class="faint" style="font-size:.72rem;">'+BB.esc(p.pack||'')+'</div>' }, { html:BB.num(l.qty)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div>' }, BB.money((p.price||0)*Number(l.qty))] }; }),
+      foot:['Order total',{ html:'' },BB.money(tot)] },
+    actions:[ { label:'Edit', close:true }, { label:'Send to Operations', primary:true, onClick:function(){ BB.closePopup(); saveOrder(lines); } } ] });
+}
+
+function saveOrder(lines){
   var f=d.farmer(draft.farmer);
   var month = Number(draft.month);
   var depot = depotForFarmer(draft.farmer);
+  var sent = JSON.parse(JSON.stringify(draft));
   var rec = d.add('orders', {
     ref: nextRef(),
     farmer: draft.farmer,
@@ -395,10 +426,10 @@ function confirmOrder(){
     lines: lines.map(function(l){ return { prod:l.prod, qty:Number(l.qty) }; })
   });
   BB.toast('Order captured — Operations notified');
-  renderConfirmed(rec);
+  renderConfirmed(rec, sent);
 }
 
-function renderConfirmed(o){
+function renderConfirmed(o, sent){
   window.scrollTo(0,0);
   var f=d.farmer(o.farmer);
   var html='';
@@ -406,7 +437,8 @@ function renderConfirmed(o){
     '<div class="row" style="gap:8px;"><button class="btn" id="again">'+BB.icon('mic')+'Capture another</button>'+
     // the new order opens as its own card on Orders
     '<a class="btn ghost" href="orders.html?open='+encodeURIComponent(o.id)+'">'+BB.icon('receipt')+'Open the order</a>'+
-    '<a class="btn ghost" href="forecast.html">'+BB.icon('chart')+'See the forecast</a></div></div>';
+    '<a class="btn ghost" href="forecast.html">'+BB.icon('chart')+'See the forecast</a>'+
+    (sent?'<button class="btn ghost" id="takeBack" data-tip="Withdraw '+BB.esc(o.ref)+' and reopen it to edit">Take it back</button>':'')+'</div></div>';
 
   html += '<div class="split" style="margin-top:16px;align-items:start;"><div class="grid" style="align-content:start;">';
   html += '<div class="hero-band">'+
@@ -415,8 +447,8 @@ function renderConfirmed(o){
     '<div style="opacity:.9;font-size:.9rem;">'+BB.esc(f.name)+' — '+BB.esc(f.farm)+'</div></div>';
 
   html += '<div class="card"><div class="card-h"><div><h3>The order</h3><div class="sub">'+o.lines.length+' product'+(o.lines.length===1?'':'s')+'</div></div>'+BB.statusBadge(o.status)+'</div>';
-  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Pack</th><th class="num">Qty</th><th class="num">Line value</th></tr></thead><tbody>'+
-    o.lines.map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'</td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
+  html += '<div class="scroll"><table class="bb"><thead><tr><th>Product</th><th>Pack</th><th class="num">Packs</th><th class="num">Line value</th></tr></thead><tbody>'+
+    o.lines.map(function(l){ var p=d.product(l.prod); return '<tr><td>'+BB.esc(p.name)+'</td><td>'+BB.esc(p.pack)+'</td><td class="num">'+BB.num(l.qty)+'<div class="faint" style="font-size:.72rem;">'+BB.esc(d.volumeLabel(l.prod,l.qty))+'</div></td><td class="num">'+BB.money((p.price||0)*l.qty)+'</td></tr>'; }).join('')+
     '</tbody><tfoot><tr><td colspan="3">Order total</td><td class="num">'+BB.money(d.orderValue(o))+'</td></tr></tfoot></table></div></div>';
   html += '</div>';
 
@@ -433,6 +465,17 @@ function renderConfirmed(o){
   html += '</div>';
 
   document.getElementById('capMain').innerHTML=html;
+  var tb=document.getElementById('takeBack');
+  if(tb) tb.onclick=function(){
+    var cur=d.by('orders', o.id);
+    // once Operations has moved it on, it is theirs: change it from the order card instead
+    if(cur && cur.status!=='Pending'){ BB.toast(o.ref+' is already '+cur.status.toLowerCase()+' — change it from the order card'); return; }
+    BB.confirm('Withdraw '+o.ref+' and reopen it so you can change it?', { title:'Take the order back', ok:'Take it back' }).then(function(yes){
+      if(!yes) return;
+      d.remove('orders', o.id); draft=sent; renderCapture(); window.scrollTo(0,0);
+      BB.toast(o.ref+' withdrawn — make your changes and send again');
+    });
+  };
   document.getElementById('again').onclick=function(){
     draft={ farmer:'', month:'', lines:[{prod:'',qty:''}] };
     renderCapture();

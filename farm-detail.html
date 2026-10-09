@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Farm record · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
 /* Farm record — page-scoped */
 .cropchip{display:inline-block;padding:2px 8px;border-radius:20px;background:#eef6dc;color:var(--green-mid);font-size:.7rem;font-weight:600;margin:1px 2px 1px 0;}
@@ -85,7 +85,7 @@ if(!f){
   var wa = f.cell ? String(f.cell).replace(/\D/g,'').replace(/^0/,'27') : '';
   html += '<div class="page-head row between" style="gap:16px;">'+
     '<div style="min-width:0;"><div class="eyebrow">Farm record'+(f.region?' · '+esc(f.region):'')+'</div>'+
-      '<div class="h1row"><h1>'+esc(f.farm)+'</h1>'+BB.statusBadge(f.status)+BB.sampleChip(f)+'</div>'+
+      '<div class="h1row"><h1>'+esc(f.farm)+'</h1>'+BB.farmBadge(f)+BB.sampleChip(f)+'</div>'+
       '<p>'+esc(sub)+'</p>'+
       '<div class="facts">'+
         '<span><span class="k">Crops</span>'+(crops()||'<span class="faint">not captured yet</span>')+'</span>'+

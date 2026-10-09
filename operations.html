@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>Operations board · BioBrix OS</title>
 <meta name="theme-color" content="#22431a">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
 <style>
   .ops-kpi{margin-top:14px;}
   .ops-row{margin-top:16px;}
@@ -113,7 +113,7 @@ function orderPreview(o){
   return { wide:true, layout:'split', eyebrow:'Order · '+(o.source||'Portal'), title:o.ref,
     meta:[{ icon:'calendar', text:'Captured '+BB.date(o.date), tip:'Captured' }, mDepot(o.depot)].concat(mFarmer(o.farmer)).concat([mRep(o.rep)]),
     stats:[{ l:'Value', v:BB.money(d.orderValue(o)), s:'list' }, { l:'Status', html:BB.statusBadge(o.status) },
-      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.shortDate(dl.eta):dl.status.toLowerCase()+' · '+BB.shortDate(dl.eta)) : (o.status==='Delivered'?'delivered':'not booked') },
+      { l:'Delivery', v:BB.monthName(o.deliverMonth), s:dl? (dl.status==='Delivered'?'delivered '+BB.shortDate(dl.eta):dl.status.toLowerCase()+' · '+BB.shortDate(dl.eta)+(BB.lateDays(dl)?' · late '+BB.lateDays(dl)+'d':'')) : (o.status==='Delivered'?'delivered':'not booked') },
       { l:'Invoice', html: inv? '<span class="tag tag-inv">'+BB.icon('receipt')+'Invoiced</span>' : counted? '<span class="tag tag-uninv">'+BB.icon('receipt')+'Not yet</span>' : '<span class="faint">—</span>' }],
     html:hold? alertLine(hold.reason, hold.sev!=='high') : '', table:productLines(o),
     actions:[go('Farm record', farmHref(o.farmer)), go('Open order', 'orders.html?open='+encodeURIComponent(o.id), true)] };
@@ -140,7 +140,7 @@ function stockPreview(i){
 function deliveryPreview(x){
   var o=d.by('orders', x.order), hold=o&&d.deliveryHold(o), tr=x.transport&&x.transport!=='—'?x.transport:null;
   return { wide:!!o, layout:o?'split':null, eyebrow:'Delivery', title:o?o.ref:d.farmer(x.farmer).name,
-    meta:[{ icon:'calendar', text:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.date(x.eta), tip:x.status==='Delivered'?'Delivered':'ETA' }, mDepot(x.depot),
+    meta:[{ icon:'calendar', html:(x.status==='Delivered'?'Delivered ':'ETA ')+BB.etaHtml(x), tip:x.status==='Delivered'?'Delivered':'ETA' }, mDepot(x.depot),
       { icon:'truck', text:tr||'No transport yet', tip:'Transport', muted:!tr }].concat(mFarmer(x.farmer)),
     stats:[{ l:'Status', html:BB.statusBadge(x.status) }, { l:'Order value', v:o?BB.money(d.orderValue(o)):'—' }],
     html:hold? alertLine(hold.reason, hold.sev!=='high') : '', table:o?productLines(o):null,
@@ -268,7 +268,7 @@ if(sg && sg.live){
   BB.statDetail('ops-await', function(){ return ordersTile(orders.filter(function(o){ return o.status==='Awaiting stock'; }), 'orders.html'); });
   BB.statDetail('ops-low', function(){ return { table:lineTable(lowItems, true), actions:[go('Open the full list','stock.html',true), go('Reorder radar','suppliers.html')] }; });
   BB.statDetail('ops-transit', function(){ return { table:{ columns:['Order','Farmer','Depot','Transport','ETA'], rows:inTransit.map(function(x){ var o=d.by('orders', x.order);
-    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o?o.ref:'—')+'</span>' }, d.farmer(x.farmer).name, depShort(x.depot), x.transport||'—', BB.date(x.eta)], onClick:opens(function(){ return deliveryPreview(x); }) }; }) }, actions:[go('Open the full list','deliveries.html',true)] }; });
+    return { cells:[{ html:'<span style="white-space:nowrap">'+BB.esc(o?o.ref:'—')+'</span>' }, d.farmer(x.farmer).name, depShort(x.depot), x.transport||'—', { html:BB.etaHtml(x) }], onClick:opens(function(){ return deliveryPreview(x); }) }; }) }, actions:[go('Open the full list','deliveries.html',true)] }; });
   BB.statDetail('ops-blend', function(){ return { table:{ columns:['Recipe','Batch','Depot','For','Due','Status'], rows:blending.slice().sort(function(a,b){ return String(a.due).localeCompare(String(b.due)); }).map(function(b){
     return { cells:[b.recipe, b.batch, depShort(b.depot), d.farmer(b['for']).name, BB.date(b.due), badgeCell(b.status)], onClick:opens(function(){ return blendPreview(b); }) }; }) }, actions:[go('Open the full list','depots.html',true)] }; });
 }
@@ -461,7 +461,7 @@ depots.forEach(function(dep){
   depOk.push(items.length-low.length); depLow.push(low.length);
   depotList += '<a class="dep-row" href="stock.html" data-dep="'+BB.esc(dep.id)+'">'+
     '<div style="min-width:0;"><b>'+BB.esc(dep.name)+'</b><div class="faint" style="font-size:.74rem;">'+BB.esc(dep.region)+' · '+items.length+' lines</div></div>'+
-    '<div class="row" style="gap:8px;flex:none;">'+(low.length?'<span class="badge b-bad">'+low.length+' low</span>':'<span class="badge b-ok">All above</span>')+BB.statusBadge(dep.status)+'</div>'+
+    '<div class="row" style="gap:8px;flex:none;">'+(low.length?'<span class="badge '+(low.some(function(i){ return i.qty<=0; })?'b-bad':'b-warn')+'" data-tip="Amber: below reorder · red: something is out">'+low.length+' low</span>':'<span class="badge b-ok">All above</span>')+BB.statusBadge(dep.status)+'</div>'+
   '</a>';
 });
 depotList += '</div>';
@@ -472,7 +472,7 @@ html += '<div class="split ops-row">'+
 '</div>';
 chartJobs.push(function(){ BB.chart.bar('#chDepots', { labels:depots.map(function(x){ return x.name.replace(/ Depot$/,''); }), stacked:true, height:190, table:true,
   max:Math.max(4, Math.ceil(Math.max.apply(null, depOk.map(function(v,k){ return v+depLow[k]; }).concat([0]))/4)*4),
-  series:[{name:'Above reorder',values:depOk,color:'#3f6b28'},{name:'Below reorder',values:depLow,color:'#b8382a'}],
+  series:[{name:'Above reorder',values:depOk,color:'#3f6b28'},{name:'Below reorder',values:depLow,color:'#c77d17'}],
   // that depot's lines, lowest first
   detail:function(ctx){ return depotStock(depots[ctx.index]); } }); });
 
@@ -604,7 +604,7 @@ if(!inTransit.length){
       '<td><b style="color:var(--green-dark);">'+BB.esc(d.farmer(x.farmer).name)+'</b></td>'+
       '<td class="muted">'+BB.esc(d.depot(x.depot).name)+'</td>'+
       '<td class="muted">'+BB.esc(x.transport||'')+'</td>'+
-      '<td class="num muted">'+BB.date(x.eta)+'</td>'+
+      '<td class="num muted">'+BB.etaHtml(x)+'</td>'+
     '</tr>';
   });
   transitBody += '</tbody></table></div>';

@@ -10,10 +10,10 @@
 <meta name="theme-color" content="#22431a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="BioBrix">
-<script src="bb-config.js?v=redesign2"></script><script src="guard.js?v=redesign2"></script>
-<script src="bb-data.js?v=redesign2"></script>
-<script src="bb-shell.js?v=redesign2"></script>
-<script src="bb-intel.js?v=redesign2"></script>
+<script src="bb-config.js?v=redesign3"></script><script src="guard.js?v=redesign3"></script>
+<script src="bb-data.js?v=redesign3"></script>
+<script src="bb-shell.js?v=redesign3"></script>
+<script src="bb-intel.js?v=redesign3"></script>
 <style>
 /* ── Insights (moved from the Intelligence page) ── */
 .alert-list{max-height:440px;overflow:auto;}
@@ -23,6 +23,8 @@
 .alert .sv{width:8px;height:8px;border-radius:50%;flex:none;margin-top:7px;}
 .alert .tx{flex:1;min-width:0;font-size:.86rem;line-height:1.45;}
 .alert .badge{flex:none;}
+.alert .chev{flex:none;color:var(--faint);margin-top:2px;display:inline-flex;transition:transform .12s,color .12s;}.alert .chev svg{width:15px;height:15px;}
+.alert:hover .chev{color:var(--green);transform:translateX(2px);}
 /* rows that open a preview over the page */
 .pop-row{cursor:pointer;transition:background .12s;}
 .pop-row:hover{background:#fafcf7;}
@@ -159,20 +161,41 @@ var myOrders = orders.filter(function(o){return o.rep===u.rep;});
 var myProgs = d.where('programs',function(p){return p.advisor===u.rep&&p.status==='Active';});
 var blendHref = canGo('operations.html') ? 'operations.html' : 'depots.html';
 var popOrders = function(list){ return function(){ return { wide:true, table:orderTable(list) }; }; };
+// Quotes waiting for Rudie: the quoted price (list + markup), approved or declined right here.
+var popQuotes = function(){
+  var list = d.all('orders').filter(function(o){ return d.quoteStatus(o)==='Awaiting approval'; });
+  var tot = list.reduce(function(t,o){ return t+d.quoteTotal(o); },0);
+  var act = function(o, yes){
+    var undo=BB.snapshot('orders', o.id), q=Object.assign({}, o.quote, yes? { status:'Approved', approvedBy:u.name, approvedAt:new Date().toISOString().slice(0,10), approvedPct:d.quotePct(o) } : { status:'Declined', declinedBy:u.name });
+    d.update('orders', o.id, { quote:q });
+    BB.toast(o.ref+(yes?' approved — back to '+String(d.rep(o.rep).name).split(' ')[0]+' to send':' declined'), { undo:function(){ undo(); BB.popup(popQuotes()); }, undone:o.ref+' is waiting for approval again' });
+    BB.popup(popQuotes());
+  };
+  return { wide:true, eyebrow:'Orders', title:'Quotes to approve', sub: list.length? list.length+' waiting · '+BB.money(tot)+' quoted' : 'Nothing waiting — all quotes are dealt with.',
+    table: list.length? { columns:['Order','Farmer','Rep','Markup','Quoted','' ], num:[3,4],
+      rows:list.map(function(o){ var f=d.farmer(o.farmer);
+        return { cells:[o.ref, f.name+(f.farm&&f.farm!==f.name?' · '+f.farm:''), d.rep(o.rep).name, d.quotePct(o)+'%'+(o.quote.raisedFrom!=null?' (was '+o.quote.raisedFrom+'%)':''), { html:'<b>'+BB.money(d.quoteTotal(o))+'</b><div class="faint" style="font-size:.72rem;">list '+BB.money(d.orderValue(o))+'</div>' },
+          { html: isDir? '<span style="display:inline-flex;gap:6px;"><button class="btn sm" data-qa="'+o.id+'">'+BB.icon('check')+'Approve</button><button class="btn ghost sm" data-qd="'+o.id+'">Decline</button></span>' : '<span class="faint">waiting for Rudie</span>' }],
+          href:orderHref(o) }; }) } : null,
+    actions:[ canGo('orders.html')? { label:'Open Orders', href:'orders.html' } : null ].filter(Boolean),
+    onOpen:function(body){
+      body.querySelectorAll('button[data-qa],button[data-qd]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); e.stopPropagation();
+        var o=d.by('orders', b.dataset.qa||b.dataset.qd); if(o) act(o, !!b.dataset.qa); }; }); } };
+};
 var popSamples = function(){ return { table:sampleTable(soilIn, leafIn) }; };
 var popStock = function(){ return { table:stockTable(lowInv) }; };
 var popBlend = function(list){ return function(){ return { table:{ columns:['Recipe','Depot','Batch','For','Due','Status'], rows:list.map(function(b){ return { cells:[b.recipe, d.depot(b.depot).name, b.batch, d.farmer(b.for).farm, BB.date(b.due), { html:BB.statusBadge(b.status) }] }; }) } }; }; };
-var popDeliv = function(){ return { table:{ columns:['Order','Farm','Depot','ETA','Transport'], rows:transitD.map(function(x){ var o=d.by('orders',x.order)||{}; return { cells:[o.ref||'—', d.farmer(x.farmer).farm, d.depot(x.depot).name, BB.date(x.eta), x.transport||'—'], href:canGo('deliveries.html')?'deliveries.html':null }; }) } }; };
+var popDeliv = function(){ return { table:{ columns:['Order','Farm','Depot','ETA','Transport'], rows:transitD.map(function(x){ var o=d.by('orders',x.order)||{}; return { cells:[o.ref||'—', d.farmer(x.farmer).farm, d.depot(x.depot).name, { html:BB.etaHtml(x) }, x.transport||'—'], href:canGo('deliveries.html')?'deliveries.html':null }; }) } }; };
 var PULSE = {
   director: [
     {l:'Pipeline (forecast)', v:BB.money(forecastVal), s:openForecast.length+' open orders', href:canGo('forecast.html')?'forecast.html':'orders.html', pop:popOrders(openForecast)},
     {l:'Confirmed value', v:BB.money(confirmedVal), s:'this season', ok:1, href:'orders.html', pop:popOrders(confirmedO)},
-    {l:'Quotes to approve', v:awaitingQ.length, s:'in Orders — tap to approve', warn:awaitingQ.length>0, href:'orders.html', pop:popOrders(awaitingQ)},
+    {l:'Quotes to approve', v:awaitingQ.length, s:'in Orders — tap to approve', warn:awaitingQ.length>0, href:'orders.html', pop:popQuotes},
     {l:'Samples in', v:(newSoil+newLeaf), s:'soil + leaf to action', warn:(newSoil+newLeaf)>0, href:'bioanalyze-soil.html', pop:popSamples}
   ],
   advisor: [
     {l:'My farmers', v:myFarmers, s:u.region, href:'farms.html', pop:function(){ var fs=u.rep ? d.where('farmers',function(f){return f.rep===u.rep;}) : d.all('farmers');
-      return { table:{ columns:['Farmer','Farm','Town','Status'], rows:fs.map(function(f){ return { cells:[f.name, f.farm, f.town||'—', { html:BB.statusBadge(f.status||'') }], onClick:custRow(null, f.id).onClick }; }) } }; }},
+      return { table:{ columns:['Farmer','Farm','Town','Status'], rows:fs.map(function(f){ return { cells:[f.name, f.farm, f.town||'—', { html:BB.farmBadge(f) }], onClick:custRow(null, f.id).onClick }; }) } }; }},
     {l:'Samples to interpret', v:(newSoil+newLeaf), s:'soil + leaf', warn:(newSoil+newLeaf)>0, href:'bioanalyze-soil.html', pop:popSamples},
     {l:'Active programmes', v:myProgs.length, s:'BioConsult', href:'bioconsult.html', pop:function(){
       return { table:{ columns:['Farm','Crop','Season','Goal'], rows:myProgs.map(function(p){ return { cells:[d.farmer(p.farmer).farm, p.crop||'—', p.season||'—', p.goal||'—'], onClick:custRow(null, p.farmer).onClick }; }) } }; }},
@@ -421,7 +444,7 @@ if(BB.intel && BB.auth.can('intelligence')){
     '<div class="card"><div class="card-h"><div><h3>What needs you today</h3><div class="sub">most urgent first · across money, stock, samples and the field</div></div>'+
       '<span class="badge '+(nHigh?'b-bad':al.length?'b-warn':'b-ok')+'">'+(nHigh?nHigh+' high · ':'')+al.length+' total</span></div>'+
       (al.length? '<div class="alert-list">'+alShown.map(function(a, ai){ var s=SEV[a.sev]||SEV.low;
-        return '<a href="'+a.to+'" class="alert" data-al="'+ai+'"><span class="sv" style="background:'+s.c+';"></span><span class="tx">'+BB.esc(a.txt)+'</span><span class="badge '+s.b+'">'+s.t+'</span></a>'; }).join('')+'</div>'+
+        return '<a href="'+a.to+'" class="alert" data-al="'+ai+'"><span class="sv" style="background:'+s.c+';"></span><span class="tx">'+BB.esc(a.txt)+'</span><span class="badge '+s.b+'">'+s.t+'</span><span class="chev" aria-hidden="true">'+BB.icon('chevron')+'</span></a>'; }).join('')+'</div>'+
         (alRest>0?'<div class="card-f">and '+alRest+' more of lower priority.</div>':'')
       : '<div class="empty">Nothing needs you right now.</div>')+
     '</div>'+
@@ -500,7 +523,7 @@ if(sage && sage.live && (BB.auth.can('finance') || isDir)){
 // follow-ups: programme timing turned into dated reminders (advisor sees own; director sees all).
 // These run on the portal's own seeded farms. Once BioBrix is on their own figures their people
 // must never meet our example farmers, so the whole block stands down for a live client seat.
-if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && BB.auth.can('finance'))){
+if((isAdvisor || isDir) && !(clientLive && !fhSeat) && !(sage && sage.live && !sage.demo && BB.auth.can('finance'))){
   var fups = d.all('followups').filter(function(x){ return x.status!=='Done'; }).sort(function(a,b){ return (a.due||'').localeCompare(b.due||''); }).slice(0,5);
   var today0 = new Date(new Date().toISOString().slice(0,10));
   html += '<div class="card" style="margin-top:16px;" id="fuCard"><div class="card-h"><div><h3>Follow-ups due</h3><div class="sub">the farmer gets an email + WhatsApp nudge 3 days before, with the weather window</div></div><span class="badge b-warn">'+fups.length+' open</span></div>';
@@ -547,7 +570,8 @@ chartJobs.concat(insightJobs).forEach(function(f){ try{ f(); }catch(e){ console.
 
 
 Array.prototype.forEach.call(document.querySelectorAll('button[data-fudone]'), function(b){
-  b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); BB.toast('Follow-up done · '+d.farmer(fu.farmer).name); location.reload(); };
+  b.onclick=function(){ var fu=d.by('followups', this.dataset.fudone); if(!fu) return; BB.toastAcrossReload('Follow-up done · '+d.farmer(fu.farmer).name, 'followups', fu.id, 'Follow-up is open again');
+    d.update('followups', fu.id, { status:'Done', doneAt:new Date().toISOString().slice(0,10) }); location.reload(); };
 });
 // ---- Record cards: a ledger customer, a portal farm, a stock line, an order, a monitoring visit ----
 // Alerts, the chase list, follow-ups and the rows of the lists above all open one of these.
@@ -585,7 +609,7 @@ function farmCard(fid, o){
     meta:[ f.name&&f.name!==f.farm?{ icon:'user', text:f.name, tip:'Farmer' }:null, placeOf(f)?{ icon:'map', text:placeOf(f), tip:'Town' }:null,
       (f.crops||[]).length?{ icon:'sprout', text:f.crops.join(', ')+(f.ha?' · '+BB.num(f.ha)+' ha':''), tip:'Crops' }:null,
       repMeta(d.rep(f.rep)), phoneMeta(f.cell) ],
-    stats:[{ l:'Status', html:BB.statusBadge(f.status||'—') }, { l:'Balance', v:BB.money(bal), s:l.length+' open invoice'+(l.length===1?'':'s') },
+    stats:[{ l:'Status', html:BB.farmBadge(f) }, { l:'Balance', v:BB.money(bal), s:l.length+' open invoice'+(l.length===1?'':'s') },
       { l:'Credit limit', v:lim?BB.money(lim):'—', s:lim&&bal>lim?'over by '+BB.money(bal-lim):null, cls:lim&&bal>lim?'warn':'' },
       { l:'Orders', v:BB.num(os.length), s:os.length?BB.money(ov)+' this season':'none yet' }],
     html:alertLine(o.alert, o.sev), table:l.length?t:null,
