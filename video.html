@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Your BioBrix OS video · BioBrix OS</title>
+<meta name="theme-color" content="#22431a">
+<script src="bb-config.js?v=redesign7"></script><script src="guard.js?v=redesign7"></script>
+<script src="bb-data.js?v=redesign7"></script>
+<script src="bb-shell.js?v=redesign7"></script>
+<style>
+  .vid-card{overflow:hidden;}
+  .vid-card video{display:block;width:100%;height:auto;background:#0f1c0a;aspect-ratio:16/9;}
+  .vid-points{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+  .vid-points .stat .v{font-size:1rem;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3;}
+</style>
+</head>
+<body>
+<script>
+BB.renderHeader({ active:'home', back:'index.html' });
+var html =
+  '<div class="page-head"><div class="eyebrow">BioBrix OS</div><h1>Your BioBrix OS video</h1>'+
+  '<p>Just over four minutes, from the morning page to the farmer\'s own page.</p></div>'+
+  '<div class="card vid-card"><video controls playsinline preload="metadata" poster="media/walkthrough-poster.jpg">'+
+  '<source src="media/biobrix-os-walkthrough.mp4" type="video/mp4"></video></div>'+
+  '<div class="vid-points" style="margin-top:16px;">'+
+  ['Every morning|Your own page, what needs you today','Finance|Who owes what, before the truck leaves','Orders|Speak the order, it\'s captured','Forecast|Plan the season, see where to grow','Farms & BioServices|Soil, leaf and visits in one record','The farmer\'s page|Your farmers feel looked after'].map(function(s){
+    var p=s.split('|'); return '<div class="stat"><div class="l">'+p[0]+'</div><div class="v">'+p[1]+'</div></div>'; }).join('')+
+  '</div><div style="height:24px;"></div>';
+document.body.insertAdjacentHTML('beforeend', '<main class="wrap">'+html+'</main>');
+</script>
+</body>
+</html>

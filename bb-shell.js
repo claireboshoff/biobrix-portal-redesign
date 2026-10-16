@@ -725,6 +725,8 @@
     { key:'home', icon:'home', label:'Home', items:[
       { href:'index.html', icon:'home', label:'Today' },
       { href:'team.html', icon:'message', label:'Team feed', kw:'chat updates' },
+      { href:'video.html', icon:'monitor', label:'Your BioBrix OS video', kw:'walkthrough video' },
+      { href:'ways-to-pay.html', icon:'wallet', label:'Ways to pay', kw:'payment plan finance option months' },
       { href:'showcase.html', icon:'monitor', label:'Device showcase' } ]},
     { key:'sales', icon:'sales', label:'Sales', items:[
       { href:'voice-order.html', icon:'mic', label:'Capture an order', kw:'voice new order speak' },

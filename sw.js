@@ -4,14 +4,14 @@
    Data lives in localStorage (bb-data.js) so the app keeps working with no signal. */
 // Its own cache family: the preview shares an address with other BioBrix builds, so it only
 // ever clears its own old caches, never theirs.
-var CACHE = 'biobrix-redesign-v49';
+var CACHE = 'biobrix-redesign-v50';
 var SHELL = [
   'index.html','login.html','welcome.html','bb-config.js?v=redesign7','guard.js?v=redesign7','bb-data.js?v=redesign7','bb-shell.js?v=redesign7','bb-intel.js?v=redesign7','bb-ask.js?v=redesign7','bb-table.js?v=redesign7','manifest.json',
   'voice-order.html','forecast.html','territory.html','orders.html',
   'operations.html','stock.html','depots.html','suppliers.html','deliveries.html',
   'bioservices.html','farms.html','farm-detail.html','bioanalyze-soil.html',
   'bioanalyze-leaf.html','biowatch.html','bioconsult.html','products-library.html',
-  'forecast-plan.html','sales-report.html','commission.html','farm-files.html','client-portal.html','team.html','labels.html','document.html','showcase.html','finance.html','dispatch.html','jobs.html',
+  'forecast-plan.html','sales-report.html','commission.html','farm-files.html','client-portal.html','team.html','labels.html','document.html','showcase.html','finance.html','dispatch.html','jobs.html','video.html','ways-to-pay.html',
   'assets/hero-field.webp','assets/hero-field-clean.webp'
 ];
 self.addEventListener('install', function(e){
@@ -26,6 +26,8 @@ self.addEventListener('activate', function(e){
 self.addEventListener('fetch', function(e){
   if(e.request.method!=='GET') return;
   var req = e.request;
+  // video streams with range requests: straight to the network, never cached
+  if(/\.mp4(\?|$)/.test(req.url)) return;
   var isHTML = req.mode==='navigate' || (req.headers.get('accept')||'').indexOf('text/html')>=0;
   // app scripts + data files are tiny and change often: always fresh when online, cache only offline
   var isApp = /\.(js|json|txt)(\?|$)/.test(req.url) && req.url.indexOf(self.location.origin)===0;
